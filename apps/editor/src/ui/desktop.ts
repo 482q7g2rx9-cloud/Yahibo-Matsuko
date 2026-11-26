@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { ps } from './projectSettings';
 import { syncNativeMenu } from './menus';
 import { historyReset, historyTick } from './history';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
@@ -41,7 +42,7 @@ export function loadOpened(o){stopAll();Object.keys(E.els).forEach(dropEl);E.img
   P.media.forEach(function(m){queueJobs(m);});}
 /* 足りないもの（サムネイル・波形・プロキシ）を作ってもらう */
 export function queueJobs(m,force){if(!HOST||!m.file||m.missing||!m.path||!HOST.project.current)return;
-  var r={id:m.id,path:m.path,kind:m.k,duration:m.d||0,thumb:m.k!=='音声'&&(force||!m.thumb),peaks:m.k!=='画像'&&!m.noAudio&&(force||!m.peaks),proxy:!!m.np&&(force||!m.proxyPath)};
+  var r={id:m.id,path:m.path,kind:m.k,duration:m.d||0,thumb:m.k!=='音声'&&(force||!m.thumb),peaks:m.k!=='画像'&&!m.noAudio&&(force||!m.peaks),proxy:!!m.np&&(force||!m.proxyPath),proxyHeight:ps().proxy};
   if(!r.thumb&&!r.peaks&&!r.proxy)return;JOBS[m.id]=JOBS[m.id]||{};['thumb','peaks','proxy'].forEach(function(k){if(r[k])JOBS[m.id][k]=0;});
   HOST.media.process([r]).catch(function(e){delete JOBS[m.id];toast(String(e));});}
 /* ファイルのパスから読み込む（ダイアログ・ドロップ） */

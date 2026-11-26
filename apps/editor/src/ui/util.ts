@@ -9,7 +9,10 @@ export function h(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
 export function A(act,v){return ' data-a="'+act+'"'+(v!==undefined?' data-v="'+h(v)+'"':'');}
 export function hms(s){s=Math.round(s);return Math.floor(s/3600)+':'+('0'+Math.floor(s/60)%60).slice(-2)+':'+('0'+s%60).slice(-2);}
 export function mmss(s){s=Math.round(s||0);return Math.floor(s/60)+':'+(s%60<10?'0':'')+s%60;}
-export function tc(t){t=Math.max(0,t||0);function p(n){return (n<10?'0':'')+n;}return p(Math.floor(t/3600))+':'+p(Math.floor(t/60)%60)+':'+p(Math.floor(t)%60)+':'+p(Math.floor((t%1)*30+1e-6));}
+/* タイムコードのフレームの数え方（プロジェクト設定のフレームレートを丸めたもの。29.97 なら 30） */
+export var TCF=30;
+export function setTcFps(f){TCF=Math.max(1,Math.round(f||30));}
+export function tc(t){t=Math.max(0,t||0);function p(n){return (n<10?'0':'')+n;}return p(Math.floor(t/3600))+':'+p(Math.floor(t/60)%60)+':'+p(Math.floor(t)%60)+':'+p(Math.floor((t%1)*TCF+1e-6));}
 export function hm(d){d=d||new Date();return (d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();}
 export function mb(n){return n>=1e9?(n/1e9).toFixed(1)+' GB':n>=1e6?Math.round(n/1e6)+' MB':Math.max(1,Math.round(n/1e3))+' KB';}
 export function rng(seed){var x=seed||1;return function(){x=(x*16807)%2147483647;return (x-1)/2147483646;};}

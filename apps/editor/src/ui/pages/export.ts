@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { canvasAttrs, ps, seqWH } from '../projectSettings';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from '../data';
 import { M, P, progDur, uid } from '../project';
@@ -23,6 +24,9 @@ export function checks(){var o=[],d=progDur(),used={};P.clips.forEach(function(c
   var hid=P.tracks.filter(function(t){return t.kind==='v'?t.hide&&P.clips.some(function(c){return c.tr===t.id;}):!audible(t)&&P.clips.some(function(c){return c.tr===t.id;});});
   if(hid.length)o.push(['wn','トラック',hid.map(function(t){return t.id;}).join('・')+' は非表示・ミュートのため書き出されません']);
   var miss=Object.keys(used).map(M).filter(function(m){return m&&m.missing;});if(miss.length)o.push(['er','素材ファイル','見つからない素材 '+miss.length+'件（'+miss.map(function(m){return m.n;}).join('、')+'）。メディアページで「リンクし直す」を押してください']);
+  if(S.x&&!S.x.audio){var sw=seqWH(),xw=String(S.x.res).split('×').map(Number),sf=parseFloat(ps().fps),xf=parseFloat(S.x.fps);
+    if(xw[0]&&Math.abs(xw[0]/xw[1]-sw[0]/sw[1])>0.01)o.push(['wn','解像度','シーケンスは '+sw[0]+'×'+sw[1]+'、書き出しは '+S.x.res+' です。縦横の比率が違うので、黒い帯が付きます']);
+    if(xf&&sf&&Math.abs(xf-sf)>0.01)o.push(['wn','フレームレート','シーケンスは '+ps().fps+' fps、書き出しは '+S.x.fps+' です']);}
   var f=xFmt();o.push(f?['ok','書き出し形式',f[0]+(HOST?'　FFmpeg で書き出します':'　このブラウザで書き出せます')]:['er','書き出し形式','このブラウザは書き出しに対応していません（Chrome・Edge・Safari の新しい版で開いてください）']);
   return o;}
 export function newJob(){var f=xFmt(),rg=xRange();if(S.x.range==='イン点〜アウト点'&&P.pin==null&&P.pout==null){toast('編集ページで I・O キーを押して範囲を決めてください');return null;}if(rg[1]-rg[0]<0.5&&P.clips.length){toast('書き出す範囲が短すぎます');return null;}if(!f){toast('このブラウザでは書き出せません');return null;}if(!P.clips.length){toast('タイムラインにクリップがありません');return null;}
@@ -35,7 +39,7 @@ R.export=function(){
     ext=f?f[2]:'mp4',fmts=supported(x.audio?AM:VM).map(function(z){return z[0];});
   var pl=S.queue.filter(function(q){return q.id===S.xplay;})[0];
   var mon=pl?'<video src="'+pl.url+'" controls autoplay style="height:calc(225px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain;background:#000"></video><button class="b s" style="position:absolute;right:8px;top:8px"'+A('xback')+'>プレビューに戻る</button>'
-    :'<canvas data-prog width="960" height="540" style="height:calc(225px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain;display:block"></canvas>';
+    :'<canvas data-prog '+canvasAttrs()+' style="height:calc(225px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas>';
   return '<div class="pn l" style="width:280px">'+ph('書き出しプリセット（用途別）')+'<div class="scroll">'+D.presets.map(function(p,i){return '<div class="li'+(S.preset===i?' selr':'')+'" role="button" tabindex="0"'+A('preset',i)+' style="padding:16px 16px 14px;border-bottom:1px solid var(--dv)"><div style="font-size:13px">'+h(p.n)+'</div><div class="t2" style="margin-top:8px">'+h(p.d)+'</div></div>';}).join('')+
     '<div style="padding:14px">'+btn('＋ プリセットを追加','todo','','','','width:100%')+'</div></div></div>'+
   '<div class="pc">'+ph('プレビュー　シーケンス全体','<span class="x">'+(x.audio?'音声のみ':h(x.res)+'　'+h(x.fps))+'　'+mmss(dur)+'</span>')+

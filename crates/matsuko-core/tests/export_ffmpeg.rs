@@ -250,6 +250,7 @@ fn settings(from: f64, to: f64) -> Settings {
         audio_only: false,
         video_bitrate: 2_000_000,
         audio_bitrate: 128_000,
+        audio_rate: 48_000,
     }
 }
 
@@ -513,6 +514,7 @@ fn eight_minutes_faster_than_realtime() {
         audio_only: false,
         video_bitrate: 12_000_000,
         audio_bitrate: 192_000,
+        audio_rate: 48_000,
     };
     let out = work.join("8min.mp4");
     let encs: Vec<String> = ["libopenh264", "libx264"].map(String::from).to_vec();

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { frameSec, openProjectSettings, rebuildProxies, renderProjectSettings, setPs } from './projectSettings';
 import { openHistory, restoreHistory } from './history';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
@@ -77,7 +78,7 @@ ACT={
   kSet:function(v){S.capture=v;S.kFocus=v;renderPrefs();},kCancel:function(){S.capture=null;renderPrefs();},kReset:function(v){var k=KB.filter(function(x){return x[0]===v;})[0];if(k){KEYMAP[v]=k[3].slice();saveKeys();}renderPrefs();},
   kResetAll:function(){try{localStorage.removeItem('matsuko.keys');}catch(e){}loadKeys();renderPrefs();toast('ショートカットを初期設定に戻しました');},
   undo:undo,redo:redo,
-  sfb:function(){srcSeek(S.t.cut-1/30);},sff:function(){srcSeek(S.t.cut+1/30);},
+  sfb:function(){srcSeek(S.t.cut-frameSec());},sff:function(){srcSeek(S.t.cut+frameSec());},
   etab:function(v){S.etab=v;draw();},tool:function(v){S.tool=v;draw();if(v==='text')toast('タイムラインをクリックした位置にテロップを追加します');},
   sec:function(v){S.open[v]=!S.open[v];draw();},
   fxg:function(v){S.fxClosed[v]=!S.fxClosed[v];draw();},fxi:function(v){S.fx=v;draw();},ba:function(v){S.ba=v;draw();},kfm:function(v){S.kfMode=v;draw();},
@@ -85,7 +86,7 @@ ACT={
   mute:function(v){S.mute[v]=!S.mute[v];draw();},solo:function(v){S.solo[v]=!S.solo[v];draw();},
   rec:rec,stop:function(){if(REC){clearInterval(REC);setREC(null);draw();}},recTop:function(){S.rec=0;var e=document.querySelector('[data-rec]');if(e)e.textContent=tc(0);},
   play:function(){if(S.page==='cut')srcPlay();else if(S.page==='fx')fxPlay();else progPlay();},
-  prev:function(){jump(-1);},next:function(){jump(1);},fb:function(){if(E.playing)progStop();setProg(S.t.edit-1/30);},ff:function(){if(E.playing)progStop();setProg(S.t.edit+1/30);},
+  prev:function(){jump(-1);},next:function(){jump(1);},fb:function(){if(E.playing)progStop();setProg(S.t.edit-frameSec());},ff:function(){if(E.playing)progStop();setProg(S.t.edit+frameSec());},
   top:function(){setProg(0);},end:function(){setProg(progDur());},
   preset:function(v){S.preset=+v;S.x=presetX(S.preset);draw();},
   qadd:function(){var j=newJob();if(!j)return;if(HOST)return deskEnqueue(j,false);draw();toast('キューに追加しました');},
@@ -108,6 +109,7 @@ ACT={
   help:function(){toast('メディアで読み込み → カットでイン・アウトを決めて追加 → 編集で並べ替え・分割 → 出力で書き出し');},
   dlgOk:function(){document.getElementById('dlg').hidden=true;var f=ask.fn;ask.fn=null;if(f)f();},dlgNo:function(){document.getElementById('dlg').hidden=true;ask.fn=null;S.capture=null;if(S.page==='edit')draw();},
   hist:function(){openHistory();},hRestore:function(v){restoreHistory(v);},
+  psOpen:function(){openProjectSettings();},psTab:function(v){S.pstab=v;renderProjectSettings();},psSet:function(v){var i=v.indexOf('|');setPs(v.slice(0,i),v.slice(i+1));},psProxy:function(){rebuildProxies();},
   todo:function(){toast('この機能は、まだ使えません');}
 };
 }

@@ -88,6 +88,9 @@ pub struct ExportReq {
     audio_only: bool,
     video_bitrate: u64,
     audio_bitrate: u64,
+    /// 音声のサンプリング周波数（プロジェクト設定。既定は 48000）
+    #[serde(default)]
+    audio_rate: Option<u32>,
 }
 
 fn emit(app: &AppHandle, id: &str, st: &str, p: f64, data: Value) {
@@ -162,6 +165,7 @@ pub async fn export_start(app: AppHandle, req: ExportReq) -> Result<(), String> 
         audio_only: req.audio_only,
         video_bitrate: req.video_bitrate,
         audio_bitrate: req.audio_bitrate,
+        audio_rate: req.audio_rate.unwrap_or(48_000),
     };
     let encoders = h264_encoders().await;
     let cancel = Arc::new(AtomicBool::new(false));

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { frameSec } from './projectSettings';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { S } from './state';
 import { redo, undo } from './store';
@@ -33,10 +34,10 @@ export function runKey(a,e){var pg=S.page;
   if(pg==='cut'){var cm={pin:'setIn',pout:'setOut',fb:'sfb',ff:'sff'};if(cm[a]){e.preventDefault();ACT[cm[a]]();}
     else if((a==='delSel'||a==='rdel')&&primary()&&primary().tr==='V1'){e.preventDefault();ACT.rdel();}return;}
   if(pg!=='edit')return;e.preventDefault();
-  var step={fb:-1/30,ff:1/30,sb:-1,sf:1};if(a in step){if(E.playing)progStop();setProg(S.t.edit+step[a]);heads(true);return;}
+  var step={fb:-frameSec(),ff:frameSec(),sb:-1,sf:1};if(a in step){if(E.playing)progStop();setProg(S.t.edit+step[a]);heads(true);return;}
   if(a==='prev'||a==='next'){jump(a==='prev'?-1:1);return;}if(a==='top'||a==='end'){ACT[a]();heads(true);return;}
   var tool={tSel:'select',tSplit:'split',tHand:'hand'};if(tool[a]){S.tool=tool[a];draw();return;}
-  if(a==='nl'||a==='nr'){nudge(a==='nl'?-1/30:1/30);return;}
+  if(a==='nl'||a==='nr'){nudge(a==='nl'?-frameSec():frameSec());return;}
   if(a==='addTitle'){ACT.addTitle('name');return;}if(ACT[a])ACT[a]();}
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */

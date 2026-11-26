@@ -86,6 +86,8 @@ pub struct Settings {
     /// 映像・音声のビットレート（bps）
     pub video_bitrate: u64,
     pub audio_bitrate: u64,
+    /// 音声のサンプリング周波数（48000 か 44100。0 なら 48000）
+    pub audio_rate: u32,
 }
 
 /// 画面が作ったテロップの画像
@@ -440,6 +442,11 @@ fn audio_step(p: &Project, st: &Settings, f0: u64, f1: u64, output: &Path) -> St
     let fps = st.fps;
     let (t0, t1) = (fps.time(f0), fps.time(f1));
     let seconds = t1 - t0;
+    let rate = if st.audio_rate == 0 {
+        48_000
+    } else {
+        st.audio_rate
+    };
     let mut args: Vec<String> = HEAD.map(s).to_vec();
     let mut parts = vec![];
     let mut n = 0;
@@ -468,13 +475,14 @@ fn audio_step(p: &Project, st: &Settings, f0: u64, f1: u64, output: &Path) -> St
         let gain = 10f64.powf(c.vol.unwrap_or(0.0) / 20.0);
         let delay = ((a - t0) * 1000.0).round() as u64;
         parts.push(format!(
-            "[{n}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume={:.4},adelay={delay}:all=1[a{n}]",
+            "[{n}:a]aresample={rate},aformat=sample_fmts=fltp:channel_layouts=stereo,volume={:.4},adelay={delay}:all=1[a{n}]",
             gain
         ));
         n += 1;
     }
     let graph = if n == 0 {
-        args.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"].map(s));
+        args.extend(["-f", "lavfi", "-i"].map(s));
+        args.push(format!("anullsrc=r={rate}:cl=stereo"));
         format!("[0:a]atrim=0:{}[out]", f3(seconds))
     } else {
         let ins: String = (0..n).map(|i| format!("[a{i}]")).collect();
@@ -557,6 +565,7 @@ mod tests {
             audio_only: false,
             video_bitrate: 4_000_000,
             audio_bitrate: 192_000,
+            audio_rate: 48_000,
         }
     }
     /// テスト用：ファイルがあることにする（実在するパス）
@@ -800,6 +809,33 @@ mod tests {
             "libx264"
         )
         .is_err());
+    }
+
+    #[test]
+    fn audio_sample_rate_follows_the_project() {
+        let p = Project {
+            v: 2,
+            tracks: tracks(),
+            ..Default::default()
+        };
+        let st = Settings {
+            audio_only: true,
+            audio_rate: 44_100,
+            ..settings(0.0, 3.0)
+        };
+        let pl = plan(
+            &p,
+            &[],
+            &st,
+            Path::new("/w"),
+            Path::new("/o.m4a"),
+            "libx264",
+        )
+        .unwrap();
+        let Step::Audio { args, .. } = &pl.steps[0] else {
+            panic!()
+        };
+        assert!(args.join(" ").contains("anullsrc=r=44100"));
     }
 
     #[test]

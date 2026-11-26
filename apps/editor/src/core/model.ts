@@ -106,6 +106,20 @@ export interface Clip {
   sz?: string;
 }
 
+/** プロジェクト設定（プロジェクト → プロジェクト設定…）。足りない項目は初期値（1920×1080・29.97 fps・標準・720p・48 kHz） */
+export interface ProjectSettings {
+  /** シーケンスの解像度（例：1920×1080） */
+  res?: string;
+  /** フレームレート（例：29.97） */
+  fps?: string;
+  /** プレビューの画質：high・std・light */
+  pq?: 'high' | 'std' | 'light';
+  /** プロキシの高さ（540・720・1080） */
+  proxy?: number;
+  /** 音声のサンプリング周波数（48000・44100） */
+  ar?: number;
+}
+
 /** プロジェクト */
 export interface Project {
   v: 2;
@@ -117,6 +131,7 @@ export interface Project {
   /** 書き出し範囲のイン点・アウト点（秒） */
   pin?: number | null;
   pout?: number | null;
+  settings?: ProjectSettings;
 }
 
 /** 新しい id を作る関数（接頭辞を受け取る）。テストでは決まった順の id を返すものに差し替える */

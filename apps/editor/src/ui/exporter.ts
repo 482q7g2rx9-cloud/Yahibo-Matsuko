@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { ps } from './projectSettings';
 import { numberIn } from '../core/silence';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
@@ -57,7 +58,7 @@ export function titleImages(from,to,W,H){var out=[];P.clips.forEach(function(c){
     else{cv.height=H;drawTitle(cv.getContext('2d'),W,H,ti,c.start);}
     out.push({clip:c.id,png:cv.toDataURL('image/png'),scroll:scroll});});return out;}
 export function deskStart(j){var set=j.set,wh=set.res.split('×'),W=+wh[0]||1920,H=+wh[1]||1080,to=set.to!=null?set.to:progDur();
-  var req={id:j.id,out:j.out,project:forDisk(),titles:set.audio?[]:titleImages(set.from||0,to,W,H),width:W,height:H,fps:String(set.fps),from:set.from||0,to:to,audioOnly:!!set.audio,videoBitrate:Math.round(set.v||8e6),audioBitrate:Math.round(set.a||192e3)};
+  var req={id:j.id,out:j.out,project:forDisk(),titles:set.audio?[]:titleImages(set.from||0,to,W,H),width:W,height:H,fps:String(set.fps),from:set.from||0,to:to,audioOnly:!!set.audio,videoBitrate:Math.round(set.v||8e6),audioBitrate:Math.round(set.a||192e3),audioRate:ps().ar};
   j.st='run';j.p=0;j.t0=Date.now();X={j:j,run:true,desk:true};draw();
   HOST.export.start(req).catch(function(e){j.st='err';j.msg=String(e);X=null;draw();xNext();});}
 /* 進み具合・結果（"export-job"） */

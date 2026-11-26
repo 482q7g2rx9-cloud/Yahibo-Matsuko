@@ -1056,6 +1056,326 @@ function init$o() {
   HIST = [];
   REDO = [];
 }
+const SNAPSHOT_INTERVAL = 2 * 60 * 1e3;
+const SNAPSHOT_KEEP = 100;
+const KIND_LABEL = { auto: "自動", open: "開いたとき", restore: "復元する前" };
+const SNAP_MEDIA_KEYS = ["id", "n", "k", "d", "c", "r", "f", "inP", "outP", "marks", "rate", "sample", "file"];
+function slimForSnapshot(p) {
+  const media = p.media.map((m) => {
+    const o = {};
+    for (const k of SNAP_MEDIA_KEYS) if (m[k] !== void 0) o[k] = m[k];
+    return o;
+  });
+  return JSON.parse(JSON.stringify({ v: 2, sample: p.sample, media, tracks: p.tracks, clips: p.clips, pin: p.pin, pout: p.pout }));
+}
+const mmss$1 = (s) => {
+  s = Math.round(s || 0);
+  return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + s % 60;
+};
+function summarize(p) {
+  const len = p.clips.reduce((a, c) => Math.max(a, cEnd$1(c)), 0);
+  return `クリップ ${p.clips.length}・長さ ${mmss$1(len)}・素材 ${p.media.filter((m) => !m.sample).length}`;
+}
+function dueForSnapshot(lastAt2, now, interval = SNAPSHOT_INTERVAL) {
+  return lastAt2 == null || now - lastAt2 >= interval;
+}
+function sameContent(a, b) {
+  if (!a) return false;
+  return JSON.stringify(a.clips) === JSON.stringify(b.clips) && JSON.stringify(a.tracks) === JSON.stringify(b.tracks) && JSON.stringify(a.media.map((m) => [m.id, m.inP, m.outP, m.r, m.marks])) === JSON.stringify(b.media.map((m) => [m.id, m.inP, m.outP, m.r, m.marks])) && a.pin === b.pin && a.pout === b.pout;
+}
+function toPrune(list, keep = SNAPSHOT_KEEP) {
+  return list.slice().sort((a, b) => b.at - a.at || b.id - a.id).slice(keep).map((s) => s.id);
+}
+function restoreFrom(cur, snap2) {
+  const now = new Map(cur.media.map((m) => [m.id, m]));
+  const media = cur.media.map((m) => {
+    const old = snap2.media.find((x) => x.id === m.id);
+    if (!old) return m;
+    return { ...m, inP: old.inP, outP: old.outP, r: old.r, marks: old.marks, rate: old.rate };
+  });
+  const clips = snap2.clips.filter((c) => c.type !== "media" || c.m != null && now.has(c.m));
+  return {
+    project: { ...cur, media, tracks: JSON.parse(JSON.stringify(snap2.tracks)), clips: JSON.parse(JSON.stringify(clips)), pin: snap2.pin, pout: snap2.pout },
+    dropped: snap2.clips.length - clips.length
+  };
+}
+function formatTime(at, today = Date.now()) {
+  const d = new Date(at), t = new Date(today);
+  const hm2 = (d.getHours() < 10 ? "0" : "") + d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes();
+  const same = d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+  return same ? "今日 " + hm2 : d.getMonth() + 1 + "/" + d.getDate() + " " + hm2;
+}
+var last = null, lastAt = null;
+var store = {
+  add: function(at, kind, summary, data) {
+    if (HOST) return HOST.history.add(at, kind, summary, data);
+    return IDB.op("history", "readwrite", function(st) {
+      return st.add({ at, kind, summary, data });
+    });
+  },
+  list: function() {
+    if (HOST) return HOST.history.list();
+    return IDB.op("history", "readonly", function(st) {
+      return st.getAll();
+    }).then(function(all) {
+      return (all || []).map(function(r) {
+        return { id: r.id, at: r.at, kind: r.kind, summary: r.summary };
+      }).sort(function(a, b) {
+        return b.at - a.at || b.id - a.id;
+      });
+    });
+  },
+  get: function(id) {
+    if (HOST) return HOST.history.get(id);
+    return IDB.op("history", "readonly", function(st) {
+      return st.get(id);
+    }).then(function(r) {
+      return r ? r.data : null;
+    });
+  },
+  del: function(ids) {
+    if (!ids.length) return Promise.resolve();
+    if (HOST) return HOST.history.del(ids);
+    return IDB.op("history", "readwrite", function(st) {
+      ids.forEach(function(id) {
+        st.delete(id);
+      });
+      return null;
+    });
+  }
+};
+function ready() {
+  return HOST ? !!HOST.project.current : !!(IDB && IDB.db);
+}
+function historyReset() {
+  last = null;
+  lastAt = null;
+}
+function historyTick(kind) {
+  kind = kind || "auto";
+  if (!ready()) return Promise.resolve(null);
+  var now = Date.now();
+  if (kind === "auto" && !dueForSnapshot(lastAt, now)) return Promise.resolve(null);
+  var s = slimForSnapshot(P);
+  if (kind !== "restore" && sameContent(last, s)) return Promise.resolve(null);
+  last = s;
+  lastAt = now;
+  return Promise.resolve(store.add(now, kind, summarize(P), s)).then(function(id) {
+    return store.list().then(function(L) {
+      return store.del(toPrune(L));
+    }).then(function() {
+      return id;
+    });
+  }).catch(function() {
+    return null;
+  });
+}
+function openHistory() {
+  if (!ready()) return toast(HOST ? "プロジェクトを開くと、変更履歴が残るようになります" : "このブラウザでは変更履歴を使えません");
+  var d = document.getElementById("dlg");
+  d.innerHTML = '<div class="dlg hist" role="dialog" aria-modal="true" aria-labelledby="dlgT"><h2 id="dlgT">変更履歴・復元</h2><p class="mu">編集しているあいだ、2分ごとにプロジェクトの写しを残しています（新しい順に100件）。戻したい時点の「復元」を押してください。復元したあとも、Ctrl+Z で元に戻せます。</p><div class="hlist" data-hlist><div class="mu" style="padding:16px">読み込んでいます…</div></div><div class="row" style="justify-content:flex-end;margin-top:16px">' + btn("閉じる", "dlgNo", "", "pri") + "</div></div>";
+  d.hidden = false;
+  d.querySelector('[data-a="dlgNo"]').focus();
+  Promise.resolve(store.list()).then(function(L) {
+    var box = d.querySelector("[data-hlist]");
+    if (!box) return;
+    box.innerHTML = L.length ? L.map(function(r) {
+      return '<div class="hsnap"><span>' + h(formatTime(r.at)) + '</span><span class="chip ' + (r.kind === "auto" ? "c-mu" : "c-in") + '">' + h(KIND_LABEL[r.kind] || r.kind) + '</span><span class="t2">' + h(r.summary) + "</span>" + btn("復元", "hRestore", r.id + "|" + r.at, "s") + "</div>";
+    }).join("") : '<div class="mu" style="padding:16px">まだ履歴がありません。編集すると、2分ごとに残ります。</div>';
+  }).catch(function(e) {
+    var box = d.querySelector("[data-hlist]");
+    if (box) box.innerHTML = '<div class="t-wn" style="padding:16px">変更履歴を読み込めませんでした：' + h(String(e)) + "</div>";
+  });
+}
+function restoreHistory(v) {
+  var p = String(v).split("|"), id = +p[0], at = +p[1];
+  ask("この時点に戻す", "「" + formatTime(at) + "」の状態に戻します。いまの状態は「復元する前」として履歴に残り、Ctrl+Z でも元に戻せます。", "復元", function() {
+    Promise.resolve(store.get(id)).then(function(snap2) {
+      if (!snap2) return toast("その履歴は見つかりませんでした");
+      return historyTick("restore").then(function() {
+        mark();
+        var r = restoreFrom(P, snap2);
+        Object.keys(E.els).forEach(dropEl);
+        setP(r.project);
+        S.sel = [];
+        last = slimForSnapshot(P);
+        lastAt = Date.now();
+        changed();
+        toast(r.dropped ? "復元しました（いまはない素材のクリップ " + r.dropped + "件は戻せませんでした）" : "「" + formatTime(at) + "」の状態に復元しました");
+      });
+    }).catch(function(e) {
+      toast("復元できませんでした：" + e);
+    });
+  });
+}
+var SRC;
+var SIM;
+function srcEl(m) {
+  if (SRC.id !== m.id) {
+    if (SRC.el) {
+      SRC.el.pause();
+      SRC.el.removeAttribute("src");
+      SRC.el.load();
+    }
+    SRC.el = null;
+    SRC.id = m.id;
+    SRC.playing = false;
+  }
+  if (!SRC.el && m.url && m.k === "映像") {
+    var v = document.createElement("video");
+    if (HOST) v.crossOrigin = "anonymous";
+    v.preload = "auto";
+    v.playsInline = true;
+    v.src = m.url;
+    v.style.cssText = "width:100%;height:100%;object-fit:contain;display:block;background:#000";
+    v.addEventListener("loadedmetadata", function() {
+      try {
+        v.currentTime = Math.min(S.t.cut, v.duration || 0);
+      } catch (x) {
+      }
+    });
+    v.addEventListener("pause", function() {
+      SRC.playing = false;
+      syncPlayBtn();
+    });
+    SRC.el = v;
+  }
+  return SRC.el;
+}
+function srcPlay() {
+  var m = M(S.src);
+  if (!m) return;
+  var el = m.url ? srcEl(m) : null;
+  if (el) {
+    if (!el.paused) {
+      el.pause();
+      return;
+    }
+    if (S.t.cut >= TOTAL.cut - 0.05) S.t.cut = 0;
+    el.currentTime = S.t.cut;
+    var pr = el.play();
+    if (pr && pr.catch) pr.catch(function() {
+    });
+    SRC.playing = true;
+    syncPlayBtn();
+    (function loop() {
+      if (el.paused) {
+        SRC.playing = false;
+        syncPlayBtn();
+        return;
+      }
+      setT("cut", el.currentTime);
+      SRC.raf = requestAnimationFrame(loop);
+    })();
+    return;
+  }
+  if (SIM) {
+    clearInterval(SIM);
+    SIM = null;
+    SRC.playing = false;
+    syncPlayBtn();
+    return;
+  }
+  SRC.playing = true;
+  syncPlayBtn();
+  SIM = setInterval(function() {
+    var t = S.t.cut + 0.1;
+    if (t >= TOTAL.cut) {
+      clearInterval(SIM);
+      SIM = null;
+      SRC.playing = false;
+      syncPlayBtn();
+      return;
+    }
+    setT("cut", t);
+  }, 100);
+}
+function srcSeek(t) {
+  setT("cut", t);
+  var m = M(S.src);
+  if (m && m.url && SRC.el && SRC.id === m.id) {
+    try {
+      SRC.el.currentTime = S.t.cut;
+    } catch (x) {
+    }
+  }
+}
+var FXP;
+function fxPlay() {
+  if (FXP) {
+    clearInterval(FXP);
+    FXP = null;
+    syncPlayBtn();
+    return;
+  }
+  FXP = setInterval(function() {
+    var t = S.t.fx + 0.1;
+    if (t >= TOTAL.fx) t = 0;
+    setT("fx", t);
+  }, 100);
+  syncPlayBtn();
+}
+function setT(k, t) {
+  var tot = TOTAL[k];
+  S.t[k] = Math.max(0, Math.min(tot, t));
+  var pct = S.t[k] / tot * 100;
+  [].forEach.call(document.querySelectorAll('[data-head="' + k + '"]'), function(e) {
+    e.style.left = pct + "%";
+  });
+  [].forEach.call(document.querySelectorAll('[data-time="' + k + '"]'), function(e) {
+    if (!e.classList.contains("tch") || e.textContent) e.textContent = tc(S.t[k]);
+  });
+}
+function stopAll() {
+  if (E.playing) progStop();
+  if (SRC.el && !SRC.el.paused) SRC.el.pause();
+  if (SIM) {
+    clearInterval(SIM);
+    SIM = null;
+  }
+  SRC.playing = false;
+  if (FXP) {
+    clearInterval(FXP);
+    FXP = null;
+  }
+  if (REC) {
+    clearInterval(REC);
+    REC = null;
+  }
+  syncPlayBtn();
+}
+function syncPlayBtn() {
+  var on = S.page === "cut" ? SRC.playing : S.page === "fx" ? !!FXP : E.playing;
+  [].forEach.call(document.querySelectorAll(".ib.play"), function(b) {
+    b.classList.toggle("on", on);
+    b.innerHTML = ic(on ? "pause" : "play");
+    b.setAttribute("aria-label", on ? "一時停止" : "再生");
+  });
+}
+var REC;
+function rec() {
+  if (REC) {
+    clearInterval(REC);
+    REC = null;
+    draw();
+    return;
+  }
+  REC = setInterval(function() {
+    S.rec += 0.1;
+    var e = document.querySelector("[data-rec]");
+    if (e) e.textContent = tc(S.rec);
+  }, 100);
+  draw();
+}
+function setREC(v) {
+  REC = v;
+}
+function init$n() {
+  SRC = { el: null, id: null, playing: false, raf: 0 };
+  SIM = null;
+  FXP = null;
+  REC = null;
+}
 var IMP;
 function kindOf(f) {
   var t = f.type || "", n = f.name.toLowerCase();
@@ -1251,176 +1571,8 @@ function openPicker() {
   i.value = "";
   i.click();
 }
-function init$n() {
-  IMP = { total: 0, done: 0, cur: "" };
-}
-var SRC;
-var SIM;
-function srcEl(m) {
-  if (SRC.id !== m.id) {
-    if (SRC.el) {
-      SRC.el.pause();
-      SRC.el.removeAttribute("src");
-      SRC.el.load();
-    }
-    SRC.el = null;
-    SRC.id = m.id;
-    SRC.playing = false;
-  }
-  if (!SRC.el && m.url && m.k === "映像") {
-    var v = document.createElement("video");
-    if (HOST) v.crossOrigin = "anonymous";
-    v.preload = "auto";
-    v.playsInline = true;
-    v.src = m.url;
-    v.style.cssText = "width:100%;height:100%;object-fit:contain;display:block;background:#000";
-    v.addEventListener("loadedmetadata", function() {
-      try {
-        v.currentTime = Math.min(S.t.cut, v.duration || 0);
-      } catch (x) {
-      }
-    });
-    v.addEventListener("pause", function() {
-      SRC.playing = false;
-      syncPlayBtn();
-    });
-    SRC.el = v;
-  }
-  return SRC.el;
-}
-function srcPlay() {
-  var m = M(S.src);
-  if (!m) return;
-  var el = m.url ? srcEl(m) : null;
-  if (el) {
-    if (!el.paused) {
-      el.pause();
-      return;
-    }
-    if (S.t.cut >= TOTAL.cut - 0.05) S.t.cut = 0;
-    el.currentTime = S.t.cut;
-    var pr = el.play();
-    if (pr && pr.catch) pr.catch(function() {
-    });
-    SRC.playing = true;
-    syncPlayBtn();
-    (function loop() {
-      if (el.paused) {
-        SRC.playing = false;
-        syncPlayBtn();
-        return;
-      }
-      setT("cut", el.currentTime);
-      SRC.raf = requestAnimationFrame(loop);
-    })();
-    return;
-  }
-  if (SIM) {
-    clearInterval(SIM);
-    SIM = null;
-    SRC.playing = false;
-    syncPlayBtn();
-    return;
-  }
-  SRC.playing = true;
-  syncPlayBtn();
-  SIM = setInterval(function() {
-    var t = S.t.cut + 0.1;
-    if (t >= TOTAL.cut) {
-      clearInterval(SIM);
-      SIM = null;
-      SRC.playing = false;
-      syncPlayBtn();
-      return;
-    }
-    setT("cut", t);
-  }, 100);
-}
-function srcSeek(t) {
-  setT("cut", t);
-  var m = M(S.src);
-  if (m && m.url && SRC.el && SRC.id === m.id) {
-    try {
-      SRC.el.currentTime = S.t.cut;
-    } catch (x) {
-    }
-  }
-}
-var FXP;
-function fxPlay() {
-  if (FXP) {
-    clearInterval(FXP);
-    FXP = null;
-    syncPlayBtn();
-    return;
-  }
-  FXP = setInterval(function() {
-    var t = S.t.fx + 0.1;
-    if (t >= TOTAL.fx) t = 0;
-    setT("fx", t);
-  }, 100);
-  syncPlayBtn();
-}
-function setT(k, t) {
-  var tot = TOTAL[k];
-  S.t[k] = Math.max(0, Math.min(tot, t));
-  var pct = S.t[k] / tot * 100;
-  [].forEach.call(document.querySelectorAll('[data-head="' + k + '"]'), function(e) {
-    e.style.left = pct + "%";
-  });
-  [].forEach.call(document.querySelectorAll('[data-time="' + k + '"]'), function(e) {
-    if (!e.classList.contains("tch") || e.textContent) e.textContent = tc(S.t[k]);
-  });
-}
-function stopAll() {
-  if (E.playing) progStop();
-  if (SRC.el && !SRC.el.paused) SRC.el.pause();
-  if (SIM) {
-    clearInterval(SIM);
-    SIM = null;
-  }
-  SRC.playing = false;
-  if (FXP) {
-    clearInterval(FXP);
-    FXP = null;
-  }
-  if (REC) {
-    clearInterval(REC);
-    REC = null;
-  }
-  syncPlayBtn();
-}
-function syncPlayBtn() {
-  var on = S.page === "cut" ? SRC.playing : S.page === "fx" ? !!FXP : E.playing;
-  [].forEach.call(document.querySelectorAll(".ib.play"), function(b) {
-    b.classList.toggle("on", on);
-    b.innerHTML = ic(on ? "pause" : "play");
-    b.setAttribute("aria-label", on ? "一時停止" : "再生");
-  });
-}
-var REC;
-function rec() {
-  if (REC) {
-    clearInterval(REC);
-    REC = null;
-    draw();
-    return;
-  }
-  REC = setInterval(function() {
-    S.rec += 0.1;
-    var e = document.querySelector("[data-rec]");
-    if (e) e.textContent = tc(S.rec);
-  }, 100);
-  draw();
-}
-function setREC(v) {
-  REC = v;
-}
 function init$m() {
-  SRC = { el: null, id: null, playing: false, raf: 0 };
-  SIM = null;
-  FXP = null;
-  REC = null;
+  IMP = { total: 0, done: 0, cur: "" };
 }
 const SILENCE_PAD = 0.1;
 const SILENCE_MIN_MARK = 0.2;
@@ -1603,7 +1755,7 @@ function xTick() {
   heads();
   var f = document.querySelector('[data-q="' + x.j.id + '"]'), tx = document.querySelector('[data-qt="' + x.j.id + '"]');
   if (f) f.style.width = x.j.p + "%";
-  if (tx) tx.textContent = Math.round(x.j.p) + "%　残り約" + mmss$1(x.dur - x.t);
+  if (tx) tx.textContent = Math.round(x.j.p) + "%　残り約" + mmss(x.dur - x.t);
 }
 function xPause() {
   if (!X) return;
@@ -1668,7 +1820,7 @@ function titleImages(from, to, W, H) {
 }
 function deskStart(j) {
   var set = j.set, wh = set.res.split("×"), W = +wh[0] || 1920, H = +wh[1] || 1080, to = set.to != null ? set.to : progDur();
-  var req = { id: j.id, out: j.out, project: forDisk(), titles: set.audio ? [] : titleImages(set.from || 0, to, W, H), width: W, height: H, fps: String(set.fps), from: set.from || 0, to, audioOnly: !!set.audio, videoBitrate: Math.round(set.v || 8e6), audioBitrate: Math.round(set.a || 192e3) };
+  var req = { id: j.id, out: j.out, project: forDisk(), titles: set.audio ? [] : titleImages(set.from || 0, to, W, H), width: W, height: H, fps: String(set.fps), from: set.from || 0, to, audioOnly: !!set.audio, videoBitrate: Math.round(set.v || 8e6), audioBitrate: Math.round(set.a || 192e3), audioRate: ps().ar };
   j.st = "run";
   j.p = 0;
   j.t0 = Date.now();
@@ -1692,7 +1844,7 @@ function deskEvent(e) {
     j.p = e.p * 100;
     var f = document.querySelector('[data-q="' + j.id + '"]'), tx = document.querySelector('[data-qt="' + j.id + '"]'), el = (Date.now() - j.t0) / 1e3;
     if (f) f.style.width = j.p + "%";
-    if (tx) tx.textContent = Math.round(j.p) + "%" + (e.p > 0.03 ? "　残り約" + mmss$1(el * (1 - e.p) / e.p) : "");
+    if (tx) tx.textContent = Math.round(j.p) + "%" + (e.p > 0.03 ? "　残り約" + mmss(el * (1 - e.p) / e.p) : "");
     return;
   }
   if (e.state === "done") {
@@ -1703,7 +1855,7 @@ function deskEvent(e) {
     j.out = d.out;
     j.url = HOST.media.url(d.out);
     j.secs = d.elapsed;
-    toast("「" + j.n + "」の書き出しが終わりました（" + mmss$1(d.elapsed) + "）");
+    toast("「" + j.n + "」の書き出しが終わりました（" + mmss(d.elapsed) + "）");
   } else {
     j.st = "err";
     j.msg = d.message || "失敗しました";
@@ -1809,7 +1961,7 @@ function tlText(m) {
   P.clips.slice().sort(function(a, b) {
     return a.start - b.start;
   }).forEach(function(c) {
-    if (c.m === m.id) o.push(c.tr + "　" + mmss$1(c.start) + "–" + mmss$1(cEnd(c)));
+    if (c.m === m.id) o.push(c.tr + "　" + mmss(c.start) + "–" + mmss(cEnd(c)));
   });
   return o.length ? o.slice(0, 4).join(" / ") + (o.length > 4 ? " ほか" : "") : "—";
 }
@@ -1825,10 +1977,10 @@ function init$k() {
     };
     if (!P.media.length) body = '<div class="scroll" style="display:flex;align-items:center;justify-content:center"><div style="text-align:center;line-height:2"><div style="font-size:15px;font-weight:500">素材がまだありません</div><div class="mu">動画・音声・画像のファイルを、この画面へドラッグするか「＋ 読み込み」から選んでください。</div><div style="margin-top:10px">' + btn("＋ 読み込み", "imp", "", "pri") + "</div></div></div>";
     else if (S.mview === "list") body = '<div class="mt h"><span></span><span>名前</span><span>種別</span><span>長さ</span><span>記号</span><span>権利</span><span>台本行</span><span>状態</span></div><div class="scroll">' + L.map(function(x) {
-      return '<div class="mt r li' + (m && x.id === m.id ? " selr" : "") + '" role="button" tabindex="0"' + A("mrow", x.id) + ' title="ダブルクリックでタイムラインに追加">' + mthumb(x, 64, 36) + '<span style="font-size:13px">' + h(x.n) + tag(x) + '</span><span class="t2">' + h(x.k) + "</span><span>" + (x.d ? mmss$1(x.d) : "—") + "</span><span>" + h(x.c) + "</span><span>" + rightsChip(x) + '</span><span class="mu">' + h(x.sr) + "</span><span>" + (HOST && x.file ? '<span data-pxt="' + x.id + '" data-short>' + (jobText(x, 1) || useText(x)) + "</span>" : useText(x)) + "</span></div>";
+      return '<div class="mt r li' + (m && x.id === m.id ? " selr" : "") + '" role="button" tabindex="0"' + A("mrow", x.id) + ' title="ダブルクリックでタイムラインに追加">' + mthumb(x, 64, 36) + '<span style="font-size:13px">' + h(x.n) + tag(x) + '</span><span class="t2">' + h(x.k) + "</span><span>" + (x.d ? mmss(x.d) : "—") + "</span><span>" + h(x.c) + "</span><span>" + rightsChip(x) + '</span><span class="mu">' + h(x.sr) + "</span><span>" + (HOST && x.file ? '<span data-pxt="' + x.id + '" data-short>' + (jobText(x, 1) || useText(x)) + "</span>" : useText(x)) + "</span></div>";
     }).join("") + (L.length ? "" : '<div class="mu" style="padding:24px">該当する素材はありません</div>') + "</div>";
     else body = '<div class="scroll"><div class="thg">' + L.map(function(x) {
-      return '<div class="tc li' + (m && x.id === m.id ? " selr" : "") + '" role="button" tabindex="0"' + A("mrow", x.id) + ">" + mthumb(x, "fill") + '<div style="margin-top:6px;font-size:13px">' + h(x.n) + tag(x) + '</div><div class="row" style="gap:8px;margin-top:4px"><span class="mu">' + h(x.k) + "　" + (x.d ? mmss$1(x.d) : "—") + '</span><span class="grow"></span>' + rightsChip(x) + "</div></div>";
+      return '<div class="tc li' + (m && x.id === m.id ? " selr" : "") + '" role="button" tabindex="0"' + A("mrow", x.id) + ">" + mthumb(x, "fill") + '<div style="margin-top:6px;font-size:13px">' + h(x.n) + tag(x) + '</div><div class="row" style="gap:8px;margin-top:4px"><span class="mu">' + h(x.k) + "　" + (x.d ? mmss(x.d) : "—") + '</span><span class="grow"></span>' + rightsChip(x) + "</div></div>";
     }).join("") + "</div></div>";
     var jf = HOST && !IMP.total ? jobsFoot() : "", foot = jf ? jf : IMP.total ? "<span>読み込み中：" + h(IMP.cur) + '</span><div class="prog" style="width:200px"><i style="width:' + Math.round(IMP.done / IMP.total * 100) + '%"></i></div><span class="t-ac">' + IMP.done + " / " + IMP.total + '</span><span class="grow"></span>' : '<span class="mu">ファイルをこの画面へドラッグしても読み込めます（動画・音声・画像）</span><span class="grow"></span><span class="mu">読み込んだ素材 ' + P.media.filter(function(x) {
       return x.file;
@@ -1849,271 +2001,6 @@ function init$k() {
       return '<option value="' + o[0] + '"' + (S.msort === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
     }).join("") + '</select><span class="grow"></span><span class="seg">' + btn("リスト", "mview", "list", S.mview === "list" ? "on" : "") + btn("サムネイル", "mview", "thumb", S.mview === "thumb" ? "on" : "") + "</span>" + btn("＋ 読み込み", "imp") + "</div>" + body + '<div class="row" style="height:44px;flex:none;gap:12px;padding:0 16px;border-top:1px solid var(--dv);background:var(--bg2)">' + foot + '</div></div><div class="pn r" style="width:320px">' + (right || ph("素材の詳細")) + "</div>";
   };
-}
-var PREF;
-function savePref() {
-  try {
-    localStorage.setItem("matsuko.pref", JSON.stringify(PREF));
-  } catch (e) {
-  }
-}
-function openPrefs(tab) {
-  closeMenu();
-  S.ptab = tab || S.ptab || "general";
-  S.capture = null;
-  renderPrefs();
-}
-function prefRow(label, ctl, note) {
-  return '<div class="prow"><div><div>' + label + "</div>" + (note ? '<div class="mu" style="margin-top:2px">' + note + "</div>" : "") + "</div><div>" + ctl + "</div></div>";
-}
-function renderPrefs() {
-  var d = document.getElementById("dlg"), t = S.ptab, body = "";
-  if (t === "general") body = "<h3>一般</h3>" + prefRow("テーマ", '<span class="seg">' + [["light", "ライト"], ["dark", "ダーク"], ["system", "システムに合わせる"]].map(function(x) {
-    return btn(x[1], "pTheme", x[0], "s" + (S.theme === x[0] ? " on" : ""));
-  }).join("") + "</span>") + prefRow("表示サイズ", '<span class="seg">' + [[1.25, "大"], [1, "デフォルト"], [0.85, "小"]].map(function(x) {
-    return btn(x[1], "pUi", x[0], "s" + (PREF.ui === x[0] ? " on" : ""));
-  }).join("") + "</span>", "文字や部品の大きさです（大 125%・デフォルト 100%・小 85%）。ウインドウを大きくすると、広くなった分だけ作業スペース（プレビューやタイムライン）が広がります。ウインドウが小さいときは、全体を縮小して収めます。") + prefRow("アクセントカラー", '<span class="row" style="gap:8px">' + [["blue", "青", "#378ef0"], ["green", "緑", "#2d9d78"], ["orange", "オレンジ", "#e68619"], ["purple", "紫", "#9256d9"]].map(function(x) {
-    return '<button class="sw' + (S.accent === x[0] ? " on" : "") + '" aria-label="' + x[1] + '" aria-pressed="' + (S.accent === x[0]) + '" title="' + x[1] + '"' + A("pAcc", x[0]) + ' style="background:' + x[2] + '"></button>';
-  }).join("") + "</span>");
-  else if (t === "timeline") body = "<h3>タイムライン</h3>" + prefRow("スナップ", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"' + (PREF.snap ? " checked" : "") + ">最初から入れておく</label>", "クリップの端・再生ヘッド・イン点／アウト点に吸い付きます。編集中は " + (keyOf("snapT") || "—") + " キーで切り替えられます。") + prefRow("再生中の表示", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"' + (PREF.follow ? " checked" : "") + ">再生ヘッドを追いかける</label>", "再生ヘッドが画面の外に出たら、タイムラインを自動で動かします。");
-  else {
-    var groups = [];
-    KB.forEach(function(k) {
-      if (groups.indexOf(k[1]) < 0) groups.push(k[1]);
-    });
-    body = '<h3>ショートカット</h3><div class="mu" style="margin-bottom:10px;line-height:1.6">「変更」を押してから、割り当てたいキーを押してください。Esc で取り消します。ほかの動作で使っているキーを選ぶと、そちらからは外れます。</div>' + groups.map(function(g) {
-      return '<div class="pgrp">' + g + "</div>" + KB.filter(function(k) {
-        return k[1] === g;
-      }).map(function(k) {
-        var cap = S.capture === k[0], keys = KEYMAP[k[0]], custom = JSON.stringify(keys) !== JSON.stringify(k[3]);
-        return '<div class="krow' + (cap ? " cap" : "") + '" data-krow="' + k[0] + '"><span>' + h(k[2]) + '</span><span class="row" style="gap:4px;flex-wrap:wrap">' + (cap ? '<span class="t-ac">キーを押してください…</span>' : keys.length ? keys.map(function(c) {
-          return "<kbd>" + h(keyLabel(c)) + "</kbd>";
-        }).join("") : '<span class="mu">なし</span>') + '</span><span class="row" style="gap:4px;justify-content:flex-end">' + (cap ? btn("取り消し", "kCancel", "", "s") : btn("変更", "kSet", k[0], "s")) + (custom && !cap ? btn("戻す", "kReset", k[0], "s") : "") + "</span></div>";
-      }).join("");
-    }).join("") + '<div class="pgrp">マウスなど（変えられません）</div>' + MOUSE.map(function(m) {
-      return '<div class="krow"><span>' + h(m[1]) + "</span><span><kbd>" + h(m[0]) + "</kbd></span><span></span></div>";
-    }).join("") + '<div class="row" style="justify-content:flex-end;margin-top:12px">' + btn("すべて初期設定に戻す", "kResetAll", "", "s") + "</div>";
-  }
-  d.innerHTML = '<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">環境設定</h2>' + btn("閉じる", "dlgNo", "", "s") + '</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">' + [["general", "一般"], ["timeline", "タイムライン"], ["keys", "ショートカット"]].map(function(x) {
-    return "<button" + (t === x[0] ? ' aria-current="true"' : "") + A("ptab", x[0]) + ">" + x[1] + "</button>";
-  }).join("") + '</nav><div class="pcont">' + body + "</div></div></div>";
-  d.hidden = false;
-  var sc = d.querySelector(".pcont");
-  if (sc && renderPrefs.st && renderPrefs.tab === t) sc.scrollTop = renderPrefs.st;
-  renderPrefs.tab = t;
-  if (sc) sc.addEventListener("scroll", function() {
-    renderPrefs.st = sc.scrollTop;
-  });
-  var fr = S.kFocus && d.querySelector('[data-krow="' + S.kFocus + '"]');
-  if (fr) fr.scrollIntoView({ block: "nearest" });
-}
-function assignKey(id, c) {
-  KB.forEach(function(k) {
-    if (k[0] !== id) {
-      var i = KEYMAP[k[0]].indexOf(c);
-      if (i >= 0) {
-        KEYMAP[k[0]].splice(i, 1);
-        toast("「" + keyLabel(c) + "」を「" + k[2] + "」から外しました");
-      }
-    }
-  });
-  KEYMAP[id] = [c];
-  saveKeys();
-}
-function init$j() {
-  PREF = { snap: true, follow: true, ui: 1 };
-  try {
-    var pf = JSON.parse(localStorage.getItem("matsuko.pref") || "{}");
-    if (typeof pf.snap === "boolean") PREF.snap = pf.snap;
-    if (typeof pf.follow === "boolean") PREF.follow = pf.follow;
-    if ([0.85, 1, 1.25].indexOf(pf.ui) >= 0) PREF.ui = pf.ui;
-    else if (pf.ui === 0.8 || pf.ui === 0.9) PREF.ui = 0.85;
-  } catch (e) {
-  }
-  S.snap = PREF.snap;
-}
-var KB;
-var MOUSE;
-var IS_MAC;
-var KEYMAP;
-function loadKeys() {
-  KEYMAP = {};
-  KB.forEach(function(k) {
-    KEYMAP[k[0]] = k[3].slice();
-  });
-  try {
-    var o = JSON.parse(localStorage.getItem("matsuko.keys") || "{}");
-    Object.keys(o).forEach(function(id) {
-      if (KEYMAP[id] && Array.isArray(o[id])) KEYMAP[id] = o[id];
-    });
-  } catch (e) {
-  }
-}
-function saveKeys() {
-  var o = {};
-  KB.forEach(function(k) {
-    if (JSON.stringify(KEYMAP[k[0]]) !== JSON.stringify(k[3])) o[k[0]] = KEYMAP[k[0]];
-  });
-  try {
-    localStorage.setItem("matsuko.keys", JSON.stringify(o));
-  } catch (e) {
-  }
-}
-function comboOf(e) {
-  var k = e.key;
-  if (!k || ["Control", "Shift", "Alt", "Meta", "Dead", "Process", "Unidentified"].indexOf(k) >= 0) return null;
-  if (k === " ") k = "Space";
-  else if (k.length === 1) k = k.toUpperCase();
-  var sym = k.length === 1 && !/[A-Z0-9]/.test(k), p = [];
-  if (e.ctrlKey || e.metaKey) p.push("Ctrl");
-  if (e.altKey) p.push("Alt");
-  if (e.shiftKey && !sym) p.push("Shift");
-  p.push(k);
-  return p.join("+");
-}
-function keyLabel(c) {
-  if (!c) return "";
-  return c.split("+").map(function(x) {
-    return { Ctrl: IS_MAC ? "⌘" : "Ctrl", Alt: IS_MAC ? "⌥" : "Alt", Shift: IS_MAC ? "⇧" : "Shift", ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓", Space: "Space", Escape: "Esc" }[x] || x;
-  }).join(IS_MAC ? "" : "+");
-}
-function keyOf(id) {
-  return KEYMAP[id] && KEYMAP[id][0] ? keyLabel(KEYMAP[id][0]) : "";
-}
-function actionFor(c) {
-  for (var i = 0; i < KB.length; i++) if (KEYMAP[KB[i][0]].indexOf(c) >= 0) return KB[i][0];
-  return null;
-}
-var KEY_GLOBAL;
-function runKey(a, e) {
-  var pg = S.page;
-  if (KEY_GLOBAL[a]) {
-    e.preventDefault();
-    KEY_GLOBAL[a]();
-    return;
-  }
-  if (a === "undo" || a === "redo") {
-    e.preventDefault();
-    a === "undo" ? undo() : redo();
-    return;
-  }
-  if (a === "play") {
-    if (["edit", "export", "cut", "fx"].indexOf(pg) >= 0) {
-      e.preventDefault();
-      ACT.play();
-    }
-    return;
-  }
-  if (pg === "cut") {
-    var cm = { pin: "setIn", pout: "setOut", fb: "sfb", ff: "sff" };
-    if (cm[a]) {
-      e.preventDefault();
-      ACT[cm[a]]();
-    } else if ((a === "delSel" || a === "rdel") && primary() && primary().tr === "V1") {
-      e.preventDefault();
-      ACT.rdel();
-    }
-    return;
-  }
-  if (pg !== "edit") return;
-  e.preventDefault();
-  var step = { fb: -1 / 30, ff: 1 / 30, sb: -1, sf: 1 };
-  if (a in step) {
-    if (E.playing) progStop();
-    setProg(S.t.edit + step[a]);
-    heads(true);
-    return;
-  }
-  if (a === "prev" || a === "next") {
-    jump(a === "prev" ? -1 : 1);
-    return;
-  }
-  if (a === "top" || a === "end") {
-    ACT[a]();
-    heads(true);
-    return;
-  }
-  var tool = { tSel: "select", tSplit: "split", tHand: "hand" };
-  if (tool[a]) {
-    S.tool = tool[a];
-    draw();
-    return;
-  }
-  if (a === "nl" || a === "nr") {
-    nudge(a === "nl" ? -1 / 30 : 1 / 30);
-    return;
-  }
-  if (a === "addTitle") {
-    ACT.addTitle("name");
-    return;
-  }
-  if (ACT[a]) ACT[a]();
-}
-function init$i() {
-  KB = [
-    ["play", "再生", "再生／停止", ["Space"]],
-    ["fb", "再生", "1 フレーム戻る", ["ArrowLeft"]],
-    ["ff", "再生", "1 フレーム進む", ["ArrowRight"]],
-    ["sb", "再生", "1 秒戻る", ["Shift+ArrowLeft"]],
-    ["sf", "再生", "1 秒進む", ["Shift+ArrowRight"]],
-    ["prev", "再生", "前の編集点へ", ["ArrowUp"]],
-    ["next", "再生", "次の編集点へ", ["ArrowDown"]],
-    ["top", "再生", "先頭へ", ["Home"]],
-    ["end", "再生", "最後へ", ["End"]],
-    ["pin", "再生", "イン点（編集：書き出し範囲／カット：ソース）", ["I"]],
-    ["pout", "再生", "アウト点", ["O"]],
-    ["tSel", "道具", "選択ツール", ["V"]],
-    ["tSplit", "道具", "分割ツール", ["C"]],
-    ["tHand", "道具", "ハンドツール", ["H"]],
-    ["addTitle", "道具", "テロップを追加", ["T"]],
-    ["snapT", "道具", "スナップの入／切", ["N"]],
-    ["split", "編集", "再生ヘッドで分割", ["S"]],
-    ["delSel", "編集", "削除（すき間を残す）", ["Delete", "Backspace"]],
-    ["rdel", "編集", "削除して詰める", ["Shift+Delete", "Shift+Backspace"]],
-    ["nl", "編集", "選んだクリップを左へ 1 フレーム", ["Alt+ArrowLeft"]],
-    ["nr", "編集", "選んだクリップを右へ 1 フレーム", ["Alt+ArrowRight"]],
-    ["cut2", "編集", "切り取り", ["Ctrl+X"]],
-    ["copy", "編集", "コピー", ["Ctrl+C"]],
-    ["paste", "編集", "再生ヘッドに貼り付け", ["Ctrl+V"]],
-    ["dup", "編集", "すぐ後ろに複製", ["Ctrl+D"]],
-    ["selAll", "編集", "すべて選択", ["Ctrl+A"]],
-    ["lnk", "編集", "リンク／リンク解除", ["Ctrl+L"]],
-    ["undo", "編集", "元に戻す", ["Ctrl+Z"]],
-    ["redo", "編集", "やり直し", ["Ctrl+Y", "Ctrl+Shift+Z"]],
-    ["zin", "表示", "タイムラインを拡大", ["+", "=", ";"]],
-    ["zout", "表示", "タイムラインを縮小", ["-"]],
-    ["zfit", "表示", "タイムライン全体を表示", ["\\", "¥"]],
-    ["save", "ファイル", "保存", ["Ctrl+S"]],
-    ["imp", "ファイル", "素材を読み込む", ["Ctrl+I"]],
-    ["toExport", "ファイル", "書き出し", ["Ctrl+M"]],
-    ["prefs", "ファイル", "環境設定", ["Ctrl+,"]]
-  ];
-  MOUSE = [
-    ["クリック", "選ぶ（リンクしたクリップも一緒に）"],
-    ["Shift／Ctrl＋クリック", "選択に足す・外す"],
-    ["Alt＋クリック", "リンク先を含めずに選ぶ"],
-    ["何もないところからドラッグ", "囲んで選ぶ"],
-    ["ドラッグ", "移動（トラックの間も）。重なった部分は上書き"],
-    ["Ctrl を押しながら離す", "挿入（後ろをずらす）"],
-    ["Alt を押しながら離す", "複製して置く"],
-    ["端をドラッグ", "長さの調整（Ctrl でリップル）"],
-    ["Ctrl＋ホイール", "タイムラインの拡大・縮小"],
-    ["Shift＋ホイール", "タイムラインを横に動かす"],
-    ["Esc", "選択を外す"],
-    ["Alt＋1〜7", "ページを切り替える"]
-  ];
-  IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || "");
-  KEYMAP = {};
-  loadKeys();
-  KEY_GLOBAL = { save: function() {
-    ACT.save();
-  }, imp: function() {
-    openPicker();
-  }, toExport: function() {
-    go("export");
-  }, prefs: function() {
-    openPrefs();
-  } };
 }
 var ROWS;
 var EYE, LOCK;
@@ -2276,7 +2163,7 @@ function inspector() {
     var tot = L.reduce(function(a2, x) {
       return a2 + cLen(x);
     }, 0);
-    return { name: L.length + " 個を選択", html: fsec("clip", "選んだクリップ", null, kv("数", L.length + " 個") + kv("合計の長さ", mmss$1(tot)) + '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">' + btn("削除", "delSel", "", "s") + btn("リップル削除", "rdel", "", "s") + btn(L.some(function(x) {
+    return { name: L.length + " 個を選択", html: fsec("clip", "選んだクリップ", null, kv("数", L.length + " 個") + kv("合計の長さ", mmss(tot)) + '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">' + btn("削除", "delSel", "", "s") + btn("リップル削除", "rdel", "", "s") + btn(L.some(function(x) {
       return x.link;
     }) ? "リンク解除" : "リンク", "lnk", "", "s") + btn("コピー", "copy", "", "s") + "</div>") };
   }
@@ -2284,7 +2171,7 @@ function inspector() {
   var m = c.m ? M(c.m) : null, a = pair ? L.filter(function(x) {
     return T(x.tr).kind === "a";
   })[0] : T(c.tr).kind === "a" ? c : null, v = T(c.tr).kind === "v" ? c : null;
-  var info = kv("素材", h(m ? m.n : c.label || "—")) + kv("トラック", c.tr + (a && v ? " / " + a.tr : "")) + kv("開始", tc(c.start)) + (c.type === "media" ? kv("イン", tc(c.in)) + kv("アウト", tc(c.out)) : "") + kv("長さ", mmss$1(cLen(c))) + '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">' + btn("再生ヘッドで分割", "split", "", "s") + btn("削除", "delSel", "", "s") + btn("リップル削除", "rdel", "", "s") + (c.link || pair ? btn("リンク解除", "lnk", "", "s") : "") + "</div>";
+  var info = kv("素材", h(m ? m.n : c.label || "—")) + kv("トラック", c.tr + (a && v ? " / " + a.tr : "")) + kv("開始", tc(c.start)) + (c.type === "media" ? kv("イン", tc(c.in)) + kv("アウト", tc(c.out)) : "") + kv("長さ", mmss(cLen(c))) + '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">' + btn("再生ヘッドで分割", "split", "", "s") + btn("削除", "delSel", "", "s") + btn("リップル削除", "rdel", "", "s") + (c.link || pair ? btn("リンク解除", "lnk", "", "s") : "") + "</div>";
   var h2 = fsec("clip", "クリップ", null, info);
   if (v && v.type === "media") h2 += fsec("motion", "モーション・不透明度", null, motionForm(v), 1);
   if (a) h2 += fsec("audio", "音量", null, numRow("音量", a, "vol"));
@@ -2323,7 +2210,7 @@ function xRange() {
   }
   return [0, d];
 }
-function init$h() {
+function init$j() {
   ROWS = [];
   EYE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8z"/></svg>';
   LOCK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0110 0v3h1v11H6V10zm2 0h6V7a3 3 0 00-6 0z"/></svg>';
@@ -2345,14 +2232,14 @@ function init$h() {
         return !S.eq || m.n.indexOf(S.eq) >= 0;
       }).map(function(m) {
         var r = D.rights[m.r] || ["—", ""], can = m.url && !m.loading || m.sample && m.k !== "音声" && m.k !== "テイク";
-        return '<div style="position:relative"' + (can ? ' data-am="' + m.id + '"' : "") + '><div class="tb" style="cursor:' + (can ? "grab" : "default") + ";background:" + (m.thumb ? "#000 url(" + m.thumb + ") center / cover" : m.k === "音声" ? "#2f6b45" : m.k === "テイク" ? "#5a4a8a" : (m.col || ["#555"])[0]) + '"><span>' + m.k + "</span><span>" + (m.k === "画像" ? "" : mmss$1(m.d)) + "</span></div>" + (can ? '<button class="b s" aria-label="「' + h(m.n) + '」をタイムラインに追加" title="タイムラインに追加"' + A("addtl", m.id) + ' style="position:absolute;right:4px;top:4px;width:24px;height:24px;padding:0;border-radius:50%">' + ic("plus", 14) + "</button>" : "") + '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (m.k === "音声" ? h(m.c) + " " : "") + h(m.n) + '</div><div class="' + (m.r === "wn" ? "t-wn" : "t-ok") + '">' + r[0] + "</div></div>";
+        return '<div style="position:relative"' + (can ? ' data-am="' + m.id + '"' : "") + '><div class="tb" style="cursor:' + (can ? "grab" : "default") + ";background:" + (m.thumb ? "#000 url(" + m.thumb + ") center / cover" : m.k === "音声" ? "#2f6b45" : m.k === "テイク" ? "#5a4a8a" : (m.col || ["#555"])[0]) + '"><span>' + m.k + "</span><span>" + (m.k === "画像" ? "" : mmss(m.d)) + "</span></div>" + (can ? '<button class="b s" aria-label="「' + h(m.n) + '」をタイムラインに追加" title="タイムラインに追加"' + A("addtl", m.id) + ' style="position:absolute;right:4px;top:4px;width:24px;height:24px;padding:0;border-radius:50%">' + ic("plus", 14) + "</button>" : "") + '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (m.k === "音声" ? h(m.c) + " " : "") + h(m.n) + '</div><div class="' + (m.r === "wn" ? "t-wn" : "t-ok") + '">' + r[0] + "</div></div>";
       }).join("") + "</div>" + (L.length ? "" : '<div class="mu" style="padding:0 16px">「＋ 読込」で動画・音声・画像を読み込めます。</div>') + "</div>";
     } else left = '<div class="scroll" style="padding:14px;display:flex;flex-direction:column;gap:8px">' + (S.etab === "text" ? '<div class="mu" style="line-height:1.6">押すと、再生ヘッドの位置にテロップを追加します（T キーでも追加できます）。</div>' : "") + D.templates[S.etab].map(function(t, i) {
       var st = ["name", "q", "sub", "credit"][i];
       return S.etab === "text" ? '<div class="card" role="button" tabindex="0"' + A("addTitle", st) + "><b>" + h(t[0]) + '　<span style="display:inline;color:var(--ac)">＋ 追加</span></b><span>' + h(t[1]) + "</span></div>" : '<div class="card"><b>' + h(t[0]) + "</b><span>" + h(t[1]) + "</span></div>";
     }).join("") + "</div>";
     var tools = [["select", "選択", keyOf("tSel")], ["split", "分割", keyOf("tSplit")], ["trash", "削除", ""], ["hand", "ハンド", keyOf("tHand")], ["text", "文字", ""]], ins = inspector(), rngOn = P.pin != null || P.pout != null;
-    return '<div class="pn l" style="width:' + pw("editL") + 'px">' + splitter("editL", "l") + ph("素材") + tabs([["assets", "アセット"], ["templates", "テンプレート"], ["text", "テロップ"], ["audio", "音声"]], S.etab, "etab", "素材の種類") + left + '</div><div class="pc" style="background:var(--bg0)"><div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">' + ph("プレビュー", '<span class="x">全長 ' + mmss$1(progDur()) + "</span>") + '<div class="mon" style="flex:1;min-height:0"><canvas data-prog width="960" height="540" style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain;display:block"></canvas></div><div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">' + tc(S.t.edit) + '</span><span class="mid">' + ibtn("inPt", "イン点を設定（I キー）", "pin") + ibtn("outPt", "アウト点を設定（O キー）", "pout") + '<span class="vsep"></span>' + ibtn("prevCut", "前の編集点へ（↑）", "prev") + ibtn("back", "1フレーム戻る（←）", "fb") + playBtn(E.playing) + ibtn("fwd", "1フレーム進む（→）", "ff") + ibtn("nextCut", "次の編集点へ（↓）", "next") + '<span class="vsep"></span>' + ibtn("split", "再生ヘッドで分割（S キー）", "split") + '</span><span class="end row" style="justify-content:flex-end;gap:6px">フル画質' + ibtn("full", "全画面", "todo") + '</span></div></div><div style="flex:1;min-height:0;display:flex"><div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px;background:var(--bg1);border-right:1px solid var(--ln)">' + tools.map(function(t) {
+    return '<div class="pn l" style="width:' + pw("editL") + 'px">' + splitter("editL", "l") + ph("素材") + tabs([["assets", "アセット"], ["templates", "テンプレート"], ["text", "テロップ"], ["audio", "音声"]], S.etab, "etab", "素材の種類") + left + '</div><div class="pc" style="background:var(--bg0)"><div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">' + ph("プレビュー", '<span class="x">全長 ' + mmss(progDur()) + "</span>") + '<div class="mon" style="flex:1;min-height:0"><canvas data-prog ' + canvasAttrs() + ' style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas></div><div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">' + tc(S.t.edit) + '</span><span class="mid">' + ibtn("inPt", "イン点を設定（I キー）", "pin") + ibtn("outPt", "アウト点を設定（O キー）", "pout") + '<span class="vsep"></span>' + ibtn("prevCut", "前の編集点へ（↑）", "prev") + ibtn("back", "1フレーム戻る（←）", "fb") + playBtn(E.playing) + ibtn("fwd", "1フレーム進む（→）", "ff") + ibtn("nextCut", "次の編集点へ（↓）", "next") + '<span class="vsep"></span>' + ibtn("split", "再生ヘッドで分割（S キー）", "split") + '</span><span class="end row" style="justify-content:flex-end;gap:6px"><button class="b s" style="height:24px;padding:0 8px;border:0;background:none;color:var(--mu)" title="プレビューの画質（プロジェクト設定で変えられます）"' + A("psOpen") + ">" + pqLabel() + "</button>" + ibtn("full", "全画面", "todo") + '</span></div></div><div style="flex:1;min-height:0;display:flex"><div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px;background:var(--bg1);border-right:1px solid var(--ln)">' + tools.map(function(t) {
       var on = S.tool === t[0];
       return '<button aria-label="' + t[1] + '" title="' + t[1] + (t[2] ? "（" + t[2] + " キー）" : "") + '" aria-pressed="' + on + '"' + A("tool", t[0]) + ' style="width:38px;height:44px;padding:0;border:0;border-radius:4px;background:' + (on ? "var(--bg4)" : "transparent") + ";color:" + (on ? "var(--ac)" : "var(--tx2)") + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">' + ic(t[0], 16) + '<span style="font-size:10px;color:var(--tx2)">' + t[1] + "</span></button>";
     }).join("") + '</div><div style="flex:1;min-width:0;display:flex;flex-direction:column"><div class="row tlbar"><button class="b s' + (S.snap ? " on" : "") + '" aria-pressed="' + S.snap + '"' + A("snapT") + ' title="スナップ（N キー）">スナップ</button>' + btn("＋ トラック", "addTrk", "", "s", "トラックを追加") + (rngOn ? '<span class="t-ac" style="margin-left:6px">書き出し範囲 ' + tc(P.pin || 0) + " – " + tc(P.pout != null ? P.pout : progDur()) + "</span>" + btn("範囲を消去", "pclear", "", "s") : "") + '</div><div class="tl tl2" data-tlwrap>' + tlInner() + '</div><div class="tlfoot"><button aria-label="縮小" title="縮小（' + keyOf("zout") + '）"' + A("zout") + '>−</button><input type="range" min="0" max="100" value="' + zoomVal() + '" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（' + keyOf("zin") + '）"' + A("zin") + '>＋</button></div></div></div></div><div class="pn r" style="width:' + pw("editR") + 'px">' + splitter("editR", "r") + ph("インスペクタ", '<span class="x">' + h(ins.name) + "</span>") + '<div class="scroll">' + ins.html + (P.sample ? '<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>' : "") + "</div></div>";
@@ -2589,8 +2476,90 @@ function zoomTo(p, at) {
   S.tlx = Math.max(0, at * p - px);
   drawTL();
 }
-function init$g() {
+function init$i() {
   EPS = 1e-6;
+}
+var PREF;
+function savePref() {
+  try {
+    localStorage.setItem("matsuko.pref", JSON.stringify(PREF));
+  } catch (e) {
+  }
+}
+function openPrefs(tab) {
+  closeMenu();
+  S.ptab = tab || S.ptab || "general";
+  S.capture = null;
+  renderPrefs();
+}
+function prefRow(label, ctl, note) {
+  return '<div class="prow"><div><div>' + label + "</div>" + (note ? '<div class="mu" style="margin-top:2px">' + note + "</div>" : "") + "</div><div>" + ctl + "</div></div>";
+}
+function renderPrefs() {
+  var d = document.getElementById("dlg"), t = S.ptab, body = "";
+  if (t === "general") body = "<h3>一般</h3>" + prefRow("テーマ", '<span class="seg">' + [["light", "ライト"], ["dark", "ダーク"], ["system", "システムに合わせる"]].map(function(x) {
+    return btn(x[1], "pTheme", x[0], "s" + (S.theme === x[0] ? " on" : ""));
+  }).join("") + "</span>") + prefRow("表示サイズ", '<span class="seg">' + [[1.25, "大"], [1, "デフォルト"], [0.85, "小"]].map(function(x) {
+    return btn(x[1], "pUi", x[0], "s" + (PREF.ui === x[0] ? " on" : ""));
+  }).join("") + "</span>", "文字や部品の大きさです（大 125%・デフォルト 100%・小 85%）。ウインドウを大きくすると、広くなった分だけ作業スペース（プレビューやタイムライン）が広がります。ウインドウが小さいときは、全体を縮小して収めます。") + prefRow("アクセントカラー", '<span class="row" style="gap:8px">' + [["blue", "青", "#378ef0"], ["green", "緑", "#2d9d78"], ["orange", "オレンジ", "#e68619"], ["purple", "紫", "#9256d9"]].map(function(x) {
+    return '<button class="sw' + (S.accent === x[0] ? " on" : "") + '" aria-label="' + x[1] + '" aria-pressed="' + (S.accent === x[0]) + '" title="' + x[1] + '"' + A("pAcc", x[0]) + ' style="background:' + x[2] + '"></button>';
+  }).join("") + "</span>");
+  else if (t === "timeline") body = "<h3>タイムライン</h3>" + prefRow("スナップ", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"' + (PREF.snap ? " checked" : "") + ">最初から入れておく</label>", "クリップの端・再生ヘッド・イン点／アウト点に吸い付きます。編集中は " + (keyOf("snapT") || "—") + " キーで切り替えられます。") + prefRow("再生中の表示", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"' + (PREF.follow ? " checked" : "") + ">再生ヘッドを追いかける</label>", "再生ヘッドが画面の外に出たら、タイムラインを自動で動かします。");
+  else {
+    var groups = [];
+    KB.forEach(function(k) {
+      if (groups.indexOf(k[1]) < 0) groups.push(k[1]);
+    });
+    body = '<h3>ショートカット</h3><div class="mu" style="margin-bottom:10px;line-height:1.6">「変更」を押してから、割り当てたいキーを押してください。Esc で取り消します。ほかの動作で使っているキーを選ぶと、そちらからは外れます。</div>' + groups.map(function(g) {
+      return '<div class="pgrp">' + g + "</div>" + KB.filter(function(k) {
+        return k[1] === g;
+      }).map(function(k) {
+        var cap = S.capture === k[0], keys = KEYMAP[k[0]], custom = JSON.stringify(keys) !== JSON.stringify(k[3]);
+        return '<div class="krow' + (cap ? " cap" : "") + '" data-krow="' + k[0] + '"><span>' + h(k[2]) + '</span><span class="row" style="gap:4px;flex-wrap:wrap">' + (cap ? '<span class="t-ac">キーを押してください…</span>' : keys.length ? keys.map(function(c) {
+          return "<kbd>" + h(keyLabel(c)) + "</kbd>";
+        }).join("") : '<span class="mu">なし</span>') + '</span><span class="row" style="gap:4px;justify-content:flex-end">' + (cap ? btn("取り消し", "kCancel", "", "s") : btn("変更", "kSet", k[0], "s")) + (custom && !cap ? btn("戻す", "kReset", k[0], "s") : "") + "</span></div>";
+      }).join("");
+    }).join("") + '<div class="pgrp">マウスなど（変えられません）</div>' + MOUSE.map(function(m) {
+      return '<div class="krow"><span>' + h(m[1]) + "</span><span><kbd>" + h(m[0]) + "</kbd></span><span></span></div>";
+    }).join("") + '<div class="row" style="justify-content:flex-end;margin-top:12px">' + btn("すべて初期設定に戻す", "kResetAll", "", "s") + "</div>";
+  }
+  d.innerHTML = '<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">環境設定</h2>' + btn("閉じる", "dlgNo", "", "s") + '</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">' + [["general", "一般"], ["timeline", "タイムライン"], ["keys", "ショートカット"]].map(function(x) {
+    return "<button" + (t === x[0] ? ' aria-current="true"' : "") + A("ptab", x[0]) + ">" + x[1] + "</button>";
+  }).join("") + '</nav><div class="pcont">' + body + "</div></div></div>";
+  d.hidden = false;
+  var sc = d.querySelector(".pcont");
+  if (sc && renderPrefs.st && renderPrefs.tab === t) sc.scrollTop = renderPrefs.st;
+  renderPrefs.tab = t;
+  if (sc) sc.addEventListener("scroll", function() {
+    renderPrefs.st = sc.scrollTop;
+  });
+  var fr = S.kFocus && d.querySelector('[data-krow="' + S.kFocus + '"]');
+  if (fr) fr.scrollIntoView({ block: "nearest" });
+}
+function assignKey(id, c) {
+  KB.forEach(function(k) {
+    if (k[0] !== id) {
+      var i = KEYMAP[k[0]].indexOf(c);
+      if (i >= 0) {
+        KEYMAP[k[0]].splice(i, 1);
+        toast("「" + keyLabel(c) + "」を「" + k[2] + "」から外しました");
+      }
+    }
+  });
+  KEYMAP[id] = [c];
+  saveKeys();
+}
+function init$h() {
+  PREF = { snap: true, follow: true, ui: 1 };
+  try {
+    var pf = JSON.parse(localStorage.getItem("matsuko.pref") || "{}");
+    if (typeof pf.snap === "boolean") PREF.snap = pf.snap;
+    if (typeof pf.follow === "boolean") PREF.follow = pf.follow;
+    if ([0.85, 1, 1.25].indexOf(pf.ui) >= 0) PREF.ui = pf.ui;
+    else if (pf.ui === 0.8 || pf.ui === 0.9) PREF.ui = 0.85;
+  } catch (e) {
+  }
+  S.snap = PREF.snap;
 }
 function checks() {
   var o = [], d = progDur(), used = {};
@@ -2598,10 +2567,10 @@ function checks() {
     if (c.m) used[c.m] = 1;
   });
   if (!P.clips.length) o.push(["er", "タイムライン", "クリップがありません。編集ページかカットページで追加してください"]);
-  else o.push([Math.abs(d - 480) <= 15 ? "ok" : "wn", "尺", mmss$1(d) + "（目標 8:00）" + (Math.abs(d - 480) <= 15 ? "" : d < 480 ? "　目標より " + mmss$1(480 - d) + " 短い" : "　目標より " + mmss$1(d - 480) + " 長い")]);
+  else o.push([Math.abs(d - 480) <= 15 ? "ok" : "wn", "尺", mmss(d) + "（目標 8:00）" + (Math.abs(d - 480) <= 15 ? "" : d < 480 ? "　目標より " + mmss(480 - d) + " 短い" : "　目標より " + mmss(d - 480) + " 長い")]);
   if (S.x && S.x.range === "イン点〜アウト点") {
     var rr = xRange();
-    o.push(P.pin != null || P.pout != null ? ["ok", "範囲", tc(rr[0]) + " 〜 " + tc(rr[1]) + "（" + mmss$1(rr[1] - rr[0]) + "）"] : ["wn", "範囲", "イン点・アウト点がありません。編集ページで I・O キーを押して決めてください"]);
+    o.push(P.pin != null || P.pout != null ? ["ok", "範囲", tc(rr[0]) + " 〜 " + tc(rr[1]) + "（" + mmss(rr[1] - rr[0]) + "）"] : ["wn", "範囲", "イン点・アウト点がありません。編集ページで I・O キーを押して決めてください"]);
   }
   var wn = Object.keys(used).map(M).filter(function(m) {
     return m && m.r === "wn";
@@ -2630,6 +2599,11 @@ function checks() {
   if (miss.length) o.push(["er", "素材ファイル", "見つからない素材 " + miss.length + "件（" + miss.map(function(m) {
     return m.n;
   }).join("、") + "）。メディアページで「リンクし直す」を押してください"]);
+  if (S.x && !S.x.audio) {
+    var sw = seqWH(), xw = String(S.x.res).split("×").map(Number), sf = parseFloat(ps().fps), xf = parseFloat(S.x.fps);
+    if (xw[0] && Math.abs(xw[0] / xw[1] - sw[0] / sw[1]) > 0.01) o.push(["wn", "解像度", "シーケンスは " + sw[0] + "×" + sw[1] + "、書き出しは " + S.x.res + " です。縦横の比率が違うので、黒い帯が付きます"]);
+    if (xf && sf && Math.abs(xf - sf) > 0.01) o.push(["wn", "フレームレート", "シーケンスは " + ps().fps + " fps、書き出しは " + S.x.fps + " です"]);
+  }
   var f = xFmt();
   o.push(f ? ["ok", "書き出し形式", f[0] + (HOST ? "　FFmpeg で書き出します" : "　このブラウザで書き出せます")] : ["er", "書き出し形式", "このブラウザは書き出しに対応していません（Chrome・Edge・Safari の新しい版で開いてください）"]);
   return o;
@@ -2656,7 +2630,7 @@ function newJob() {
   if (!HOST) S.queue.push(j);
   return j;
 }
-function init$f() {
+function init$g() {
   R.export = function() {
     if (!S.x) S.x = presetX(S.preset);
     var x = S.x, f = xFmt(), bits = xBits(), dur = progDur(), rg = xRange(), est = (bits.v + bits.a) * (rg[1] - rg[0]) / 8, ck = checks(), nw = ck.filter(function(c) {
@@ -2667,15 +2641,15 @@ function init$f() {
     var pl = S.queue.filter(function(q) {
       return q.id === S.xplay;
     })[0];
-    var mon = pl ? '<video src="' + pl.url + '" controls autoplay style="height:calc(225px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain;background:#000"></video><button class="b s" style="position:absolute;right:8px;top:8px"' + A("xback") + ">プレビューに戻る</button>" : '<canvas data-prog width="960" height="540" style="height:calc(225px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain;display:block"></canvas>';
+    var mon = pl ? '<video src="' + pl.url + '" controls autoplay style="height:calc(225px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain;background:#000"></video><button class="b s" style="position:absolute;right:8px;top:8px"' + A("xback") + ">プレビューに戻る</button>" : "<canvas data-prog " + canvasAttrs() + ' style="height:calc(225px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas>';
     return '<div class="pn l" style="width:280px">' + ph("書き出しプリセット（用途別）") + '<div class="scroll">' + D.presets.map(function(p, i) {
       return '<div class="li' + (S.preset === i ? " selr" : "") + '" role="button" tabindex="0"' + A("preset", i) + ' style="padding:16px 16px 14px;border-bottom:1px solid var(--dv)"><div style="font-size:13px">' + h(p.n) + '</div><div class="t2" style="margin-top:8px">' + h(p.d) + "</div></div>";
-    }).join("") + '<div style="padding:14px">' + btn("＋ プリセットを追加", "todo", "", "", "", "width:100%") + '</div></div></div><div class="pc">' + ph("プレビュー　シーケンス全体", '<span class="x">' + (x.audio ? "音声のみ" : h(x.res) + "　" + h(x.fps)) + "　" + mmss$1(dur) + "</span>") + '<div class="mon" style="height:calc(246px + var(--xh,0px)*.5)">' + mon + '<div style="position:absolute;left:0;right:0;bottom:0;height:7px;background:var(--bg0)"><i data-bar="edit" style="display:block;height:7px;width:' + (dur ? S.t.edit / dur * 100 : 0) + '%;background:var(--ac)"></i></div></div><div class="tp" style="border-top:0"><span class="tc" style="width:220px"><span data-time="edit">' + tc(S.t.edit) + "</span> / " + tc(dur) + '</span><span class="mid">' + ibtn("toStart", "先頭へ", "top") + playBtn(E.playing) + ibtn("nextCut", "末尾へ", "end") + '</span><span class="end" style="width:220px"></span></div>' + ph("書き出し前のチェック", nw ? '<span style="font-weight:400" class="t-wn">要確認 ' + nw + "件</span>" : '<span class="t-ok" style="font-weight:400">問題なし</span>') + ck.map(function(c) {
+    }).join("") + '<div style="padding:14px">' + btn("＋ プリセットを追加", "todo", "", "", "", "width:100%") + '</div></div></div><div class="pc">' + ph("プレビュー　シーケンス全体", '<span class="x">' + (x.audio ? "音声のみ" : h(x.res) + "　" + h(x.fps)) + "　" + mmss(dur) + "</span>") + '<div class="mon" style="height:calc(246px + var(--xh,0px)*.5)">' + mon + '<div style="position:absolute;left:0;right:0;bottom:0;height:7px;background:var(--bg0)"><i data-bar="edit" style="display:block;height:7px;width:' + (dur ? S.t.edit / dur * 100 : 0) + '%;background:var(--ac)"></i></div></div><div class="tp" style="border-top:0"><span class="tc" style="width:220px"><span data-time="edit">' + tc(S.t.edit) + "</span> / " + tc(dur) + '</span><span class="mid">' + ibtn("toStart", "先頭へ", "top") + playBtn(E.playing) + ibtn("nextCut", "末尾へ", "end") + '</span><span class="end" style="width:220px"></span></div>' + ph("書き出し前のチェック", nw ? '<span style="font-weight:400" class="t-wn">要確認 ' + nw + "件</span>" : '<span class="t-ok" style="font-weight:400">問題なし</span>') + ck.map(function(c) {
       return '<div style="display:grid;grid-template-columns:48px 120px 1fr 90px;gap:18px;align-items:center;min-height:41px;padding:0 16px;border-bottom:1px solid var(--dv)"><span class="chip ' + (c[0] === "ok" ? "c-ok" : c[0] === "wn" ? "c-wn" : "c-er") + '" style="text-align:center">' + (c[0] === "ok" ? "OK" : c[0] === "wn" ? "警告" : "エラー") + "</span><span>" + h(c[1]) + '</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + h(c[2]) + '">' + h(c[2]) + '</span><span style="text-align:right">' + (c[3] ? btn(c[3], c[4], "", "s") : "") + "</span></div>";
     }).join("") + ph("書き出しキュー", X && X.run && !HOST ? '<span class="x">書き出し中はこのタブを表示したままにしてください</span>' : "") + '<div class="scroll">' + (S.queue.length ? S.queue.map(function(q) {
       var st, btns;
       if (q.st === "done") {
-        st = '<span class="t-ok">完了　' + q.at + "　" + mb(q.size) + (q.secs != null ? "（" + mmss$1(q.secs) + "で書き出し）" : "") + "</span>";
+        st = '<span class="t-ok">完了　' + q.at + "　" + mb(q.size) + (q.secs != null ? "（" + mmss(q.secs) + "で書き出し）" : "") + "</span>";
         btns = btn("再生", "xview", q.id, "s") + (HOST ? "" : btn("保存", "xsave", q.id, "s on"));
       } else if (q.st === "wait") {
         st = '<span class="mu">待機中</span>';
@@ -2694,7 +2668,7 @@ function init$f() {
       ["形式", fmts.length ? sel("形式", fmts, x.fmt, "width:100%", "xfmt") : '<span class="t-er">対応形式なし</span>']
     ].concat(x.audio ? [["音声", sel("音声", D.opts.au, x.au, "width:100%", "xau")]] : [["解像度", sel("解像度", D.opts.res, x.res, "width:100%", "xres")], ["フレームレート", sel("フレームレート", D.opts.fps, x.fps, "width:100%", "xfps")], ["ビットレート", sel("ビットレート", D.opts.br, x.br, "width:100%", "xbr")], ["音声", sel("音声", D.opts.au, x.au, "width:100%", "xau")]]).map(function(r) {
       return '<div style="display:grid;grid-template-columns:100px 1fr;align-items:center;height:40px"><span class="t2">' + r[0] + "</span>" + r[1] + "</div>";
-    }).join("") + '<div class="box" style="margin-top:12px;padding:14px;border:1px solid var(--dv);line-height:1.9">推定サイズ　約 ' + mb(est || 0) + (HOST ? "<br>FFmpeg で書き出します。多くの場合、番組の長さより短い時間で終わります<br>" : "<br>書き出しにかかる時間　約 " + mmss$1(rg[1] - rg[0]) + "（実際の長さと同じ）<br>") + '<span class="mu">画面の比率が違う素材は、黒い帯を付けて収めます。</span></div></div><div class="row" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv)">' + btn("キューに追加", "qadd", "", "sec", "", "flex:1;height:36px") + btn("書き出し", "xrun", "", "pri", "", "flex:1;height:36px") + "</div></div>";
+    }).join("") + '<div class="box" style="margin-top:12px;padding:14px;border:1px solid var(--dv);line-height:1.9">推定サイズ　約 ' + mb(est || 0) + (HOST ? "<br>FFmpeg で書き出します。多くの場合、番組の長さより短い時間で終わります<br>" : "<br>書き出しにかかる時間　約 " + mmss(rg[1] - rg[0]) + "（実際の長さと同じ）<br>") + '<span class="mu">画面の比率が違う素材は、黒い帯を付けて収めます。</span></div></div><div class="row" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv)">' + btn("キューに追加", "qadd", "", "sec", "", "flex:1;height:36px") + btn("書き出し", "xrun", "", "pri", "", "flex:1;height:36px") + "</div></div>";
   };
 }
 var SCALE, BASE_W, BASE_H;
@@ -2728,7 +2702,7 @@ function fit() {
   }
 }
 var ZOOM;
-function init$e() {
+function init$f() {
   SCALE = 1;
   ZOOM = null;
   BASE_W = 1180;
@@ -2759,7 +2733,7 @@ function jump(dir) {
     heads(true);
   }
 }
-function init$d() {
+function init$e() {
   ACT = {
     go,
     bin: function(v) {
@@ -2900,7 +2874,7 @@ function init$d() {
       var tl = sg.reduce(function(s2, g) {
         return s2 + g[1] - g[0];
       }, 0);
-      toast(sg.length > 1 ? "無音を除いて " + sg.length + " カットで追加しました（" + mmss$1(tl) + "）" : "仮編集に追加しました（" + mmss$1(tl) + "）");
+      toast(sg.length > 1 ? "無音を除いて " + sg.length + " カットで追加しました（" + mmss(tl) + "）" : "仮編集に追加しました（" + mmss(tl) + "）");
     },
     cutOvr: function() {
       var m = M(S.src), p = primary();
@@ -3173,10 +3147,10 @@ function init$d() {
     undo,
     redo,
     sfb: function() {
-      srcSeek(S.t.cut - 1 / 30);
+      srcSeek(S.t.cut - frameSec());
     },
     sff: function() {
-      srcSeek(S.t.cut + 1 / 30);
+      srcSeek(S.t.cut + frameSec());
     },
     etab: function(v) {
       S.etab = v;
@@ -3258,11 +3232,11 @@ function init$d() {
     },
     fb: function() {
       if (E.playing) progStop();
-      setProg(S.t.edit - 1 / 30);
+      setProg(S.t.edit - frameSec());
     },
     ff: function() {
       if (E.playing) progStop();
-      setProg(S.t.edit + 1 / 30);
+      setProg(S.t.edit + frameSec());
     },
     top: function() {
       setProg(0);
@@ -3401,10 +3375,451 @@ function init$d() {
     hRestore: function(v) {
       restoreHistory(v);
     },
+    psOpen: function() {
+      openProjectSettings();
+    },
+    psTab: function(v) {
+      S.pstab = v;
+      renderProjectSettings();
+    },
+    psSet: function(v) {
+      var i = v.indexOf("|");
+      setPs(v.slice(0, i), v.slice(i + 1));
+    },
+    psProxy: function() {
+      rebuildProxies();
+    },
     todo: function() {
       toast("この機能は、まだ使えません");
     }
   };
+}
+var KB;
+var MOUSE;
+var IS_MAC;
+var KEYMAP;
+function loadKeys() {
+  KEYMAP = {};
+  KB.forEach(function(k) {
+    KEYMAP[k[0]] = k[3].slice();
+  });
+  try {
+    var o = JSON.parse(localStorage.getItem("matsuko.keys") || "{}");
+    Object.keys(o).forEach(function(id) {
+      if (KEYMAP[id] && Array.isArray(o[id])) KEYMAP[id] = o[id];
+    });
+  } catch (e) {
+  }
+}
+function saveKeys() {
+  var o = {};
+  KB.forEach(function(k) {
+    if (JSON.stringify(KEYMAP[k[0]]) !== JSON.stringify(k[3])) o[k[0]] = KEYMAP[k[0]];
+  });
+  try {
+    localStorage.setItem("matsuko.keys", JSON.stringify(o));
+  } catch (e) {
+  }
+}
+function comboOf(e) {
+  var k = e.key;
+  if (!k || ["Control", "Shift", "Alt", "Meta", "Dead", "Process", "Unidentified"].indexOf(k) >= 0) return null;
+  if (k === " ") k = "Space";
+  else if (k.length === 1) k = k.toUpperCase();
+  var sym = k.length === 1 && !/[A-Z0-9]/.test(k), p = [];
+  if (e.ctrlKey || e.metaKey) p.push("Ctrl");
+  if (e.altKey) p.push("Alt");
+  if (e.shiftKey && !sym) p.push("Shift");
+  p.push(k);
+  return p.join("+");
+}
+function keyLabel(c) {
+  if (!c) return "";
+  return c.split("+").map(function(x) {
+    return { Ctrl: IS_MAC ? "⌘" : "Ctrl", Alt: IS_MAC ? "⌥" : "Alt", Shift: IS_MAC ? "⇧" : "Shift", ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓", Space: "Space", Escape: "Esc" }[x] || x;
+  }).join(IS_MAC ? "" : "+");
+}
+function keyOf(id) {
+  return KEYMAP[id] && KEYMAP[id][0] ? keyLabel(KEYMAP[id][0]) : "";
+}
+function actionFor(c) {
+  for (var i = 0; i < KB.length; i++) if (KEYMAP[KB[i][0]].indexOf(c) >= 0) return KB[i][0];
+  return null;
+}
+var KEY_GLOBAL;
+function runKey(a, e) {
+  var pg = S.page;
+  if (KEY_GLOBAL[a]) {
+    e.preventDefault();
+    KEY_GLOBAL[a]();
+    return;
+  }
+  if (a === "undo" || a === "redo") {
+    e.preventDefault();
+    a === "undo" ? undo() : redo();
+    return;
+  }
+  if (a === "play") {
+    if (["edit", "export", "cut", "fx"].indexOf(pg) >= 0) {
+      e.preventDefault();
+      ACT.play();
+    }
+    return;
+  }
+  if (pg === "cut") {
+    var cm = { pin: "setIn", pout: "setOut", fb: "sfb", ff: "sff" };
+    if (cm[a]) {
+      e.preventDefault();
+      ACT[cm[a]]();
+    } else if ((a === "delSel" || a === "rdel") && primary() && primary().tr === "V1") {
+      e.preventDefault();
+      ACT.rdel();
+    }
+    return;
+  }
+  if (pg !== "edit") return;
+  e.preventDefault();
+  var step = { fb: -frameSec(), ff: frameSec(), sb: -1, sf: 1 };
+  if (a in step) {
+    if (E.playing) progStop();
+    setProg(S.t.edit + step[a]);
+    heads(true);
+    return;
+  }
+  if (a === "prev" || a === "next") {
+    jump(a === "prev" ? -1 : 1);
+    return;
+  }
+  if (a === "top" || a === "end") {
+    ACT[a]();
+    heads(true);
+    return;
+  }
+  var tool = { tSel: "select", tSplit: "split", tHand: "hand" };
+  if (tool[a]) {
+    S.tool = tool[a];
+    draw();
+    return;
+  }
+  if (a === "nl" || a === "nr") {
+    nudge(a === "nl" ? -frameSec() : frameSec());
+    return;
+  }
+  if (a === "addTitle") {
+    ACT.addTitle("name");
+    return;
+  }
+  if (ACT[a]) ACT[a]();
+}
+function init$d() {
+  KB = [
+    ["play", "再生", "再生／停止", ["Space"]],
+    ["fb", "再生", "1 フレーム戻る", ["ArrowLeft"]],
+    ["ff", "再生", "1 フレーム進む", ["ArrowRight"]],
+    ["sb", "再生", "1 秒戻る", ["Shift+ArrowLeft"]],
+    ["sf", "再生", "1 秒進む", ["Shift+ArrowRight"]],
+    ["prev", "再生", "前の編集点へ", ["ArrowUp"]],
+    ["next", "再生", "次の編集点へ", ["ArrowDown"]],
+    ["top", "再生", "先頭へ", ["Home"]],
+    ["end", "再生", "最後へ", ["End"]],
+    ["pin", "再生", "イン点（編集：書き出し範囲／カット：ソース）", ["I"]],
+    ["pout", "再生", "アウト点", ["O"]],
+    ["tSel", "道具", "選択ツール", ["V"]],
+    ["tSplit", "道具", "分割ツール", ["C"]],
+    ["tHand", "道具", "ハンドツール", ["H"]],
+    ["addTitle", "道具", "テロップを追加", ["T"]],
+    ["snapT", "道具", "スナップの入／切", ["N"]],
+    ["split", "編集", "再生ヘッドで分割", ["S"]],
+    ["delSel", "編集", "削除（すき間を残す）", ["Delete", "Backspace"]],
+    ["rdel", "編集", "削除して詰める", ["Shift+Delete", "Shift+Backspace"]],
+    ["nl", "編集", "選んだクリップを左へ 1 フレーム", ["Alt+ArrowLeft"]],
+    ["nr", "編集", "選んだクリップを右へ 1 フレーム", ["Alt+ArrowRight"]],
+    ["cut2", "編集", "切り取り", ["Ctrl+X"]],
+    ["copy", "編集", "コピー", ["Ctrl+C"]],
+    ["paste", "編集", "再生ヘッドに貼り付け", ["Ctrl+V"]],
+    ["dup", "編集", "すぐ後ろに複製", ["Ctrl+D"]],
+    ["selAll", "編集", "すべて選択", ["Ctrl+A"]],
+    ["lnk", "編集", "リンク／リンク解除", ["Ctrl+L"]],
+    ["undo", "編集", "元に戻す", ["Ctrl+Z"]],
+    ["redo", "編集", "やり直し", ["Ctrl+Y", "Ctrl+Shift+Z"]],
+    ["zin", "表示", "タイムラインを拡大", ["+", "=", ";"]],
+    ["zout", "表示", "タイムラインを縮小", ["-"]],
+    ["zfit", "表示", "タイムライン全体を表示", ["\\", "¥"]],
+    ["save", "ファイル", "保存", ["Ctrl+S"]],
+    ["imp", "ファイル", "素材を読み込む", ["Ctrl+I"]],
+    ["toExport", "ファイル", "書き出し", ["Ctrl+M"]],
+    ["prefs", "ファイル", "環境設定", ["Ctrl+,"]]
+  ];
+  MOUSE = [
+    ["クリック", "選ぶ（リンクしたクリップも一緒に）"],
+    ["Shift／Ctrl＋クリック", "選択に足す・外す"],
+    ["Alt＋クリック", "リンク先を含めずに選ぶ"],
+    ["何もないところからドラッグ", "囲んで選ぶ"],
+    ["ドラッグ", "移動（トラックの間も）。重なった部分は上書き"],
+    ["Ctrl を押しながら離す", "挿入（後ろをずらす）"],
+    ["Alt を押しながら離す", "複製して置く"],
+    ["端をドラッグ", "長さの調整（Ctrl でリップル）"],
+    ["Ctrl＋ホイール", "タイムラインの拡大・縮小"],
+    ["Shift＋ホイール", "タイムラインを横に動かす"],
+    ["Esc", "選択を外す"],
+    ["Alt＋1〜7", "ページを切り替える"]
+  ];
+  IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || "");
+  KEYMAP = {};
+  loadKeys();
+  KEY_GLOBAL = { save: function() {
+    ACT.save();
+  }, imp: function() {
+    openPicker();
+  }, toExport: function() {
+    go("export");
+  }, prefs: function() {
+    openPrefs();
+  } };
+}
+var MENUS;
+function viewItems() {
+  var o = [{ h: "ページ" }];
+  D.pages.forEach(function(p, i) {
+    o.push([p[1], "go:" + p[0], "Alt+" + (i + 1), S.page === p[0]]);
+  });
+  o.push("-", { h: "テーマ" });
+  [["ライト", "light"], ["ダーク", "dark"], ["システムに合わせる", "system"]].forEach(function(t) {
+    o.push([t[0], "th:" + t[1], "", S.theme === t[1]]);
+  });
+  o.push("-", { h: "アクセントカラー" });
+  [["青", "blue"], ["緑", "green"], ["オレンジ", "orange"], ["紫", "purple"]].forEach(function(t) {
+    o.push([t[0], "ac:" + t[1], "", S.accent === t[1]]);
+  });
+  return o;
+}
+function items(its) {
+  return its.map(function(x) {
+    if (x === "-") return '<div class="sep"></div>';
+    if (x.h) return '<div class="dh">' + x.h + "</div>";
+    return '<button class="it" role="menuitem"' + (x[4] ? " disabled" : "") + ' data-m="' + (x[1] || "todo") + '"><span class="ck">' + (x[3] ? "✓" : "") + '</span><span class="lb">' + x[0] + '</span><span class="sc">' + h(menuKey(x[1]) || x[2] || "") + "</span></button>";
+  }).join("");
+}
+function menuKey(a) {
+  if (!a) return "";
+  if (a === "go:export") a = "toExport";
+  return KEYMAP[a] ? keyOf(a) : "";
+}
+var mbOpen;
+function buildMb() {
+  document.getElementById("mb").innerHTML = MENUS.map(function(m, i) {
+    return '<button data-menu="' + i + '" aria-haspopup="true" aria-expanded="false">' + m.n + "</button>";
+  }).join("");
+}
+function closeMenu() {
+  document.getElementById("dd").hidden = true;
+  document.getElementById("cx").hidden = true;
+  mbOpen = null;
+  [].forEach.call(document.querySelectorAll("[data-menu]"), function(b) {
+    b.setAttribute("aria-expanded", "false");
+  });
+}
+function openMenu(b) {
+  closeMenu();
+  var m = MENUS[+b.dataset.menu], d = document.getElementById("dd"), r = b.getBoundingClientRect();
+  d.innerHTML = items(m.i === "view" ? viewItems() : m.i === "file" ? fileItems() : m.i);
+  d.style.left = r.left / SCALE + "px";
+  d.style.top = r.bottom / SCALE + "px";
+  d.style.position = "fixed";
+  d.hidden = false;
+  mbOpen = b.dataset.menu;
+  b.setAttribute("aria-expanded", "true");
+  var f = d.querySelector(".it");
+  if (f) f.focus();
+}
+function openCx(x, y, list) {
+  var c = document.getElementById("cx");
+  c.innerHTML = items(list || [["キーフレームを追加"], ["キーフレームを削除"], "-"].concat(["リニア", "ベジェ", "停止"].map(function(k) {
+    return [k, "kfm:" + k, "", S.kfMode === k];
+  })).concat(["-", ["イーズイン"], ["イーズアウト"], "-", ["コピー"], ["貼り付け", "", "", "", 1]]));
+  c.hidden = false;
+  var w = c.offsetWidth, hh = c.offsetHeight;
+  c.style.left = Math.min(x / SCALE, innerWidth / SCALE - w - 4) + "px";
+  c.style.top = Math.min(y / SCALE, innerHeight / SCALE - hh - 4) + "px";
+  var f = c.querySelector(".it");
+  if (f) f.focus();
+}
+function menuAct(a) {
+  closeMenu();
+  if (a.indexOf("th:") === 0) {
+    S.theme = a.slice(3);
+    applyDesign();
+  } else if (a.indexOf("ac:") === 0) {
+    S.accent = a.slice(3);
+    applyDesign();
+  } else if (a.indexOf("go:") === 0) go(a.slice(3));
+  else if (a.indexOf("kfm:") === 0) {
+    S.kfMode = a.slice(4);
+    draw();
+  } else if (a.indexOf("orec:") === 0) {
+    var r = RECENT.filter(function(x) {
+      return !HOST.project.current || x.dir !== HOST.project.current.dir;
+    })[+a.slice(5)];
+    if (r) openProject(function() {
+      return HOST.project.openRecent(r.dir);
+    });
+  } else if (ACT[a]) ACT[a]();
+  else toast("この機能は、まだ使えません");
+}
+var mq;
+function applyDesign() {
+  var r = S.theme === "system" ? mq.matches ? "light" : "dark" : S.theme;
+  document.documentElement.dataset.theme = r;
+  document.documentElement.dataset.accent = S.accent;
+  persist();
+}
+function toast(m) {
+  var t = document.getElementById("toast");
+  t.textContent = m;
+  t.hidden = false;
+  clearTimeout(toast.h);
+  toast.h = setTimeout(function() {
+    t.hidden = true;
+  }, 2600);
+}
+function ask(title, msg, ok, fn) {
+  var d = document.getElementById("dlg");
+  d.innerHTML = '<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT"><h2 id="dlgT">' + h(title) + "</h2><p>" + h(msg) + '</p><div class="row" style="gap:8px;justify-content:flex-end">' + btn("キャンセル", "dlgNo", "", "sec") + btn(ok, "dlgOk", "", "pri") + "</div></div>";
+  d.hidden = false;
+  ask.fn = fn;
+  d.querySelector('[data-a="dlgOk"]').focus();
+}
+function resetProject(np) {
+  historyReset();
+  stopAll();
+  Object.keys(E.els).forEach(dropEl);
+  E.imgs = {};
+  if (HOST) {
+    HOST.media.cancel(P.media.map(function(m) {
+      return m.id;
+    }));
+    setJOBS({});
+  } else {
+    P.media.forEach(function(m) {
+      if (m.url) URL.revokeObjectURL(m.url);
+    });
+    IDB.clear("files");
+    IDB.clear("history");
+  }
+  setP(np);
+  setHIST([]);
+  setREDO([]);
+  S.media = np.media[0] ? np.media[0].id : null;
+  S.src = np.sample ? "v03" : null;
+  S.sel = np.sample ? ["c3", "c3a"] : [];
+  S.t.edit = 0;
+  S.t.cut = 0;
+  S.bin = "all";
+  S.pps = null;
+  S.tlx = S.tly = 0;
+  SRC.id = null;
+  SRC.el = null;
+  saveP();
+  draw();
+}
+function infoDlg(title, html) {
+  var d = document.getElementById("dlg");
+  d.innerHTML = '<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT" style="width:560px"><h2 id="dlgT">' + h(title) + '</h2><div style="max-height:60vh;overflow:auto">' + html + '</div><div class="row" style="justify-content:flex-end;margin-top:14px">' + btn("閉じる", "dlgNo", "", "pri") + "</div></div>";
+  d.hidden = false;
+  d.querySelector('[data-a="dlgNo"]').focus();
+}
+var NATIVE, nativeLast;
+var NATIVE_ITEMS = { copy: "copy", cut2: "cut", paste: "paste" };
+function unesc(t) {
+  return String(t).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+}
+function nativeAccel(a, txt) {
+  var k = a === "go:export" ? "toExport" : a, L = k && KEYMAP[k] || [], c = L.filter(function(x) {
+    return /(^|\+)Ctrl(\+|$)/.test(x);
+  })[0] || txt || "";
+  if (k === "redo" && L.indexOf("Ctrl+Shift+Z") >= 0) c = "Ctrl+Shift+Z";
+  if (!/(^|\+)Ctrl(\+|$)/.test(c)) return null;
+  var parts = c.split("+"), key = parts.pop();
+  key = { ",": "Comma", ".": "Period", "/": "Slash" }[key] || key;
+  if (!/^([A-Z0-9]|Comma|Period|Slash)$/.test(key)) return null;
+  return parts.map(function(m) {
+    return m === "Ctrl" ? "CmdOrCtrl" : m;
+  }).concat([key]).join("+");
+}
+function nativeSpec() {
+  var used = {};
+  return MENUS.map(function(m) {
+    var its = m.i === "view" ? viewItems() : m.i === "file" ? fileItems() : m.i, out = [];
+    its.forEach(function(x) {
+      if (x === "-") {
+        if (out.length && out[out.length - 1].kind !== "sep") out.push({ kind: "sep" });
+        return;
+      }
+      if (x.h) {
+        out.push({ kind: "head", label: unesc(x.h) });
+        return;
+      }
+      var id = x[1] || "todo";
+      if (id === "prefs" || id === "about") return;
+      if (NATIVE_ITEMS[id]) {
+        out.push({ kind: "native", id: NATIVE_ITEMS[id], label: unesc(x[0]) });
+        return;
+      }
+      var o = { kind: m.i === "view" && x[3] !== void 0 ? "check" : "item", id, label: unesc(x[0]), enabled: !x[4], checked: !!x[3] }, ac = nativeAccel(x[1], x[2]);
+      if (ac && !used[ac]) {
+        used[ac] = 1;
+        o.accel = ac;
+      }
+      out.push(o);
+    });
+    while (out.length && out[out.length - 1].kind === "sep") out.pop();
+    return { label: m.n, items: out };
+  });
+}
+function syncNativeMenu() {
+  if (!NATIVE) return;
+  var sp = nativeSpec(), j = JSON.stringify(sp);
+  if (j === nativeLast) return;
+  nativeLast = j;
+  Promise.resolve(HOST.menu.set(sp)).catch(function() {
+    nativeLast = "";
+  });
+}
+function editing() {
+  var a = document.activeElement;
+  return !!a && (a.isContentEditable || a.tagName === "TEXTAREA" || a.tagName === "INPUT" && !/^(range|checkbox|radio|button|submit)$/.test(a.type));
+}
+function onNativeMenu(id) {
+  if (editing() && (id === "undo" || id === "redo" || id === "selAll")) {
+    document.execCommand(id === "selAll" ? "selectAll" : id);
+    return;
+  }
+  menuAct(id);
+}
+function init$c() {
+  MENUS = [
+    { n: "ファイル", i: "file" },
+    { n: "編集", i: [["元に戻す", "undo", "Ctrl+Z"], ["やり直し", "redo", "Ctrl+Y"], "-", ["切り取り", "cut2", "Ctrl+X"], ["コピー", "copy", "Ctrl+C"], ["貼り付け", "paste", "Ctrl+V"], ["複製", "dup", "Ctrl+D"], "-", ["再生ヘッドで分割", "split", "S"], ["削除", "delSel", "Delete"], ["削除して詰める", "rdel", "Shift+Delete"], "-", ["すべて選択", "selAll", "Ctrl+A"], ["リンク／リンク解除", "lnk", "Ctrl+L"], "-", ["映像トラックを追加", "addV"], ["音声トラックを追加", "addA"]] },
+    { n: "表示", i: "view" },
+    { n: "プロジェクト", i: [["プロジェクト設定…", "psOpen"], ["メンバーと権限…"], ["変更履歴・復元…", "hist"], "-", ["台本アプリと紐づけ…", "go:script"]] },
+    { n: "ヘルプ", i: [["使い方", "help"], ["キーボードショートカット…", "keys"], ["バージョン情報", "about"]] }
+  ];
+  mbOpen = null;
+  nativeLast = "";
+  NATIVE = !!(HOST && HOST.menu && /Mac/.test(navigator.platform || navigator.userAgent || ""));
+  if (NATIVE) {
+    document.body.classList.add("native-menu");
+    HOST.menu.onAction(onNativeMenu);
+    ["copy", "cut", "paste"].forEach(function(t) {
+      document.addEventListener(t, function(e) {
+        if (editing()) return;
+        e.preventDefault();
+        menuAct(t === "cut" ? "cut2" : t);
+      });
+    });
+  }
+  mq = matchMedia("(prefers-color-scheme: light)");
+  if (mq.addEventListener) mq.addEventListener("change", applyDesign);
 }
 var HOST;
 var JOBS;
@@ -3496,7 +3911,7 @@ function loadOpened(o) {
 }
 function queueJobs(m, force) {
   if (!HOST || !m.file || m.missing || !m.path || !HOST.project.current) return;
-  var r = { id: m.id, path: m.path, kind: m.k, duration: m.d || 0, thumb: m.k !== "音声" && (force || !m.thumb), peaks: m.k !== "画像" && !m.noAudio && (force || !m.peaks), proxy: !!m.np && (force || !m.proxyPath) };
+  var r = { id: m.id, path: m.path, kind: m.k, duration: m.d || 0, thumb: m.k !== "音声" && (force || !m.thumb), peaks: m.k !== "画像" && !m.noAudio && (force || !m.peaks), proxy: !!m.np && (force || !m.proxyPath), proxyHeight: ps().proxy };
   if (!r.thumb && !r.peaks && !r.proxy) return;
   JOBS[m.id] = JOBS[m.id] || {};
   ["thumb", "peaks", "proxy"].forEach(function(k) {
@@ -3776,7 +4191,7 @@ function fileItems() {
 function setJOBS(v) {
   JOBS = v;
 }
-function init$c() {
+function init$b() {
   HOST = window.MatsukoHost && window.MatsukoHost.desktop ? window.MatsukoHost : null;
   JOBS = {};
   RECENT = [];
@@ -4183,7 +4598,7 @@ function progStop() {
   redrawProg();
   syncPlayBtn();
 }
-function init$b() {
+function init$a() {
   E = { ctx: null, master: null, mon: null, els: {}, imgs: {}, playing: false, raf: 0, base: 0, t0: 0, stats: { frames: 0, vframes: 0, blank: 0, stale: 0, late: 0, maxGap: 0, slow: 0, last: 0, at: [] } };
   PLAYERR = {};
   TST = { name: "店名テロップ", q: "質問テロップ", sub: "字幕", credit: "クレジット" };
@@ -4200,16 +4615,20 @@ function hms(s) {
   s = Math.round(s);
   return Math.floor(s / 3600) + ":" + ("0" + Math.floor(s / 60) % 60).slice(-2) + ":" + ("0" + s % 60).slice(-2);
 }
-function mmss$1(s) {
+function mmss(s) {
   s = Math.round(s || 0);
   return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + s % 60;
+}
+var TCF = 30;
+function setTcFps(f) {
+  TCF = Math.max(1, Math.round(f));
 }
 function tc(t) {
   t = Math.max(0, t || 0);
   function p(n) {
     return (n < 10 ? "0" : "") + n;
   }
-  return p(Math.floor(t / 3600)) + ":" + p(Math.floor(t / 60) % 60) + ":" + p(Math.floor(t) % 60) + ":" + p(Math.floor(t % 1 * 30 + 1e-6));
+  return p(Math.floor(t / 3600)) + ":" + p(Math.floor(t / 60) % 60) + ":" + p(Math.floor(t) % 60) + ":" + p(Math.floor(t % 1 * TCF + 1e-6));
 }
 function hm(d) {
   d = d || /* @__PURE__ */ new Date();
@@ -4257,10 +4676,10 @@ function waveSvg(a, fill) {
 }
 function waveOf(m, a, b, n, fill) {
   if (m && m.peaks && m.d) {
-    var pk = m.peaks, N = pk.length, i0 = Math.floor(a / m.d * N), i1 = Math.max(i0 + 1, Math.ceil(b / m.d * N)), seg = pk.slice(i0, i1), out = [], step = Math.max(1, seg.length / n);
-    for (var x = 0; x < seg.length; x += step) {
+    var pk = m.peaks, N = pk.length, i0 = Math.floor(a / m.d * N), i1 = Math.max(i0 + 1, Math.ceil(b / m.d * N)), seg2 = pk.slice(i0, i1), out = [], step = Math.max(1, seg2.length / n);
+    for (var x = 0; x < seg2.length; x += step) {
       var mx = 0;
-      for (var y = Math.floor(x); y < Math.min(seg.length, Math.floor(x + step)); y++) mx = Math.max(mx, seg[y]);
+      for (var y = Math.floor(x); y < Math.min(seg2.length, Math.floor(x + step)); y++) mx = Math.max(mx, seg2[y]);
       out.push(mx);
     }
     return waveSvg(out, fill);
@@ -4318,7 +4737,7 @@ function transport(key, btns, end) {
 function playBtn(on) {
   return '<button class="ib play' + (on ? " on" : "") + '" aria-label="' + (on ? "一時停止" : "再生") + '" title="再生／一時停止（スペース）"' + A("play") + ">" + ic(on ? "pause" : "play") + "</button>";
 }
-function init$a() {
+function init$9() {
   I = {
     play: '<path d="M8 5v14l11-7z"/>',
     pause: '<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>',
@@ -4347,401 +4766,114 @@ function init$a() {
     rr: '<svg width="10" height="10" viewBox="0 0 8 10" fill="currentColor" aria-hidden="true"><polygon points="1,0 7,5 1,10"/></svg>'
   };
 }
-const SNAPSHOT_INTERVAL = 2 * 60 * 1e3;
-const SNAPSHOT_KEEP = 100;
-const KIND_LABEL = { auto: "自動", open: "開いたとき", restore: "復元する前" };
-const SNAP_MEDIA_KEYS = ["id", "n", "k", "d", "c", "r", "f", "inP", "outP", "marks", "rate", "sample", "file"];
-function slimForSnapshot(p) {
-  const media = p.media.map((m) => {
-    const o = {};
-    for (const k of SNAP_MEDIA_KEYS) if (m[k] !== void 0) o[k] = m[k];
-    return o;
-  });
-  return JSON.parse(JSON.stringify({ v: 2, sample: p.sample, media, tracks: p.tracks, clips: p.clips, pin: p.pin, pout: p.pout }));
+var RES_OPTS = [["1920×1080", "1920 × 1080（フル HD）"], ["3840×2160", "3840 × 2160（4K）"], ["1280×720", "1280 × 720（HD）"], ["1080×1920", "1080 × 1920（縦長・SNS）"], ["1080×1080", "1080 × 1080（正方形）"]];
+var FPS_OPTS = ["23.976", "24", "25", "29.97", "30", "50", "59.94", "60"];
+var PQ_OPTS = [["high", "高画質", "1920 × 1080 の細かさで描く（重い）"], ["std", "標準", "960 × 540 の細かさで描く"], ["light", "軽量", "480 × 270 の細かさで描く（古いパソコン向け）"]];
+var PROXY_OPTS = [[540, "540p（軽い）"], [720, "720p（標準）"], [1080, "1080p（きれい）"]];
+var AR_OPTS = [[48e3, "48 kHz（動画の標準）"], [44100, "44.1 kHz（音楽 CD と同じ）"]];
+function ps() {
+  var s = P.settings || {};
+  return { res: s.res || "1920×1080", fps: s.fps || "29.97", pq: s.pq || "std", proxy: s.proxy || 720, ar: s.ar || 48e3 };
 }
-const mmss = (s) => {
-  s = Math.round(s || 0);
-  return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + s % 60;
-};
-function summarize(p) {
-  const len = p.clips.reduce((a, c) => Math.max(a, cEnd$1(c)), 0);
-  return `クリップ ${p.clips.length}・長さ ${mmss(len)}・素材 ${p.media.filter((m) => !m.sample).length}`;
+function seqWH() {
+  var r = ps().res.split("×");
+  return [+r[0] || 1920, +r[1] || 1080];
 }
-function dueForSnapshot(lastAt2, now, interval = SNAPSHOT_INTERVAL) {
-  return lastAt2 == null || now - lastAt2 >= interval;
+function frameSec() {
+  var f = parseFloat(ps().fps) || 30;
+  return 1 / f;
 }
-function sameContent(a, b) {
-  if (!a) return false;
-  return JSON.stringify(a.clips) === JSON.stringify(b.clips) && JSON.stringify(a.tracks) === JSON.stringify(b.tracks) && JSON.stringify(a.media.map((m) => [m.id, m.inP, m.outP, m.r, m.marks])) === JSON.stringify(b.media.map((m) => [m.id, m.inP, m.outP, m.r, m.marks])) && a.pin === b.pin && a.pout === b.pout;
-}
-function toPrune(list, keep = SNAPSHOT_KEEP) {
-  return list.slice().sort((a, b) => b.at - a.at || b.id - a.id).slice(keep).map((s) => s.id);
-}
-function restoreFrom(cur, snap2) {
-  const now = new Map(cur.media.map((m) => [m.id, m]));
-  const media = cur.media.map((m) => {
-    const old = snap2.media.find((x) => x.id === m.id);
-    if (!old) return m;
-    return { ...m, inP: old.inP, outP: old.outP, r: old.r, marks: old.marks, rate: old.rate };
-  });
-  const clips = snap2.clips.filter((c) => c.type !== "media" || c.m != null && now.has(c.m));
-  return {
-    project: { ...cur, media, tracks: JSON.parse(JSON.stringify(snap2.tracks)), clips: JSON.parse(JSON.stringify(clips)), pin: snap2.pin, pout: snap2.pout },
-    dropped: snap2.clips.length - clips.length
-  };
-}
-function formatTime(at, today = Date.now()) {
-  const d = new Date(at), t = new Date(today);
-  const hm2 = (d.getHours() < 10 ? "0" : "") + d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes();
-  const same = d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
-  return same ? "今日 " + hm2 : d.getMonth() + 1 + "/" + d.getDate() + " " + hm2;
-}
-var last = null, lastAt = null;
-var store = {
-  add: function(at, kind, summary, data) {
-    if (HOST) return HOST.history.add(at, kind, summary, data);
-    return IDB.op("history", "readwrite", function(st) {
-      return st.add({ at, kind, summary, data });
-    });
-  },
-  list: function() {
-    if (HOST) return HOST.history.list();
-    return IDB.op("history", "readonly", function(st) {
-      return st.getAll();
-    }).then(function(all) {
-      return (all || []).map(function(r) {
-        return { id: r.id, at: r.at, kind: r.kind, summary: r.summary };
-      }).sort(function(a, b) {
-        return b.at - a.at || b.id - a.id;
-      });
-    });
-  },
-  get: function(id) {
-    if (HOST) return HOST.history.get(id);
-    return IDB.op("history", "readonly", function(st) {
-      return st.get(id);
-    }).then(function(r) {
-      return r ? r.data : null;
-    });
-  },
-  del: function(ids) {
-    if (!ids.length) return Promise.resolve();
-    if (HOST) return HOST.history.del(ids);
-    return IDB.op("history", "readwrite", function(st) {
-      ids.forEach(function(id) {
-        st.delete(id);
-      });
-      return null;
-    });
-  }
-};
-function ready() {
-  return HOST ? !!HOST.project.current : !!(IDB && IDB.db);
-}
-function historyReset() {
-  last = null;
-  lastAt = null;
-}
-function historyTick(kind) {
-  kind = kind || "auto";
-  if (!ready()) return Promise.resolve(null);
-  var now = Date.now();
-  if (kind === "auto" && !dueForSnapshot(lastAt, now)) return Promise.resolve(null);
-  var s = slimForSnapshot(P);
-  if (kind !== "restore" && sameContent(last, s)) return Promise.resolve(null);
-  last = s;
-  lastAt = now;
-  return Promise.resolve(store.add(now, kind, summarize(P), s)).then(function(id) {
-    return store.list().then(function(L) {
-      return store.del(toPrune(L));
-    }).then(function() {
-      return id;
-    });
-  }).catch(function() {
-    return null;
-  });
-}
-function openHistory() {
-  if (!ready()) return toast(HOST ? "プロジェクトを開くと、変更履歴が残るようになります" : "このブラウザでは変更履歴を使えません");
-  var d = document.getElementById("dlg");
-  d.innerHTML = '<div class="dlg hist" role="dialog" aria-modal="true" aria-labelledby="dlgT"><h2 id="dlgT">変更履歴・復元</h2><p class="mu">編集しているあいだ、2分ごとにプロジェクトの写しを残しています（新しい順に100件）。戻したい時点の「復元」を押してください。復元したあとも、Ctrl+Z で元に戻せます。</p><div class="hlist" data-hlist><div class="mu" style="padding:16px">読み込んでいます…</div></div><div class="row" style="justify-content:flex-end;margin-top:16px">' + btn("閉じる", "dlgNo", "", "pri") + "</div></div>";
-  d.hidden = false;
-  d.querySelector('[data-a="dlgNo"]').focus();
-  Promise.resolve(store.list()).then(function(L) {
-    var box = d.querySelector("[data-hlist]");
-    if (!box) return;
-    box.innerHTML = L.length ? L.map(function(r) {
-      return '<div class="hsnap"><span>' + h(formatTime(r.at)) + '</span><span class="chip ' + (r.kind === "auto" ? "c-mu" : "c-in") + '">' + h(KIND_LABEL[r.kind] || r.kind) + '</span><span class="t2">' + h(r.summary) + "</span>" + btn("復元", "hRestore", r.id + "|" + r.at, "s") + "</div>";
-    }).join("") : '<div class="mu" style="padding:16px">まだ履歴がありません。編集すると、2分ごとに残ります。</div>';
-  }).catch(function(e) {
-    var box = d.querySelector("[data-hlist]");
-    if (box) box.innerHTML = '<div class="t-wn" style="padding:16px">変更履歴を読み込めませんでした：' + h(String(e)) + "</div>";
-  });
-}
-function restoreHistory(v) {
-  var p = String(v).split("|"), id = +p[0], at = +p[1];
-  ask("この時点に戻す", "「" + formatTime(at) + "」の状態に戻します。いまの状態は「復元する前」として履歴に残り、Ctrl+Z でも元に戻せます。", "復元", function() {
-    Promise.resolve(store.get(id)).then(function(snap2) {
-      if (!snap2) return toast("その履歴は見つかりませんでした");
-      return historyTick("restore").then(function() {
-        mark();
-        var r = restoreFrom(P, snap2);
-        Object.keys(E.els).forEach(dropEl);
-        setP(r.project);
-        S.sel = [];
-        last = slimForSnapshot(P);
-        lastAt = Date.now();
-        changed();
-        toast(r.dropped ? "復元しました（いまはない素材のクリップ " + r.dropped + "件は戻せませんでした）" : "「" + formatTime(at) + "」の状態に復元しました");
-      });
-    }).catch(function(e) {
-      toast("復元できませんでした：" + e);
-    });
-  });
-}
-var MENUS;
-function viewItems() {
-  var o = [{ h: "ページ" }];
-  D.pages.forEach(function(p, i) {
-    o.push([p[1], "go:" + p[0], "Alt+" + (i + 1), S.page === p[0]]);
-  });
-  o.push("-", { h: "テーマ" });
-  [["ライト", "light"], ["ダーク", "dark"], ["システムに合わせる", "system"]].forEach(function(t) {
-    o.push([t[0], "th:" + t[1], "", S.theme === t[1]]);
-  });
-  o.push("-", { h: "アクセントカラー" });
-  [["青", "blue"], ["緑", "green"], ["オレンジ", "orange"], ["紫", "purple"]].forEach(function(t) {
-    o.push([t[0], "ac:" + t[1], "", S.accent === t[1]]);
-  });
-  return o;
-}
-function items(its) {
-  return its.map(function(x) {
-    if (x === "-") return '<div class="sep"></div>';
-    if (x.h) return '<div class="dh">' + x.h + "</div>";
-    return '<button class="it" role="menuitem"' + (x[4] ? " disabled" : "") + ' data-m="' + (x[1] || "todo") + '"><span class="ck">' + (x[3] ? "✓" : "") + '</span><span class="lb">' + x[0] + '</span><span class="sc">' + h(menuKey(x[1]) || x[2] || "") + "</span></button>";
-  }).join("");
-}
-function menuKey(a) {
-  if (!a) return "";
-  if (a === "go:export") a = "toExport";
-  return KEYMAP[a] ? keyOf(a) : "";
-}
-var mbOpen;
-function buildMb() {
-  document.getElementById("mb").innerHTML = MENUS.map(function(m, i) {
-    return '<button data-menu="' + i + '" aria-haspopup="true" aria-expanded="false">' + m.n + "</button>";
-  }).join("");
-}
-function closeMenu() {
-  document.getElementById("dd").hidden = true;
-  document.getElementById("cx").hidden = true;
-  mbOpen = null;
-  [].forEach.call(document.querySelectorAll("[data-menu]"), function(b) {
-    b.setAttribute("aria-expanded", "false");
-  });
-}
-function openMenu(b) {
-  closeMenu();
-  var m = MENUS[+b.dataset.menu], d = document.getElementById("dd"), r = b.getBoundingClientRect();
-  d.innerHTML = items(m.i === "view" ? viewItems() : m.i === "file" ? fileItems() : m.i);
-  d.style.left = r.left / SCALE + "px";
-  d.style.top = r.bottom / SCALE + "px";
-  d.style.position = "fixed";
-  d.hidden = false;
-  mbOpen = b.dataset.menu;
-  b.setAttribute("aria-expanded", "true");
-  var f = d.querySelector(".it");
-  if (f) f.focus();
-}
-function openCx(x, y, list) {
-  var c = document.getElementById("cx");
-  c.innerHTML = items(list || [["キーフレームを追加"], ["キーフレームを削除"], "-"].concat(["リニア", "ベジェ", "停止"].map(function(k) {
-    return [k, "kfm:" + k, "", S.kfMode === k];
-  })).concat(["-", ["イーズイン"], ["イーズアウト"], "-", ["コピー"], ["貼り付け", "", "", "", 1]]));
-  c.hidden = false;
-  var w = c.offsetWidth, hh = c.offsetHeight;
-  c.style.left = Math.min(x / SCALE, innerWidth / SCALE - w - 4) + "px";
-  c.style.top = Math.min(y / SCALE, innerHeight / SCALE - hh - 4) + "px";
-  var f = c.querySelector(".it");
-  if (f) f.focus();
-}
-function menuAct(a) {
-  closeMenu();
-  if (a.indexOf("th:") === 0) {
-    S.theme = a.slice(3);
-    applyDesign();
-  } else if (a.indexOf("ac:") === 0) {
-    S.accent = a.slice(3);
-    applyDesign();
-  } else if (a.indexOf("go:") === 0) go(a.slice(3));
-  else if (a.indexOf("kfm:") === 0) {
-    S.kfMode = a.slice(4);
-    draw();
-  } else if (a.indexOf("orec:") === 0) {
-    var r = RECENT.filter(function(x) {
-      return !HOST.project.current || x.dir !== HOST.project.current.dir;
-    })[+a.slice(5)];
-    if (r) openProject(function() {
-      return HOST.project.openRecent(r.dir);
-    });
-  } else if (ACT[a]) ACT[a]();
-  else toast("この機能は、まだ使えません");
-}
-var mq;
-function applyDesign() {
-  var r = S.theme === "system" ? mq.matches ? "light" : "dark" : S.theme;
-  document.documentElement.dataset.theme = r;
-  document.documentElement.dataset.accent = S.accent;
-  persist();
-}
-function toast(m) {
-  var t = document.getElementById("toast");
-  t.textContent = m;
-  t.hidden = false;
-  clearTimeout(toast.h);
-  toast.h = setTimeout(function() {
-    t.hidden = true;
-  }, 2600);
-}
-function ask(title, msg, ok, fn) {
-  var d = document.getElementById("dlg");
-  d.innerHTML = '<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT"><h2 id="dlgT">' + h(title) + "</h2><p>" + h(msg) + '</p><div class="row" style="gap:8px;justify-content:flex-end">' + btn("キャンセル", "dlgNo", "", "sec") + btn(ok, "dlgOk", "", "pri") + "</div></div>";
-  d.hidden = false;
-  ask.fn = fn;
-  d.querySelector('[data-a="dlgOk"]').focus();
-}
-function resetProject(np) {
-  historyReset();
-  stopAll();
-  Object.keys(E.els).forEach(dropEl);
-  E.imgs = {};
-  if (HOST) {
-    HOST.media.cancel(P.media.map(function(m) {
-      return m.id;
-    }));
-    setJOBS({});
+function canvasAttrs() {
+  var wh = seqWH(), base = { high: 1920, std: 960, light: 480 }[ps().pq] || 960, w, hh;
+  if (wh[0] >= wh[1]) {
+    w = base;
+    hh = Math.round(base * wh[1] / wh[0]);
   } else {
-    P.media.forEach(function(m) {
-      if (m.url) URL.revokeObjectURL(m.url);
-    });
-    IDB.clear("files");
-    IDB.clear("history");
+    hh = base;
+    w = Math.round(base * wh[0] / wh[1]);
   }
-  setP(np);
-  setHIST([]);
-  setREDO([]);
-  S.media = np.media[0] ? np.media[0].id : null;
-  S.src = np.sample ? "v03" : null;
-  S.sel = np.sample ? ["c3", "c3a"] : [];
-  S.t.edit = 0;
-  S.t.cut = 0;
-  S.bin = "all";
-  S.pps = null;
-  S.tlx = S.tly = 0;
-  SRC.id = null;
-  SRC.el = null;
+  return 'width="' + w + '" height="' + hh + '"';
+}
+function pqLabel() {
+  return { high: "高画質", std: "標準画質", light: "軽量" }[ps().pq] || "標準画質";
+}
+function applyProjectSettings() {
+  var wh = seqWH(), a = document.getElementById("app");
+  if (a) a.style.setProperty("--ar", wh[0] + " / " + wh[1]);
+  setTcFps(parseFloat(ps().fps) || 30);
+}
+function openProjectSettings(tab) {
+  closeMenu();
+  S.pstab = S.pstab || "seq";
+  renderProjectSettings();
+}
+function seg(key, opts, cur) {
+  return '<span class="seg">' + opts.map(function(o) {
+    return btn(h(o[1]), "psSet", key + "|" + o[0], "s" + (String(cur) === String(o[0]) ? " on" : ""));
+  }).join("") + "</span>";
+}
+function select(key, opts, cur, label) {
+  return '<select class="inp" data-ps="' + key + '" aria-label="' + h(label) + '" style="min-width:220px">' + opts.map(function(o) {
+    var v = Array.isArray(o) ? o[0] : o, t = Array.isArray(o) ? o[1] : o + " fps";
+    return '<option value="' + h(v) + '"' + (String(cur) === String(v) ? " selected" : "") + ">" + h(t) + "</option>";
+  }).join("") + "</select>";
+}
+function renderProjectSettings() {
+  var d = document.getElementById("dlg"), t = S.pstab, s = ps(), body = "";
+  var tabs2 = [["seq", "シーケンス"], ["preview", "プレビュー"]].concat(HOST ? [["proxy", "プロキシ"]] : []).concat([["audio", "音声"]]);
+  if (!tabs2.some(function(x) {
+    return x[0] === t;
+  })) t = S.pstab = "seq";
+  if (t === "seq") body = "<h3>シーケンス</h3>" + prefRow("解像度", select("res", RES_OPTS, s.res, "解像度"), "プレビューの縦横の比率になります。書き出しの解像度がこれと違う比率のときは、書き出し前のチェックで知らせます。") + prefRow("フレームレート", select("fps", FPS_OPTS, s.fps, "フレームレート"), "タイムコードと、1フレームずつ動かすときの幅に使います。日本のテレビ放送は 29.97 fps です。");
+  else if (t === "preview") body = "<h3>プレビュー</h3>" + prefRow("画質", seg("pq", PQ_OPTS, s.pq), PQ_OPTS.map(function(o) {
+    return o[1] + "：" + o[2];
+  }).join("<br>") + "<br>再生が途切れるときは、軽くしてください。書き出しの画質は変わりません。");
+  else if (t === "proxy") body = "<h3>プロキシ</h3>" + prefRow("プロキシの高さ", seg("proxy", PROXY_OPTS, s.proxy), "重い素材（4K など）を編集するときに使う、軽い動画の大きさです。これから作るプロキシに使います。書き出しには元の素材を使うので、書き出しの画質は変わりません。") + prefRow("作り直す", btn("いまのプロキシを作り直す", "psProxy", "", "s"), "設定を変えたあと、作ってあるプロキシもこの高さにしたいときに押します。作っている間も編集を続けられます。");
+  else body = "<h3>音声</h3>" + prefRow("サンプリング周波数", seg("ar", AR_OPTS, s.ar), "書き出す音声の細かさです。ふつうは 48 kHz のままでかまいません。");
+  d.innerHTML = '<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">プロジェクト設定</h2>' + btn("閉じる", "dlgNo", "", "s") + '</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">' + tabs2.map(function(x) {
+    return "<button" + (t === x[0] ? ' aria-current="true"' : "") + A("psTab", x[0]) + ">" + x[1] + "</button>";
+  }).join("") + '</nav><div class="pcont">' + body + '<div class="mu" style="margin-top:16px;line-height:1.6">この設定はプロジェクトに保存されます（プロジェクトごとに違う設定にできます）。</div></div></div></div>';
+  d.hidden = false;
+  [].forEach.call(d.querySelectorAll("[data-ps]"), function(el) {
+    el.addEventListener("change", function() {
+      setPs(el.dataset.ps, el.value);
+    });
+  });
+}
+function setPs(key, v) {
+  var s = P.settings = Object.assign({}, P.settings || {});
+  s[key] = key === "proxy" || key === "ar" ? +v : v;
+  applyProjectSettings();
   saveP();
   draw();
+  renderProjectSettings();
 }
-function infoDlg(title, html) {
-  var d = document.getElementById("dlg");
-  d.innerHTML = '<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT" style="width:560px"><h2 id="dlgT">' + h(title) + '</h2><div style="max-height:60vh;overflow:auto">' + html + '</div><div class="row" style="justify-content:flex-end;margin-top:14px">' + btn("閉じる", "dlgNo", "", "pri") + "</div></div>";
-  d.hidden = false;
-  d.querySelector('[data-a="dlgNo"]').focus();
-}
-var NATIVE, nativeLast;
-var NATIVE_ITEMS = { copy: "copy", cut2: "cut", paste: "paste" };
-function unesc(t) {
-  return String(t).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
-}
-function nativeAccel(a, txt) {
-  var k = a === "go:export" ? "toExport" : a, L = k && KEYMAP[k] || [], c = L.filter(function(x) {
-    return /(^|\+)Ctrl(\+|$)/.test(x);
-  })[0] || txt || "";
-  if (k === "redo" && L.indexOf("Ctrl+Shift+Z") >= 0) c = "Ctrl+Shift+Z";
-  if (!/(^|\+)Ctrl(\+|$)/.test(c)) return null;
-  var parts = c.split("+"), key = parts.pop();
-  key = { ",": "Comma", ".": "Period", "/": "Slash" }[key] || key;
-  if (!/^([A-Z0-9]|Comma|Period|Slash)$/.test(key)) return null;
-  return parts.map(function(m) {
-    return m === "Ctrl" ? "CmdOrCtrl" : m;
-  }).concat([key]).join("+");
-}
-function nativeSpec() {
-  var used = {};
-  return MENUS.map(function(m) {
-    var its = m.i === "view" ? viewItems() : m.i === "file" ? fileItems() : m.i, out = [];
-    its.forEach(function(x) {
-      if (x === "-") {
-        if (out.length && out[out.length - 1].kind !== "sep") out.push({ kind: "sep" });
-        return;
-      }
-      if (x.h) {
-        out.push({ kind: "head", label: unesc(x.h) });
-        return;
-      }
-      var id = x[1] || "todo";
-      if (id === "prefs" || id === "about") return;
-      if (NATIVE_ITEMS[id]) {
-        out.push({ kind: "native", id: NATIVE_ITEMS[id], label: unesc(x[0]) });
-        return;
-      }
-      var o = { kind: m.i === "view" && x[3] !== void 0 ? "check" : "item", id, label: unesc(x[0]), enabled: !x[4], checked: !!x[3] }, ac = nativeAccel(x[1], x[2]);
-      if (ac && !used[ac]) {
-        used[ac] = 1;
-        o.accel = ac;
-      }
-      out.push(o);
-    });
-    while (out.length && out[out.length - 1].kind === "sep") out.pop();
-    return { label: m.n, items: out };
+function rebuildProxies() {
+  if (!HOST) return;
+  var L = P.media.filter(function(m) {
+    return m.file && m.np && !m.missing && m.path;
   });
-}
-function syncNativeMenu() {
-  if (!NATIVE) return;
-  var sp = nativeSpec(), j = JSON.stringify(sp);
-  if (j === nativeLast) return;
-  nativeLast = j;
-  Promise.resolve(HOST.menu.set(sp)).catch(function() {
-    nativeLast = "";
-  });
-}
-function editing() {
-  var a = document.activeElement;
-  return !!a && (a.isContentEditable || a.tagName === "TEXTAREA" || a.tagName === "INPUT" && !/^(range|checkbox|radio|button|submit)$/.test(a.type));
-}
-function onNativeMenu(id) {
-  if (editing() && (id === "undo" || id === "redo" || id === "selAll")) {
-    document.execCommand(id === "selAll" ? "selectAll" : id);
-    return;
-  }
-  menuAct(id);
-}
-function init$9() {
-  MENUS = [
-    { n: "ファイル", i: "file" },
-    { n: "編集", i: [["元に戻す", "undo", "Ctrl+Z"], ["やり直し", "redo", "Ctrl+Y"], "-", ["切り取り", "cut2", "Ctrl+X"], ["コピー", "copy", "Ctrl+C"], ["貼り付け", "paste", "Ctrl+V"], ["複製", "dup", "Ctrl+D"], "-", ["再生ヘッドで分割", "split", "S"], ["削除", "delSel", "Delete"], ["削除して詰める", "rdel", "Shift+Delete"], "-", ["すべて選択", "selAll", "Ctrl+A"], ["リンク／リンク解除", "lnk", "Ctrl+L"], "-", ["映像トラックを追加", "addV"], ["音声トラックを追加", "addA"]] },
-    { n: "表示", i: "view" },
-    { n: "プロジェクト", i: [["プロジェクト設定…"], ["メンバーと権限…"], ["変更履歴・復元…", "hist"], "-", ["台本アプリと紐づけ…", "go:script"]] },
-    { n: "ヘルプ", i: [["使い方", "help"], ["キーボードショートカット…", "keys"], ["バージョン情報", "about"]] }
-  ];
-  mbOpen = null;
-  nativeLast = "";
-  NATIVE = !!(HOST && HOST.menu && /Mac/.test(navigator.platform || navigator.userAgent || ""));
-  if (NATIVE) {
-    document.body.classList.add("native-menu");
-    HOST.menu.onAction(onNativeMenu);
-    ["copy", "cut", "paste"].forEach(function(t) {
-      document.addEventListener(t, function(e) {
-        if (editing()) return;
-        e.preventDefault();
-        menuAct(t === "cut" ? "cut2" : t);
+  if (!L.length) return toast("作り直すプロキシはありません");
+  HOST.media.cancel(L.map(function(m) {
+    return m.id;
+  }));
+  L.forEach(function(m) {
+    m.px = 0;
+    delete m.proxyPath;
+    m.url = mediaUrl(m);
+    Object.keys(E.els).forEach(function(id) {
+      var c = P.clips.find(function(x) {
+        return x.id === id;
       });
+      if (c && c.m === m.id) dropEl(id);
     });
-  }
-  mq = matchMedia("(prefers-color-scheme: light)");
-  if (mq.addEventListener) mq.addEventListener("change", applyDesign);
+    JOBS[m.id] = JOBS[m.id] || {};
+    JOBS[m.id].proxy = 0;
+    HOST.media.process([{ id: m.id, path: m.path, kind: m.k, duration: m.d || 0, proxy: true, proxyHeight: ps().proxy }]);
+  });
+  saveP();
+  draw();
+  toast(L.length + "件のプロキシを " + ps().proxy + "p で作り直しています");
 }
 var lastPage;
 function head() {
@@ -4756,6 +4888,7 @@ function nav() {
   }).join("");
 }
 function draw() {
+  applyProjectSettings();
   var pg = document.getElementById("page"), f = document.activeElement, fk = f && f.dataset && f.dataset.in, pos = f && f.selectionStart;
   var sc = [].map.call(pg.querySelectorAll(".scroll"), function(e) {
     return e.scrollTop;
@@ -4888,7 +5021,7 @@ function roughStrip() {
   if (!L.length) return '<div class="mu" style="padding:22px 0">まだカットがありません。ソースでイン点とアウト点を決めて「仮編集へ追加」を押してください。</div>';
   return '<div style="display:flex;gap:2px" data-rough>' + L.map(function(c, i) {
     var x = M(c.m) || { n: "（削除された素材）" }, on = S.sel.indexOf(c.id) >= 0;
-    return '<div class="li" role="button" tabindex="0" data-rc="' + c.id + '"' + A("rsel", c.id) + ' title="' + h(x.n) + "　" + tc(c.start) + 'から" style="width:' + (cLen(c) / sum * 100).toFixed(2) + "%;min-width:24px;height:78px;position:relative;background:" + (on ? "#bfe9f8" : "#8fd3ee") + ";border:1px solid rgba(0,0,0,.35);border-radius:3px;" + (on ? "box-shadow:0 0 0 2px var(--wt);" : "") + 'overflow:hidden"><div style="height:20px;padding:0 6px;line-height:20px;color:#06222f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b style="margin-right:6px;font-weight:500">' + (i + 1) + "</b>" + h(x.n) + "　" + mmss$1(cLen(c)) + '</div><div style="position:absolute;left:0;right:0;top:20px;bottom:0;' + filmStyle(x) + '"></div></div>';
+    return '<div class="li" role="button" tabindex="0" data-rc="' + c.id + '"' + A("rsel", c.id) + ' title="' + h(x.n) + "　" + tc(c.start) + 'から" style="width:' + (cLen(c) / sum * 100).toFixed(2) + "%;min-width:24px;height:78px;position:relative;background:" + (on ? "#bfe9f8" : "#8fd3ee") + ";border:1px solid rgba(0,0,0,.35);border-radius:3px;" + (on ? "box-shadow:0 0 0 2px var(--wt);" : "") + 'overflow:hidden"><div style="height:20px;padding:0 6px;line-height:20px;color:#06222f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b style="margin-right:6px;font-weight:500">' + (i + 1) + "</b>" + h(x.n) + "　" + mmss(cLen(c)) + '</div><div style="position:absolute;left:0;right:0;top:20px;bottom:0;' + filmStyle(x) + '"></div></div>';
   }).join("") + "</div>";
 }
 function init$5() {
@@ -4910,7 +5043,7 @@ function init$5() {
         return S.cflt === "all" || (m2.rate || "未確認") === S.cflt;
       }).map(function(m2) {
         var rt = m2.rate || "未確認", c = { "採用": "c-ok", "保留": "c-wn", "不採用": "c-er" }[rt] || "c-mu";
-        return '<div class="li' + (S.src === m2.id ? " selr" : "") + '" role="button" tabindex="0"' + A("csrc", m2.id) + ' style="display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:center;height:60px;padding:0 16px;border-bottom:1px solid var(--dv)">' + mthumb(m2, 64, 36) + '<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h(m2.n) + '</span><span class="row" style="gap:8px"><span class="mu">' + (m2.k === "画像" ? "画像" : mmss$1(m2.d)) + "</span>" + chip(rt, c) + "</span></div></div>";
+        return '<div class="li' + (S.src === m2.id ? " selr" : "") + '" role="button" tabindex="0"' + A("csrc", m2.id) + ' style="display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:center;height:60px;padding:0 16px;border-bottom:1px solid var(--dv)">' + mthumb(m2, 64, 36) + '<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h(m2.n) + '</span><span class="row" style="gap:8px"><span class="mu">' + (m2.k === "画像" ? "画像" : mmss(m2.d)) + "</span>" + chip(rt, c) + "</span></div></div>";
       }).join("") + (vids.length ? "" : '<div class="mu" style="padding:20px 14px">映像の素材がありません。メディアページで読み込んでください。</div>') + "</div>";
     }
     var m = M(S.src) || vids[0], main = "";
@@ -4925,7 +5058,7 @@ function init$5() {
         outP = 5;
       }
       var step = tot > 600 ? 120 : tot > 240 ? 60 : tot > 60 ? 30 : tot > 20 ? 5 : 1, labels = "";
-      for (var i = 0; i * step <= tot; i++) labels += '<div style="position:absolute;left:' + i * step / tot * 100 + '%;top:0;height:22px;border-left:1px solid var(--mu);padding-left:4px;color:var(--tx2);white-space:nowrap">' + mmss$1(i * step) + "</div>";
+      for (var i = 0; i * step <= tot; i++) labels += '<div style="position:absolute;left:' + i * step / tot * 100 + '%;top:0;height:22px;border-left:1px solid var(--mu);padding-left:4px;color:var(--tx2);white-space:nowrap">' + mmss(i * step) + "</div>";
       var marks = '<div style="position:absolute;left:' + inP / tot * 100 + "%;width:" + (outP - inP) / tot * 100 + '%;top:44px;height:56px;border-left:2px solid var(--ac);border-right:2px solid var(--ac);background:rgba(255,255,255,.14);pointer-events:none"></div><div style="position:absolute;left:' + inP / tot * 100 + '%;top:28px;width:16px;height:16px;border-radius:3px 3px 0 0;background:var(--ac);color:#fff;font-size:10px;font-weight:500;display:flex;align-items:center;justify-content:center;pointer-events:none">I</div><div style="position:absolute;left:calc(' + outP / tot * 100 + '% - 16px);top:28px;width:16px;height:16px;border-radius:3px 3px 0 0;background:var(--ac);color:#fff;font-size:10px;font-weight:500;display:flex;align-items:center;justify-content:center;pointer-events:none">O</div>';
       if (isMain) marks += C2.marks.map(function(k) {
         return '<div style="position:absolute;left:' + k.l + "%;width:" + k.w + "%;top:44px;height:56px;background:repeating-linear-gradient(135deg,rgba(230,60,60,.75) 0 3px,transparent 3px 7px);opacity:" + (k.done ? 1 : 0.75) + ';pointer-events:none"></div><div style="position:absolute;left:' + k.l + '%;top:22px;padding:1px 6px;border-radius:3px;background:var(--erb);color:var(--er);font-weight:500;white-space:nowrap">' + h(k.k) + "</div>";
@@ -4936,7 +5069,7 @@ function init$5() {
       }).join("");
       var mon = m.url && m.k === "映像" ? '<div data-srcbox style="height:calc(214px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain;background:#000"></div>' : m.thumb ? '<img src="' + m.thumb + '" alt="" style="height:calc(214px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain">' : '<div class="frame" style="height:calc(214px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;background:' + (m.col ? m.col[0] : "#333") + '">' + (m.sample ? '<span style="color:rgba(255,255,255,.7)">' + h(m.n) + "（見本）</span>" : "") + "</div>";
       var p = primary(), onV1 = p && p.tr === "V1", vi = onV1 ? v1Clips().indexOf(p) : -1;
-      main = ph("ソース　" + h(m.n), '<span class="x">IN ' + tc(inP) + "　OUT " + tc(outP) + "　長さ " + mmss$1(outP - inP) + "</span>") + '<div class="mon" style="height:calc(240px + var(--xh,0px)*.5)">' + mon + "</div>" + transport("cut", ibtn("back", "1フレーム戻る", "sfb") + playBtn(SRC.playing) + ibtn("fwd", "1フレーム進む", "sff"), "全長 " + mmss$1(tot)) + '<div style="height:116px;flex:none;padding:12px 16px 0;background:var(--bg0);border-bottom:1px solid var(--dv)"><div style="position:relative;height:100%;cursor:pointer" data-scrub="cut"><div style="position:relative;height:22px">' + labels + '</div><div style="position:absolute;left:0;right:0;top:44px;height:56px;background:#2f78b7;border:1px solid #8cc4ee;overflow:hidden">' + (img ? "" : waveOf(m, 0, tot, 150)) + "</div>" + marks + '<div data-head="cut" style="position:absolute;left:' + S.t.cut / tot * 100 + '%;top:28px;height:72px;width:1px;background:var(--tx);pointer-events:none"></div></div></div><div class="row" style="height:48px;flex:none;gap:8px;padding:0 16px;border-bottom:1px solid var(--dv)">' + btn("イン点", "setIn", "", "", "イン点（I キー）") + btn("アウト点", "setOut", "", "", "アウト点（O キー）") + '<span class="vsep"></span>' + btn("不要部分を削除", "delAll") + btn("無音を検出", "detect") + '<span class="grow"></span>' + btn("仮編集へ追加（挿入）", "cutIns", "", "on") + btn("上書き", "cutOvr") + "</div>" + ph("仮編集（ラフカット）＝ V1", '<span class="x">合計 ' + mmss$1(v1Clips().reduce(function(a, c) {
+      main = ph("ソース　" + h(m.n), '<span class="x">IN ' + tc(inP) + "　OUT " + tc(outP) + "　長さ " + mmss(outP - inP) + "</span>") + '<div class="mon" style="height:calc(240px + var(--xh,0px)*.5)">' + mon + "</div>" + transport("cut", ibtn("back", "1フレーム戻る", "sfb") + playBtn(SRC.playing) + ibtn("fwd", "1フレーム進む", "sff"), "全長 " + mmss(tot)) + '<div style="height:116px;flex:none;padding:12px 16px 0;background:var(--bg0);border-bottom:1px solid var(--dv)"><div style="position:relative;height:100%;cursor:pointer" data-scrub="cut"><div style="position:relative;height:22px">' + labels + '</div><div style="position:absolute;left:0;right:0;top:44px;height:56px;background:#2f78b7;border:1px solid #8cc4ee;overflow:hidden">' + (img ? "" : waveOf(m, 0, tot, 150)) + "</div>" + marks + '<div data-head="cut" style="position:absolute;left:' + S.t.cut / tot * 100 + '%;top:28px;height:72px;width:1px;background:var(--tx);pointer-events:none"></div></div></div><div class="row" style="height:48px;flex:none;gap:8px;padding:0 16px;border-bottom:1px solid var(--dv)">' + btn("イン点", "setIn", "", "", "イン点（I キー）") + btn("アウト点", "setOut", "", "", "アウト点（O キー）") + '<span class="vsep"></span>' + btn("不要部分を削除", "delAll") + btn("無音を検出", "detect") + '<span class="grow"></span>' + btn("仮編集へ追加（挿入）", "cutIns", "", "on") + btn("上書き", "cutOvr") + "</div>" + ph("仮編集（ラフカット）＝ V1", '<span class="x">合計 ' + mmss(v1Clips().reduce(function(a, c) {
         return a + cLen(c);
       }, 0)) + "　" + v1Clips().length + "カット</span>" + (onV1 ? btn("選択したカットを削除", "rdel", "", "s") : "")) + '<div style="flex:1;min-height:0;padding:14px;background:var(--bg0);overflow:auto">' + roughStrip() + '<div class="mu" style="margin-top:10px">ドラッグで並べ替え　／　' + (vi >= 0 ? "カット" + (vi + 1) + "の後ろに挿入されます" : "V1 の最後に追加されます") + "（後ろのクリップは、ほかのトラックも一緒にずれます）</div></div>";
     }
@@ -5828,28 +5961,28 @@ init$7();
 init$r();
 init$q();
 init$p();
-init$a();
+init$9();
 init$o();
-init$n();
-init$c();
-init$b();
 init$m();
-init$g();
+init$b();
+init$a();
+init$n();
+init$i();
 init$l();
 init$k();
 init$6();
 init$5();
-init$h();
+init$j();
 init$4();
 init$3();
-init$f();
+init$g();
 init$8();
-init$9();
-init$i();
-init$j();
+init$c();
 init$d();
+init$h();
+init$e();
 init$2();
 init$1();
-init$e();
+init$f();
 init();
 </script>

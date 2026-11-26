@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { applyProjectSettings } from './projectSettings';
 import { syncNativeMenu } from './menus';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
@@ -22,7 +23,7 @@ export function head(){var m=D.meta[S.page];
     '<span class="grow"></span>'+(P.sample?'<span class="mu">'+m.role+'</span>':'')+'<span class="t-ok" data-saved>'+(S.savedAt?'● 自動保存済み '+S.savedAt:HOST?(projName()?'● 自動保存':P.sample?'見本（保存されません）':'● 素材を読み込むと自動保存'):'● このブラウザに自動保存')+'</span>'+
     (m.people&&P.sample?'<span class="av" aria-label="作業中のメンバー">'+D.people.map(function(p){return '<span style="background:'+p[1]+';color:'+p[2]+'">'+p[0]+'</span>';}).join('')+'</span>':''));}
 export function nav(){document.getElementById('pages').innerHTML=D.pages.map(function(p){return '<button'+A('go',p[0])+(S.page===p[0]?' aria-current="page"':'')+'>'+p[1]+'</button>';}).join('');}
-export function draw(){var pg=document.getElementById('page'),f=document.activeElement,fk=f&&f.dataset&&f.dataset.in,pos=f&&f.selectionStart;
+export function draw(){applyProjectSettings();var pg=document.getElementById('page'),f=document.activeElement,fk=f&&f.dataset&&f.dataset.in,pos=f&&f.selectionStart;
   var sc=[].map.call(pg.querySelectorAll('.scroll'),function(e){return e.scrollTop;});
   pg.innerHTML=R[S.page]();head();nav();
   if(lastPage!==S.page){pg.classList.remove('enter');void pg.offsetWidth;pg.classList.add('enter');lastPage=S.page;}

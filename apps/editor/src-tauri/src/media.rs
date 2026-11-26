@@ -165,6 +165,9 @@ pub struct JobReq {
     pub peaks: bool,
     #[serde(default)]
     pub proxy: bool,
+    /// プロキシの高さ（プロジェクト設定。既定は 720）
+    #[serde(default)]
+    pub proxy_height: Option<u32>,
 }
 
 /// 画面に送る進み具合
@@ -512,6 +515,8 @@ async fn encode(
     let tmp = dir.join(format!("{}.part.{ext}", it.id));
     let out = dir.join(format!("{}.{ext}", it.id));
     // 操作が重くならないよう、CPU を1つ空けておく
+    let ph = it.proxy_height.unwrap_or(720).clamp(240, 2160);
+    let vf = format!("scale=w=-2:h='min({ph},ih)':flags=bilinear,format=yuv420p");
     let threads = std::thread::available_parallelism()
         .map(|n| n.get().saturating_sub(1).max(1))
         .unwrap_or(2);
@@ -539,7 +544,7 @@ async fn encode(
                 "-sn",
                 "-dn",
                 "-vf",
-                "scale=w=-2:h='min(720,ih)':flags=bilinear,format=yuv420p",
+                vf.as_str(),
                 "-g",
                 "15",
             ]
