@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { drawLookText } from './titleStyles';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { C, M, P, T, cEnd, progDur, vTracks } from './project';
 import { S } from './state';
@@ -46,7 +47,7 @@ export function sync(t,play){var want={};
 /* 1フレームを描く：V1 から上へ重ねる。見本の素材は色の画面に名前を出す */
 export function drawFrame(cx,W,H,t){cx.fillStyle='#000';cx.fillRect(0,0,W,H);
   vTracks().slice().reverse().forEach(function(tr){if(tr.hide)return;P.clips.forEach(function(c){if(c.tr!==tr.id||t<c.start-1e-9||t>=cEnd(c))return;
-    if(c.type==='title')drawTitle(cx,W,H,{label:c.label,st:c.st,sz:c.sz,t:c.start-c.in,d:Math.max(0.1,c.out)},t);
+    if(c.type==='title')drawTitle(cx,W,H,{label:c.label,st:c.st,sz:c.sz,look:c.look,t:c.start-c.in,d:Math.max(0.1,c.out)},t);
     else if(c.type==='adj')adjust(cx,W,H);else drawClip(cx,W,H,c);});});}
 export function adjust(cx,W,H){try{var tmp=adjust.c||(adjust.c=document.createElement('canvas'));tmp.width=W;tmp.height=H;tmp.getContext('2d').drawImage(cx.canvas,0,0);cx.filter='saturate(1.08) contrast(1.04)';cx.drawImage(tmp,0,0);cx.filter='none';}catch(e){}}
 export function drawClip(cx,W,H,c){var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='映像'&&m.k!=='画像')return;
@@ -55,16 +56,18 @@ export function drawClip(cx,W,H,c){var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='
   cx.translate(W/2+(c.x||0)/100*W,H/2+(c.y||0)/100*H);cx.rotate((c.rot||0)*Math.PI/180);
   if(w){var s=Math.min(W/w,H/hh)*sc;cx.drawImage(src,-w*s/2,-hh*s/2,w*s,hh*s);}
   else{var col=m.col||['#333','#222'],g=cx.createLinearGradient(-W/2,-H/2,W/2,H/2);g.addColorStop(0,col[0]);g.addColorStop(1,col[1]);cx.fillStyle=g;cx.fillRect(-W/2*sc,-H/2*sc,W*sc,H*sc);
-    cx.fillStyle='rgba(255,255,255,.78)';cx.font='500 '+Math.round(H*.05*sc)+'px "Noto Sans JP",sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(m.n+(m.url?'（読み込み中）':'（見本）'),0,0);}
+    cx.fillStyle='rgba(255,255,255,.78)';cx.font='500 '+Math.round(H*.05*sc)+'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(m.n+(m.url?'（読み込み中）':'（見本）'),0,0);}
   cx.restore();}
 /* テロップ：name=店名（画面下・白文字縁取り） q=質問（画面上・黄色帯） sub=字幕（下中央・半透明帯） credit=クレジット（下から上へ流れる） */
 export var TST;
 export function drawTitle(cx,W,H,ti,t){var sz={'小':.042,'中':.055,'大':.075}[ti.sz||'中']||.055,fs=Math.round(H*sz),lines=String(ti.label||'').split('\n'),lh=fs*1.35,pad=fs*.6;
-  cx.font='700 '+fs+'px "Noto Sans JP",sans-serif';cx.textBaseline='middle';cx.lineJoin='round';
+  cx.font='700 '+fs+'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';cx.textBaseline='middle';cx.lineJoin='round';
+  var lk=ti.look; /* テロップのスタイル（titleStyles.ts）。あれば文字をそのスタイルで描く */
   var tw=Math.max.apply(null,lines.map(function(l){return cx.measureText(l).width;}).concat([0])),bh=lh*lines.length;
-  function outl(l,x,y){cx.lineWidth=fs*.18;cx.strokeStyle='rgba(0,0,0,.85)';cx.strokeText(l,x,y);cx.fillStyle='#fff';cx.fillText(l,x,y);}
-  if(ti.st==='q'){cx.textAlign='left';cx.fillStyle='rgba(255,210,60,.92)';cx.fillRect(W*.06,H*.07,tw+pad*2,bh+pad*.8);cx.fillStyle='#1a1400';lines.forEach(function(l,i){cx.fillText(l,W*.06+pad,H*.07+pad*.4+lh*(i+.5));});}
-  else if(ti.st==='sub'){cx.textAlign='center';var y0=H*.92-bh;cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect((W-tw)/2-pad,y0-pad*.4,tw+pad*2,bh+pad*.8);cx.fillStyle='#fff';lines.forEach(function(l,i){cx.fillText(l,W/2,y0+lh*(i+.5));});}
+  function outl(l,x,y){if(lk)return drawLookText(cx,l,x,y,fs,lk);cx.lineWidth=fs*.18;cx.strokeStyle='rgba(0,0,0,.85)';cx.strokeText(l,x,y);cx.fillStyle='#fff';cx.fillText(l,x,y);}
+  function plain(l,x,y){if(lk)drawLookText(cx,l,x,y,fs,lk);else cx.fillText(l,x,y);}
+  if(ti.st==='q'){cx.textAlign='left';cx.fillStyle='rgba(255,210,60,.92)';cx.fillRect(W*.06,H*.07,tw+pad*2,bh+pad*.8);cx.fillStyle='#1a1400';lines.forEach(function(l,i){plain(l,W*.06+pad,H*.07+pad*.4+lh*(i+.5));});}
+  else if(ti.st==='sub'){cx.textAlign='center';var y0=H*.92-bh;cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect((W-tw)/2-pad,y0-pad*.4,tw+pad*2,bh+pad*.8);cx.fillStyle='#fff';lines.forEach(function(l,i){plain(l,W/2,y0+lh*(i+.5));});}
   else if(ti.st==='credit'){cx.textAlign='center';var pr=Math.max(0,Math.min(1,(t-ti.t)/ti.d)),y=H-(H+bh)*pr;lines.forEach(function(l,i){outl(l,W/2,y+lh*(i+.5));});}
   else{cx.textAlign='left';var yb=H*.9-bh;lines.forEach(function(l,i){outl(l,W*.06,yb+lh*(i+.5));});}}
 /* 止まっているときだけ描き直す（再生中は毎フレーム描くので、素材の読み込みのたびに描くと重くなる） */

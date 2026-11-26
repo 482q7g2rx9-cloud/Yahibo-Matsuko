@@ -414,6 +414,13 @@ body.native-menu #mb{display:none}
 .split:hover::after,.split.on::after{background:var(--ac)}
 body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!important}
 
+/* テロップのスタイルの一覧（テロップタブ）。見本は暗い地に描く */
+.tsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px;margin-top:4px}
+.tsl{aspect-ratio:8/5;padding:0;border:1px solid transparent;border-radius:4px;background:#262626;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.tsl img{width:100%;height:100%;object-fit:contain;pointer-events:none}
+.tsl:hover{border-color:var(--bdh)}
+.tsl.on{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+
 </style>
 <div id="app">
 <header id="top"></header>
@@ -910,6 +917,105 @@ function init$p() {
   })) S.page = "edit";
   if (["light", "dark", "system"].indexOf(S.theme) < 0) S.theme = "system";
   if (["blue", "green", "orange", "purple"].indexOf(S.accent) < 0) S.accent = "blue";
+}
+const COLORS = [
+  ["白", "#ffffff"],
+  ["黄", "#ffe14d"],
+  ["ピンク", "#ff6fb5"],
+  ["赤", "#ff4040"],
+  ["オレンジ", "#ff9a3c"],
+  ["緑", "#4fdc78"],
+  ["水色", "#4dd8ff"],
+  ["青", "#4a7dff"],
+  ["紫", "#b06bff"]
+];
+function lighten(hex, k = 0.6) {
+  const n = parseInt(hex.slice(1), 16), r = n >> 16, g = n >> 8 & 255, b = n & 255;
+  const m = (v) => Math.round(v + (255 - v) * k).toString(16).padStart(2, "0");
+  return "#" + m(r) + m(g) + m(b);
+}
+function darken(hex, k = 0.55) {
+  const n = parseInt(hex.slice(1), 16), r = n >> 16, g = n >> 8 & 255, b = n & 255;
+  const m = (v) => Math.round(v * (1 - k)).toString(16).padStart(2, "0");
+  return "#" + m(r) + m(g) + m(b);
+}
+const pick = (names) => COLORS.filter((c) => names.includes(c[0]));
+const ROW = ["白", "黄", "ピンク", "赤", "緑", "水色", "青"];
+const ROW2 = ["黄", "ピンク", "オレンジ", "赤", "緑", "水色", "紫"];
+const TITLE_PRESETS = [
+  ...pick(ROW).map(([n, c]) => ({ id: "edge-" + n, name: n + "・黒ふち", look: { fill: c, strokes: [["#111111", 0.24]] } })),
+  ...pick(ROW2).map(([n, c]) => ({ id: "double-" + n, name: n + "・二重ふち", look: { fill: c, strokes: [["#ffffff", 0.2], ["#151515", 0.38]] } })),
+  ...pick(ROW2).map(([n, c]) => ({ id: "white-" + n, name: "白・" + n + "ふち", look: { fill: "#ffffff", strokes: [[c, 0.24], [darken(c), 0.38]] } })),
+  ...pick(ROW2).map(([n, c]) => ({ id: "grad-" + n, name: n + "・グラデーション", look: { fill: lighten(c), fill2: c, strokes: [["#ffffff", 0.16], ["#202020", 0.32]] } })),
+  ...pick(ROW2).map(([n, c]) => ({ id: "glow-" + n, name: n + "・光る", look: { fill: "#ffffff", strokes: [[c, 0.1]], glow: [c, 0.55] } })),
+  ...pick(ROW).map(([n, c]) => ({ id: "shadow-" + n, name: n + "・影", look: { fill: c, strokes: [["#000000", 0.12]], shadow: ["rgba(0,0,0,.85)", 0.18, 0.07, 0.09] } }))
+];
+function presetById(id) {
+  return TITLE_PRESETS.find((p) => p.id === id);
+}
+function drawLookText(cx, text, x, y, fs, look) {
+  cx.save();
+  cx.lineJoin = "round";
+  cx.miterLimit = 2;
+  const strokes = (look.strokes || []).slice().sort((a, b) => b[1] - a[1]);
+  const shadow = () => {
+    if (!look.shadow) return;
+    const [c, blur, dx, dy] = look.shadow;
+    cx.shadowColor = c;
+    cx.shadowBlur = blur * fs;
+    cx.shadowOffsetX = dx * fs;
+    cx.shadowOffsetY = dy * fs;
+  };
+  const noShadow = () => {
+    cx.shadowColor = "transparent";
+    cx.shadowBlur = 0;
+    cx.shadowOffsetX = 0;
+    cx.shadowOffsetY = 0;
+  };
+  shadow();
+  strokes.forEach((s, i) => {
+    cx.lineWidth = s[1] * fs;
+    cx.strokeStyle = s[0];
+    cx.strokeText(text, x, y);
+    if (i === 0) noShadow();
+  });
+  if (!strokes.length) shadow();
+  if (look.glow) {
+    cx.shadowColor = look.glow[0];
+    cx.shadowBlur = look.glow[1] * fs;
+    cx.fillStyle = look.glow[0];
+    cx.fillText(text, x, y);
+    cx.fillText(text, x, y);
+    noShadow();
+  }
+  let fill = look.fill;
+  if (look.fill2) {
+    const g = cx.createLinearGradient(0, y - fs * 0.5, 0, y + fs * 0.5);
+    g.addColorStop(0, look.fill);
+    g.addColorStop(1, look.fill2);
+    fill = g;
+  }
+  cx.fillStyle = fill;
+  cx.fillText(text, x, y);
+  cx.restore();
+}
+const thumbs = {};
+function presetThumb(p) {
+  if (thumbs[p.id]) return thumbs[p.id];
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 80;
+  const cx = c.getContext("2d");
+  if (!cx) return "";
+  const fs = 36;
+  cx.font = "700 " + fs + 'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';
+  cx.textAlign = "center";
+  cx.textBaseline = "middle";
+  drawLookText(cx, "あア", 64, 41, fs, p.look);
+  return thumbs[p.id] = c.toDataURL("image/png");
+}
+function clearThumbs() {
+  for (const k of Object.keys(thumbs)) delete thumbs[k];
 }
 var IDB;
 var saveTimer;
@@ -1805,7 +1911,7 @@ function titleImages(from, to, W, H) {
   var out = [];
   P.clips.forEach(function(c) {
     if (c.type !== "title" || cEnd(c) <= from || c.start >= to) return;
-    var ti = { label: c.label, st: c.st, sz: c.sz, t: c.start - c.in, d: Math.max(0.1, c.out) }, cv = document.createElement("canvas"), scroll = c.st === "credit";
+    var ti = { label: c.label, st: c.st, sz: c.sz, look: c.look, t: c.start - c.in, d: Math.max(0.1, c.out) }, cv = document.createElement("canvas"), scroll = c.st === "credit";
     cv.width = W;
     if (scroll) {
       var sz = { "小": 0.042, "中": 0.055, "大": 0.075 }[c.sz || "中"] || 0.055, lh = Math.round(H * sz) * 1.35, bh = lh * String(c.label || "").split("\n").length;
@@ -2150,7 +2256,13 @@ function hotEdit(el) {
 function titleForm(c) {
   return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0"><label for="ttext" class="t2">文字（改行できます）</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" style="width:100%;height:auto;padding:6px 8px;resize:vertical">' + h(c.label) + '</textarea><div class="fg"><span>種類</span><select class="inp" data-in="tst" aria-label="テロップの種類">' + Object.keys(TST).map(function(k) {
     return '<option value="' + k + '"' + (c.st === k ? " selected" : "") + ">" + TST[k] + "</option>";
-  }).join("") + '</select></div><div class="fg"><span>大きさ</span>' + sel("大きさ", ["小", "中", "大"], c.sz || "中", "", "tsz") + '</div><div class="fg"><span>開始（秒）</span><input class="inp" type="number" step="0.1" min="0" data-in="tstart" value="' + c.start.toFixed(1) + '" aria-label="開始（秒）"></div><div class="fg"><span>長さ（秒）</span><input class="inp" type="number" step="0.1" min="0.5" data-in="tdur" value="' + cLen(c).toFixed(1) + '" aria-label="長さ（秒）"></div><div class="row" style="gap:8px">' + btn("再生ヘッドへ移動", "tToHead", "", "s") + btn("削除", "delSel", "", "s") + "</div></div>";
+  }).join("") + '</select></div><div class="fg"><span>大きさ</span>' + sel("大きさ", ["小", "中", "大"], c.sz || "中", "", "tsz") + '</div><div class="fg"><span>スタイル</span><span class="row" style="gap:8px;min-width:0">' + (c.look ? '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h((presetById(c.lookId) || { name: "カスタム" }).name) + "</span>" + btn("外す", "tLookOff", "", "s") : '<span class="mu">なし（テロップタブで選べます）</span>') + '</span></div><div class="fg"><span>開始（秒）</span><input class="inp" type="number" step="0.1" min="0" data-in="tstart" value="' + c.start.toFixed(1) + '" aria-label="開始（秒）"></div><div class="fg"><span>長さ（秒）</span><input class="inp" type="number" step="0.1" min="0.5" data-in="tdur" value="' + cLen(c).toFixed(1) + '" aria-label="長さ（秒）"></div><div class="row" style="gap:8px">' + btn("再生ヘッドへ移動", "tToHead", "", "s") + btn("削除", "delSel", "", "s") + "</div></div>";
+}
+function styleGallery() {
+  var t = selTitle(), cur = t && t.lookId;
+  return '<div class="cap" style="margin:10px 0 0">スタイル</div><div class="mu" style="line-height:1.6">' + (t ? "選んでいるテロップのスタイルを変えます。" : "押すと、そのスタイルのテロップを再生ヘッドの位置に追加します。") + '</div><div class="tsg" role="list">' + TITLE_PRESETS.map(function(p) {
+    return '<button class="tsl' + (cur === p.id ? " on" : "") + '" role="listitem" title="' + h(p.name) + '" aria-label="' + h(p.name) + '"' + (cur === p.id ? ' aria-pressed="true"' : "") + A("tLook", p.id) + '><img src="' + presetThumb(p) + '" alt=""></button>';
+  }).join("") + "</div>";
 }
 function selTitle() {
   var c = primary();
@@ -2238,7 +2350,7 @@ function init$j() {
     } else left = '<div class="scroll" style="padding:14px;display:flex;flex-direction:column;gap:8px">' + (S.etab === "text" ? '<div class="mu" style="line-height:1.6">押すと、再生ヘッドの位置にテロップを追加します（T キーでも追加できます）。</div>' : "") + D.templates[S.etab].map(function(t, i) {
       var st = ["name", "q", "sub", "credit"][i];
       return S.etab === "text" ? '<div class="card" role="button" tabindex="0"' + A("addTitle", st) + "><b>" + h(t[0]) + '　<span style="display:inline;color:var(--ac)">＋ 追加</span></b><span>' + h(t[1]) + "</span></div>" : '<div class="card"><b>' + h(t[0]) + "</b><span>" + h(t[1]) + "</span></div>";
-    }).join("") + "</div>";
+    }).join("") + (S.etab === "text" ? styleGallery() : "") + "</div>";
     var tools = [["select", "選択", keyOf("tSel")], ["split", "分割", keyOf("tSplit")], ["trash", "削除", ""], ["hand", "ハンド", keyOf("tHand")], ["text", "文字", ""]], ins = inspector(), rngOn = P.pin != null || P.pout != null;
     return '<div class="pn l" style="width:' + pw("editL") + 'px">' + splitter("editL", "l") + ph("素材") + tabs([["assets", "アセット"], ["templates", "テンプレート"], ["text", "テロップ"], ["audio", "音声"]], S.etab, "etab", "素材の種類") + left + '</div><div class="pc" style="background:var(--bg0)"><div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">' + ph("プレビュー", '<span class="x">全長 ' + mmss(progDur()) + "</span>") + '<div class="mon" style="flex:1;min-height:0"><canvas data-prog ' + canvasAttrs() + ' style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas></div><div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">' + tc(S.t.edit) + '</span><span class="mid">' + ibtn("inPt", "イン点を設定（I キー）", "pin") + ibtn("outPt", "アウト点を設定（O キー）", "pout") + '<span class="vsep"></span>' + ibtn("prevCut", "前の編集点へ（↑）", "prev") + ibtn("back", "1フレーム戻る（←）", "fb") + playBtn(E.playing) + ibtn("fwd", "1フレーム進む（→）", "ff") + ibtn("nextCut", "次の編集点へ（↓）", "next") + '<span class="vsep"></span>' + ibtn("split", "再生ヘッドで分割（S キー）", "split") + '</span><span class="end row" style="justify-content:flex-end;gap:6px"><button class="b s" style="height:24px;padding:0 8px;border:0;background:none;color:var(--mu)" title="プレビューの画質（プロジェクト設定で変えられます）"' + A("psOpen") + ">" + pqLabel() + "</button>" + ibtn("full", "全画面", "todo") + '</span></div></div><div style="flex:1;min-height:0;display:flex"><div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px;background:var(--bg1);border-right:1px solid var(--ln)">' + tools.map(function(t) {
       var on = S.tool === t[0];
@@ -2713,6 +2825,13 @@ function init$f() {
   buildMb();
   fit();
   draw();
+  try {
+    document.fonts && document.fonts.ready.then(function() {
+      clearThumbs();
+      draw();
+    });
+  } catch (e) {
+  }
 }
 var ACT;
 function jump(dir) {
@@ -3375,6 +3494,45 @@ function init$e() {
     },
     hRestore: function(v) {
       restoreHistory(v);
+    },
+    tLook: function(v) {
+      var pr = presetById(v);
+      if (!pr) return;
+      var lk = function() {
+        return JSON.parse(JSON.stringify(pr.look));
+      };
+      var L = S.sel.map(C).filter(function(c2) {
+        return c2 && c2.type === "title" && !locked(c2);
+      });
+      if (L.length) {
+        mark();
+        L.forEach(function(c2) {
+          c2.look = lk();
+          c2.lookId = pr.id;
+        });
+        changed();
+        return toast("スタイルを「" + pr.name + "」にしました");
+      }
+      addTitle("name", S.t.edit);
+      var c = C(S.sel[0]);
+      if (c && c.type === "title") {
+        c.look = lk();
+        c.lookId = pr.id;
+        changed();
+      }
+    },
+    tLookOff: function() {
+      var L = S.sel.map(C).filter(function(c) {
+        return c && c.type === "title" && c.look;
+      });
+      if (!L.length) return;
+      mark();
+      L.forEach(function(c) {
+        delete c.look;
+        delete c.lookId;
+      });
+      changed();
+      toast("スタイルを外しました");
     },
     psOpen: function() {
       openProjectSettings();
@@ -4371,7 +4529,7 @@ function drawFrame(cx, W, H, t) {
     if (tr.hide) return;
     P.clips.forEach(function(c) {
       if (c.tr !== tr.id || t < c.start - 1e-9 || t >= cEnd(c)) return;
-      if (c.type === "title") drawTitle(cx, W, H, { label: c.label, st: c.st, sz: c.sz, t: c.start - c.in, d: Math.max(0.1, c.out) }, t);
+      if (c.type === "title") drawTitle(cx, W, H, { label: c.label, st: c.st, sz: c.sz, look: c.look, t: c.start - c.in, d: Math.max(0.1, c.out) }, t);
       else if (c.type === "adj") adjust(cx, W, H);
       else drawClip(cx, W, H, c);
     });
@@ -4434,7 +4592,7 @@ function drawClip(cx, W, H, c) {
     cx.fillStyle = g;
     cx.fillRect(-W / 2 * sc, -H / 2 * sc, W * sc, H * sc);
     cx.fillStyle = "rgba(255,255,255,.78)";
-    cx.font = "500 " + Math.round(H * 0.05 * sc) + 'px "Noto Sans JP",sans-serif';
+    cx.font = "500 " + Math.round(H * 0.05 * sc) + 'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';
     cx.textAlign = "center";
     cx.textBaseline = "middle";
     cx.fillText(m.n + (m.url ? "（読み込み中）" : "（見本）"), 0, 0);
@@ -4444,18 +4602,24 @@ function drawClip(cx, W, H, c) {
 var TST;
 function drawTitle(cx, W, H, ti, t) {
   var sz = { "小": 0.042, "中": 0.055, "大": 0.075 }[ti.sz || "中"] || 0.055, fs = Math.round(H * sz), lines = String(ti.label || "").split("\n"), lh = fs * 1.35, pad = fs * 0.6;
-  cx.font = "700 " + fs + 'px "Noto Sans JP",sans-serif';
+  cx.font = "700 " + fs + 'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';
   cx.textBaseline = "middle";
   cx.lineJoin = "round";
+  var lk = ti.look;
   var tw = Math.max.apply(null, lines.map(function(l) {
     return cx.measureText(l).width;
   }).concat([0])), bh = lh * lines.length;
   function outl(l, x, y2) {
+    if (lk) return drawLookText(cx, l, x, y2, fs, lk);
     cx.lineWidth = fs * 0.18;
     cx.strokeStyle = "rgba(0,0,0,.85)";
     cx.strokeText(l, x, y2);
     cx.fillStyle = "#fff";
     cx.fillText(l, x, y2);
+  }
+  function plain(l, x, y2) {
+    if (lk) drawLookText(cx, l, x, y2, fs, lk);
+    else cx.fillText(l, x, y2);
   }
   if (ti.st === "q") {
     cx.textAlign = "left";
@@ -4463,7 +4627,7 @@ function drawTitle(cx, W, H, ti, t) {
     cx.fillRect(W * 0.06, H * 0.07, tw + pad * 2, bh + pad * 0.8);
     cx.fillStyle = "#1a1400";
     lines.forEach(function(l, i) {
-      cx.fillText(l, W * 0.06 + pad, H * 0.07 + pad * 0.4 + lh * (i + 0.5));
+      plain(l, W * 0.06 + pad, H * 0.07 + pad * 0.4 + lh * (i + 0.5));
     });
   } else if (ti.st === "sub") {
     cx.textAlign = "center";
@@ -4472,7 +4636,7 @@ function drawTitle(cx, W, H, ti, t) {
     cx.fillRect((W - tw) / 2 - pad, y0 - pad * 0.4, tw + pad * 2, bh + pad * 0.8);
     cx.fillStyle = "#fff";
     lines.forEach(function(l, i) {
-      cx.fillText(l, W / 2, y0 + lh * (i + 0.5));
+      plain(l, W / 2, y0 + lh * (i + 0.5));
     });
   } else if (ti.st === "credit") {
     cx.textAlign = "center";

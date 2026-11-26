@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { presetById } from './titleStyles';
 import { frameSec, openProjectSettings, rebuildProxies, renderProjectSettings, setPs } from './projectSettings';
 import { openHistory, restoreHistory } from './history';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
@@ -109,6 +110,11 @@ ACT={
   help:function(){toast('メディアで読み込み → カットでイン・アウトを決めて追加 → 編集で並べ替え・分割 → 出力で書き出し');},
   dlgOk:function(){document.getElementById('dlg').hidden=true;var f=ask.fn;ask.fn=null;if(f)f();},dlgNo:function(){document.getElementById('dlg').hidden=true;ask.fn=null;S.capture=null;if(S.page==='edit')draw();},
   hist:function(){openHistory();},hRestore:function(v){restoreHistory(v);},
+  tLook:function(v){var pr=presetById(v);if(!pr)return;var lk=function(){return JSON.parse(JSON.stringify(pr.look));};
+    var L=S.sel.map(C).filter(function(c){return c&&c.type==='title'&&!locked(c);});
+    if(L.length){mark();L.forEach(function(c){c.look=lk();c.lookId=pr.id;});changed();return toast('スタイルを「'+pr.name+'」にしました');}
+    addTitle('name',S.t.edit);var c=C(S.sel[0]);if(c&&c.type==='title'){c.look=lk();c.lookId=pr.id;changed();}},
+  tLookOff:function(){var L=S.sel.map(C).filter(function(c){return c&&c.type==='title'&&c.look;});if(!L.length)return;mark();L.forEach(function(c){delete c.look;delete c.lookId;});changed();toast('スタイルを外しました');},
   psOpen:function(){openProjectSettings();},psTab:function(v){S.pstab=v;renderProjectSettings();},psSet:function(v){var i=v.indexOf('|');setPs(v.slice(0,i),v.slice(i+1));},psProxy:function(){rebuildProxies();},
   todo:function(){toast('この機能は、まだ使えません');}
 };

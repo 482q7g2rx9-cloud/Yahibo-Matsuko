@@ -52,7 +52,7 @@ export function deskEnqueue(j,run){var ext=j.n.match(/\.([a-z0-9]+)$/i)[1];
     if(!run)return toast('キューに追加しました');if(X&&X.run)toast('いまの書き出しが終わったら始めます');else xStart(j);}).catch(function(e){toast(String(e));});}
 /* テロップを、プレビューと同じ描き方で PNG にする。クレジット（流れる文字）は文字の部分だけ */
 export function titleImages(from,to,W,H){var out=[];P.clips.forEach(function(c){if(c.type!=='title'||cEnd(c)<=from||c.start>=to)return;
-    var ti={label:c.label,st:c.st,sz:c.sz,t:c.start-c.in,d:Math.max(0.1,c.out)},cv=document.createElement('canvas'),scroll=c.st==='credit';cv.width=W;
+    var ti={label:c.label,st:c.st,sz:c.sz,look:c.look,t:c.start-c.in,d:Math.max(0.1,c.out)},cv=document.createElement('canvas'),scroll=c.st==='credit';cv.width=W;
     if(scroll){var sz={'小':.042,'中':.055,'大':.075}[c.sz||'中']||.055,lh=Math.round(H*sz)*1.35,bh=lh*String(c.label||'').split('\n').length;
       cv.height=Math.max(2,Math.ceil(bh));drawTitle(cv.getContext('2d'),W,H,ti,ti.t+ti.d*H/(H+bh));}
     else{cv.height=H;drawTitle(cv.getContext('2d'),W,H,ti,c.start);}

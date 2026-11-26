@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { clearThumbs } from './titleStyles';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { draw } from './render';
 import { applyDesign, buildMb } from './menus';
@@ -32,4 +33,6 @@ applyDesign();
 buildMb();
 fit();
 draw();
+/* 日本語のフォントが読み込まれたら、テロップの見本を描き直す */
+try{document.fonts&&document.fonts.ready.then(function(){clearThumbs();draw();});}catch(e){}
 }
