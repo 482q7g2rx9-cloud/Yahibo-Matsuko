@@ -112,15 +112,15 @@ const thumbs: Record<string, string> = {};
 export function presetThumb(p: TitlePreset): string {
   if (thumbs[p.id]) return thumbs[p.id];
   const c = document.createElement('canvas');
-  c.width = 128;
-  c.height = 80;
+  c.width = 256;
+  c.height = 160;
   const cx = c.getContext('2d');
   if (!cx) return '';
-  const fs = 36;
+  const fs = 70;
   cx.font = '700 ' + fs + 'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';
   cx.textAlign = 'center';
   cx.textBaseline = 'middle';
-  drawLookText(cx, 'あア', 64, 41, fs, p.look);
+  drawLookText(cx, 'あア', 128, 82, fs, p.look);
   return (thumbs[p.id] = c.toDataURL('image/png'));
 }
 /** 日本語のフォントが読み込まれたら、見本を描き直すために捨てる */

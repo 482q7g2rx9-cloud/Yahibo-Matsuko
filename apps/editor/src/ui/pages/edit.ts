@@ -82,7 +82,7 @@ export function titleForm(c){return '<div style="display:flex;flex-direction:col
   '<div class="row" style="gap:8px">'+btn('再生ヘッドへ移動','tToHead','','s')+btn('削除','delSel','','s')+'</div></div>';}
 /* テロップのスタイルの一覧（titleStyles.ts）。テロップを選んでいればそのスタイルを変え、選んでいなければ新しく追加する */
 export function styleGallery(){var t=selTitle(),cur=t&&t.lookId;
-  return '<div class="cap" style="margin:10px 0 0">スタイル</div><div class="mu" style="line-height:1.6">'+(t?'選んでいるテロップのスタイルを変えます。':'押すと、そのスタイルのテロップを再生ヘッドの位置に追加します。')+'</div>'+
+  return '<div class="mu" style="line-height:1.6;margin-bottom:10px">'+(t?'選んでいるテロップのスタイルを変えます。':'押すと、そのスタイルのテロップを再生ヘッドの位置に追加します（T キーでも追加できます）。')+'画面の上・字幕・クレジットなどの種類は、インスペクタで変えられます。</div>'+
     '<div class="tsg" role="list">'+TITLE_PRESETS.map(function(p){return '<button class="tsl'+(cur===p.id?' on':'')+'" role="listitem" title="'+h(p.name)+'" aria-label="'+h(p.name)+'"'+(cur===p.id?' aria-pressed="true"':'')+A('tLook',p.id)+'><img src="'+presetThumb(p)+'" alt=""></button>';}).join('')+'</div>';}
 export function selTitle(){var c=primary();return c&&c.type==='title'?c:null;}
 export function inspector(){var L=S.sel.map(C).filter(Boolean),c=primary();
@@ -126,7 +126,8 @@ R.edit=function(){
       return '<div style="position:relative"'+(can?' data-am="'+m.id+'"':'')+'><div class="tb" style="cursor:'+(can?'grab':'default')+';background:'+(m.thumb?'#000 url('+m.thumb+') center / cover':m.k==='音声'?'#2f6b45':m.k==='テイク'?'#5a4a8a':(m.col||['#555'])[0])+'"><span>'+m.k+'</span><span>'+(m.k==='画像'?'':mmss(m.d))+'</span></div>'+
       (can?'<button class="b s" aria-label="「'+h(m.n)+'」をタイムラインに追加" title="タイムラインに追加"'+A('addtl',m.id)+' style="position:absolute;right:4px;top:4px;width:24px;height:24px;padding:0;border-radius:50%">'+ic('plus',14)+'</button>':'')+
       '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(m.k==='音声'?h(m.c)+' ':'')+h(m.n)+'</div><div class="'+(m.r==='wn'?'t-wn':'t-ok')+'">'+r[0]+'</div></div>';}).join('')+'</div>'+(L.length?'':'<div class="mu" style="padding:0 16px">「＋ 読込」で動画・音声・画像を読み込めます。</div>')+'</div>';}
-  else left='<div class="scroll" style="padding:14px;display:flex;flex-direction:column;gap:8px">'+(S.etab==='text'?'<div class="mu" style="line-height:1.6">押すと、再生ヘッドの位置にテロップを追加します（T キーでも追加できます）。</div>':'')+D.templates[S.etab].map(function(t,i){var st=['name','q','sub','credit'][i];return S.etab==='text'?'<div class="card" role="button" tabindex="0"'+A('addTitle',st)+'><b>'+h(t[0])+'　<span style="display:inline;color:var(--ac)">＋ 追加</span></b><span>'+h(t[1])+'</span></div>':'<div class="card"><b>'+h(t[0])+'</b><span>'+h(t[1])+'</span></div>';}).join('')+(S.etab==='text'?styleGallery():'')+'</div>';
+  else if(S.etab==='text')left='<div class="scroll" style="padding:14px">'+styleGallery()+'</div>';
+  else left='<div class="scroll" style="padding:14px;display:flex;flex-direction:column;gap:8px">'+D.templates[S.etab].map(function(t){return '<div class="card"><b>'+h(t[0])+'</b><span>'+h(t[1])+'</span></div>';}).join('')+'</div>';
   var tools=[['select','選択',keyOf('tSel')],['split','分割',keyOf('tSplit')],['trash','削除',''],['hand','ハンド',keyOf('tHand')],['text','文字','']],ins=inspector(),rngOn=P.pin!=null||P.pout!=null;
   return '<div class="pn l" style="width:'+pw('editL')+'px">'+splitter('editL','l')+''+ph('素材')+tabs([['assets','アセット'],['templates','テンプレート'],['text','テロップ'],['audio','音声']],S.etab,'etab','素材の種類')+left+'</div>'+
   '<div class="pc" style="background:var(--bg0)">'+
