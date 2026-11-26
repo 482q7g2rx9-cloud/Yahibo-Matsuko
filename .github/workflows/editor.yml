@@ -56,6 +56,8 @@ jobs:
           cache-dependency-path: apps/editor/package-lock.json
       - run: npm ci
       - run: npm run build
+      - name: 中心部分のテスト（TypeScript）
+        run: npm test
       # ブラウザ版（src/matsuko-editor.html）は src/ui から作る生成物。作り直し忘れがないか確かめる
       - name: ブラウザ版が最新か
         run: |

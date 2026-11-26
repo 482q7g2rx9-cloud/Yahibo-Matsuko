@@ -510,6 +510,224 @@ function init$q() {
     m.sample = 1;
   });
 }
+const EPS$1 = 1e-6;
+const MIN_SPLIT = 0.04;
+const cLen$1 = (c) => Math.max(0, c.out - c.in);
+const cEnd$1 = (c) => c.start + cLen$1(c);
+const mediaOf = (p, id) => p.media.find((m) => m.id === id) ?? null;
+const trackOf = (p, id) => p.tracks.find((t) => t.id === id) ?? null;
+const clipOf = (p, id) => p.clips.find((c) => c.id === id) ?? null;
+const duration = (p) => p.clips.reduce((a, c) => Math.max(a, cEnd$1(c)), 0);
+const onTrack$1 = (p, tid) => p.clips.filter((c) => c.tr === tid).sort((a, b) => a.start - b.start);
+const activeAt$1 = (p, t) => p.clips.filter((c) => c.start <= t + 1e-9 && t < cEnd$1(c) - 1e-9);
+const tracksOf = (p, kind) => p.tracks.filter((t) => t.kind === kind);
+const hasAudio = (m) => !!m && m.k === "映像" && !m.noAudio;
+const isUsed$1 = (p, m) => p.clips.some((c) => c.m === m.id);
+const srcMin$1 = (c) => c.type === "media" ? 0 : -1e9;
+function srcMax$1(p, c) {
+  if (c.type !== "media") return 1e9;
+  const m = mediaOf(p, c.m);
+  return !m || m.k === "画像" ? 1e9 : m.d || c.out;
+}
+const v1End$1 = (p) => onTrack$1(p, "V1").reduce((a, c) => Math.max(a, cEnd$1(c)), 0);
+const hasFx$1 = (c) => !!(c.x || c.y || c.rot || c.scale != null && c.scale != 100 || c.op != null && c.op != 100);
+const linked$1 = (p, c) => c && c.link ? p.clips.filter((x) => x.link === c.link && x !== c) : [];
+function locked$1(p, c) {
+  const t = trackOf(p, c.tr);
+  return !t || !!t.lock;
+}
+const busy = (p, tid, a, b) => p.clips.some((c) => c.tr === tid && c.start < b - EPS$1 && cEnd$1(c) > a + EPS$1);
+function clone(c, o) {
+  return { ...JSON.parse(JSON.stringify(c)), ...o };
+}
+function remove(x, c) {
+  const i = x.p.clips.indexOf(c);
+  if (i >= 0) x.p.clips.splice(i, 1);
+  x.removed?.(c);
+}
+function carve$1(x, tid, a, b, skip) {
+  for (const c of x.p.clips.slice()) {
+    if (c.tr !== tid || skip && skip[c.id]) continue;
+    const s = c.start, e = cEnd$1(c);
+    if (e <= a + EPS$1 || s >= b - EPS$1) continue;
+    if (s >= a - EPS$1 && e <= b + EPS$1) remove(x, c);
+    else if (s < a && e > b) {
+      const c2 = clone(c, { id: x.id("c"), start: b, in: c.in + (b - s), link: null });
+      c.out = c.in + (a - s);
+      x.p.clips.push(c2);
+    } else if (s < a) c.out = c.in + (a - s);
+    else {
+      c.in += b - s;
+      c.start = b;
+    }
+  }
+}
+function splitClip(x, c, t) {
+  if (t <= c.start + MIN_SPLIT || t >= cEnd$1(c) - MIN_SPLIT) return null;
+  const c2 = clone(c, { id: x.id("c"), start: t, in: c.in + (t - c.start) });
+  c.out = c.in + (t - c.start);
+  x.p.clips.push(c2);
+  return c2;
+}
+function splitList$1(x, list, t) {
+  const re = {};
+  const made = [];
+  for (const c of list) {
+    const c2 = splitClip(x, c, t);
+    if (!c2) continue;
+    if (c.link) {
+      re[c.link] = re[c.link] || x.id("L");
+      c2.link = re[c.link];
+    }
+    made.push(c2);
+  }
+  return made;
+}
+function splittable(p, t, list) {
+  return list.filter((c) => !locked$1(p, c) && t > c.start + MIN_SPLIT && t < cEnd$1(c) - MIN_SPLIT);
+}
+function closeRange$1(p, tid, a, b) {
+  const d = b - a;
+  if (d <= EPS$1) return;
+  for (const tr of p.tracks) {
+    if (tr.lock) continue;
+    if (tr.id !== tid && busy(p, tr.id, a, b)) continue;
+    for (const c of p.clips) if (c.tr === tr.id && c.start >= b - EPS$1) c.start -= d;
+  }
+}
+function openRange$1(x, t, len, skip) {
+  const p = x.p;
+  const spans = p.clips.filter((c) => !locked$1(p, c) && c.start < t - EPS$1 && cEnd$1(c) > t + EPS$1);
+  for (const c of spans) {
+    const head2 = t - c.start, tail = cEnd$1(c) - t;
+    if (head2 <= MIN_SPLIT) {
+      c.in += head2;
+      c.start = t;
+    } else if (tail <= MIN_SPLIT) c.out -= tail;
+  }
+  splitList$1(x, spans.filter((c) => c.start < t - EPS$1 && cEnd$1(c) > t + EPS$1), t);
+  for (const c of p.clips) {
+    if (locked$1(p, c)) continue;
+    if (c.start >= t - EPS$1) c.start += len;
+  }
+}
+function deleteClips(x, list, ripple) {
+  for (const c of list.slice().sort((a, b) => b.start - a.start)) {
+    const a = c.start, b = cEnd$1(c), tid = c.tr;
+    remove(x, c);
+    if (ripple) closeRange$1(x.p, tid, a, b);
+  }
+}
+function gapAt$1(p, tid, t) {
+  const L = onTrack$1(p, tid);
+  let a = 0;
+  for (const c of L) {
+    const s = c.start, e = cEnd$1(c);
+    if (t >= s - EPS$1 && t < e) return null;
+    if (e <= t + EPS$1) a = Math.max(a, e);
+    else if (s > t) return s - a > EPS$1 ? [a, s] : null;
+  }
+  return null;
+}
+function freeAudio$1(p, a, b) {
+  const L = tracksOf(p, "a").filter((t) => !t.lock);
+  return (L.filter((t) => !busy(p, t.id, a, b))[0] || L[0])?.id;
+}
+const newClip = (x, m, tid, start, a, b, link) => ({ id: x.id("c"), tr: tid, type: "media", m: m.id, start, in: a, out: b, link: link || null });
+function placeMedia$1(x, m, tid, start, a, b, ins) {
+  const p = x.p, tr = trackOf(p, tid), len = b - a, made = [];
+  if (!tr || tr.lock) return { made, error: "ロックしたトラックには置けません" };
+  if (len < 0.05) return { made };
+  start = Math.max(0, start);
+  const isV = m.k === "映像" || m.k === "画像";
+  let vt = null, at = null, L = null;
+  if (!isV) at = tr.kind === "a" ? tid : freeAudio$1(p, start, start + len);
+  else if (tr.kind === "a") {
+    if (!hasAudio(m)) return { made, error: "この素材には音声がありません" };
+    at = tid;
+  } else {
+    vt = tid;
+    if (hasAudio(m)) {
+      at = freeAudio$1(p, start, start + len);
+      L = x.id("L");
+    }
+  }
+  if (ins) openRange$1(x, start, len);
+  else {
+    if (vt) carve$1(x, vt, start, start + len);
+    if (at) carve$1(x, at, start, start + len);
+  }
+  if (vt) made.push(newClip(x, m, vt, start, a, b, at ? L : null));
+  if (at) made.push(newClip(x, m, at, start, a, b, vt ? L : null));
+  p.clips.push(...made);
+  return { made };
+}
+function reorderV1$1(x, c, to, after) {
+  const p = x.p, grp = [c, ...linked$1(p, c)], len = cLen$1(c), a = c.start;
+  for (const g of grp) p.clips.splice(p.clips.indexOf(g), 1);
+  closeRange$1(p, "V1", a, a + len);
+  const t = after ? cEnd$1(to) : to.start;
+  openRange$1(x, t, len);
+  for (const g of grp) {
+    g.start = t;
+    p.clips.push(g);
+  }
+}
+function addTrack$1(p, kind) {
+  const n = p.tracks.filter((t2) => t2.kind === kind).reduce((a, t2) => Math.max(a, +t2.id.slice(1) || 0), 0) + 1;
+  const t = { id: (kind === "v" ? "V" : "A") + n, kind, h: kind === "v" ? 48 : 44 };
+  if (kind === "v") p.tracks.unshift(t);
+  else p.tracks.push(t);
+  return t;
+}
+function cannotDeleteTrack(p, t) {
+  if (p.clips.some((c) => c.tr === t.id)) return "クリップが残っているトラックは削除できません";
+  if (p.tracks.filter((x) => x.kind === t.kind).length <= 1) return "最後の" + (t.kind === "v" ? "映像" : "音声") + "トラックは削除できません";
+  return null;
+}
+function copyClips(list) {
+  return { base: Math.min(...list.map((c) => c.start)), clips: JSON.parse(JSON.stringify(list)) };
+}
+function pasteClips(x, t, src) {
+  const re = {}, made = [];
+  for (const o of src.clips) {
+    const tr = trackOf(x.p, o.tr);
+    if (!tr || tr.lock) continue;
+    const c = clone(o, { id: x.id("c"), start: t + (o.start - src.base) });
+    if (o.link) {
+      re[o.link] = re[o.link] || x.id("L");
+      c.link = re[o.link];
+    }
+    carve$1(x, c.tr, c.start, cEnd$1(c));
+    x.p.clips.push(c);
+    made.push(c);
+  }
+  return made;
+}
+function nudge$1(x, list, dt) {
+  if (list.some((c) => c.start + dt < -EPS$1)) return false;
+  const skip = {};
+  for (const c of list) {
+    skip[c.id] = 1;
+    c.start += dt;
+  }
+  for (const c of list) carve$1(x, c.tr, c.start, cEnd$1(c), skip);
+  return true;
+}
+const TITLE_TEXT = { name: "名前・肩書き", q: "質問を入力", sub: "字幕を入力", credit: "出演\n協力\n制作" };
+function addTitle$1(x, st, t, tid) {
+  const p = x.p;
+  t = Math.max(0, t || 0);
+  const d = st === "credit" ? 8 : 4;
+  const free = (tr2) => !tr2.lock && !busy(p, tr2.id, t, t + d);
+  const want = tid ? trackOf(p, tid) : null;
+  let tr = want && want.kind === "v" && free(want) ? want : tracksOf(p, "v").filter((v) => v.id !== "V1").reverse().filter(free)[0];
+  if (!tr) tr = addTrack$1(p, "v");
+  const c = { id: x.id("t"), tr: tr.id, type: "title", start: t, in: 0, out: d, st, sz: "中", label: TITLE_TEXT[st] };
+  p.clips.push(c);
+  return c;
+}
+const uid$1 = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 function defTracks(sample) {
   return [
     { id: "V3", kind: "v", h: sample ? 24 : 40 },
@@ -519,6 +737,29 @@ function defTracks(sample) {
     { id: "A2", kind: "a", h: 40, name: sample ? "BGM" : "" },
     { id: "A3", kind: "a", h: 40, name: sample ? "NA" : "" }
   ];
+}
+function emptyProject() {
+  return { v: 2, sample: 0, media: [], tracks: defTracks(0), clips: [] };
+}
+function migrate(o) {
+  if (o.clips && o.tracks) return o;
+  const old = o;
+  const cl = [], med = old.media || [];
+  let s = 0;
+  for (const c of old.seq || []) {
+    const m = med.find((x) => x.id === c.m), L = "L" + c.id, d = Math.max(0, c.out - c.in);
+    cl.push({ id: c.id, tr: "V1", type: "media", m: c.m, start: s, in: c.in, out: c.out, link: L });
+    if (m && m.k === "映像" && !m.noAudio) cl.push({ id: c.id + "a", tr: "A1", type: "media", m: c.m, start: s, in: c.in, out: c.out, link: L });
+    s += d;
+  }
+  for (const t of old.titles || []) cl.push({ id: t.id, tr: "V2", type: "title", start: t.t, in: 0, out: t.d, st: t.st, sz: t.sz, label: t.label });
+  if (old.adj && s) cl.push({ id: "adj", tr: "V3", type: "adj", start: 0, in: 0, out: s, label: "調整レイヤー（色補正）" });
+  for (const b of old.bgm || []) {
+    const m = b.sample ? "a01" : b.m;
+    if (m) cl.push({ id: b.id, tr: "A2", type: "media", m, start: b.start, in: b.in, out: b.out });
+  }
+  for (const n of old.na || []) cl.push({ id: n.id, tr: "A3", type: "media", m: "n02", start: n.start, in: 0, out: Math.min(10, n.dur) });
+  return { v: 2, sample: old.sample ?? 0, media: med, tracks: defTracks(old.sample ?? 0), clips: cl, pin: old.pin, pout: old.pout };
 }
 function sampleProject() {
   var cl = [];
@@ -535,95 +776,37 @@ function sampleProject() {
   );
   return { v: 2, sample: 1, media: JSON.parse(JSON.stringify(D.media)), tracks: defTracks(1), clips: cl };
 }
-function emptyProject() {
-  return { v: 2, sample: 0, media: [], tracks: defTracks(0), clips: [] };
-}
-function migrate(o) {
-  if (o.clips && o.tracks) return o;
-  var cl = [], s = 0, med = o.media || [];
-  (o.seq || []).forEach(function(c) {
-    var m = med.filter(function(x) {
-      return x.id === c.m;
-    })[0], L = "L" + c.id, d = Math.max(0, c.out - c.in);
-    cl.push({ id: c.id, tr: "V1", type: "media", m: c.m, start: s, in: c.in, out: c.out, link: L });
-    if (m && m.k === "映像" && !m.noAudio) cl.push({ id: c.id + "a", tr: "A1", type: "media", m: c.m, start: s, in: c.in, out: c.out, link: L });
-    s += d;
-  });
-  (o.titles || []).forEach(function(t) {
-    cl.push({ id: t.id, tr: "V2", type: "title", start: t.t, in: 0, out: t.d, st: t.st, sz: t.sz, label: t.label });
-  });
-  if (o.adj && s) cl.push({ id: "adj", tr: "V3", type: "adj", start: 0, in: 0, out: s, label: "調整レイヤー（色補正）" });
-  (o.bgm || []).forEach(function(b) {
-    var m = b.sample ? "a01" : b.m;
-    if (m) cl.push({ id: b.id, tr: "A2", type: "media", m, start: b.start, in: b.in, out: b.out });
-  });
-  (o.na || []).forEach(function(n) {
-    cl.push({ id: n.id, tr: "A3", type: "media", m: "n02", start: n.start, in: 0, out: Math.min(10, n.dur) });
-  });
-  return { v: 2, sample: o.sample, media: med, tracks: defTracks(o.sample), clips: cl, pin: o.pin, pout: o.pout };
-}
 var P;
 function M(id) {
-  for (var i = 0; i < P.media.length; i++) if (P.media[i].id === id) return P.media[i];
-  return null;
+  return mediaOf(P, id);
 }
 function T(id) {
-  for (var i = 0; i < P.tracks.length; i++) if (P.tracks[i].id === id) return P.tracks[i];
-  return null;
+  return trackOf(P, id);
 }
 function C(id) {
-  for (var i = 0; i < P.clips.length; i++) if (P.clips[i].id === id) return P.clips[i];
-  return null;
+  return clipOf(P, id);
 }
 var uid;
-function cLen(c) {
-  return Math.max(0, c.out - c.in);
-}
-function cEnd(c) {
-  return c.start + cLen(c);
-}
+var cLen = cLen$1;
+var cEnd = cEnd$1;
 function progDur() {
-  return P.clips.reduce(function(a, c) {
-    return Math.max(a, cEnd(c));
-  }, 0);
+  return duration(P);
 }
 function onTrack(tid) {
-  return P.clips.filter(function(c) {
-    return c.tr === tid;
-  }).sort(function(a, b) {
-    return a.start - b.start;
-  });
+  return onTrack$1(P, tid);
 }
 function activeAt(t) {
-  return P.clips.filter(function(c) {
-    return c.start <= t + 1e-9 && t < cEnd(c) - 1e-9;
-  });
+  return activeAt$1(P, t);
 }
 function vTracks() {
-  return P.tracks.filter(function(t) {
-    return t.kind === "v";
-  });
-}
-function aTracks() {
-  return P.tracks.filter(function(t) {
-    return t.kind === "a";
-  });
-}
-function hasAudio(m) {
-  return !!m && m.k === "映像" && !m.noAudio;
+  return tracksOf(P, "v");
 }
 function isUsed(m) {
-  return P.clips.some(function(c) {
-    return c.m === m.id;
-  });
+  return isUsed$1(P, m);
 }
-function srcMin(c) {
-  return c.type === "media" ? 0 : -1e9;
-}
+var srcMin = srcMin$1;
 function srcMax(c) {
-  if (c.type !== "media") return 1e9;
-  var m = M(c.m);
-  return !m || m.k === "画像" ? 1e9 : m.d || c.out;
+  return srcMax$1(P, c);
 }
 function v1Clips() {
   return onTrack("V1").filter(function(c) {
@@ -631,21 +814,15 @@ function v1Clips() {
   });
 }
 function v1End() {
-  return onTrack("V1").reduce(function(a, c) {
-    return Math.max(a, cEnd(c));
-  }, 0);
+  return v1End$1(P);
 }
-function hasFx(c) {
-  return !!(c.x || c.y || c.rot || c.scale != null && c.scale != 100 || c.op != null && c.op != 100);
-}
+var hasFx = hasFx$1;
 function setP(v) {
   P = v;
 }
 function init$p() {
   P = sampleProject();
-  uid = function(p) {
-    return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  };
+  uid = uid$1;
 }
 var S;
 var TOTAL;
@@ -1452,19 +1629,16 @@ function rm(c) {
   if (i >= 0) P.clips.splice(i, 1);
   dropEl(c.id);
 }
-function clone(c, o) {
-  var n = JSON.parse(JSON.stringify(c));
-  for (var k in o) n[k] = o[k];
-  return n;
+function ctx() {
+  return { p: P, id: uid, removed: function(c) {
+    dropEl(c.id);
+  } };
 }
 function linked(c) {
-  return c && c.link ? P.clips.filter(function(x) {
-    return x.link === c.link && x !== c;
-  }) : [];
+  return linked$1(P, c);
 }
 function locked(c) {
-  var t = T(c.tr);
-  return !t || !!t.lock;
+  return locked$1(P, c);
 }
 function selIds(id, alone) {
   var c = C(id);
@@ -1486,47 +1660,13 @@ function primary() {
   return v[v.length - 1] || L[L.length - 1] || null;
 }
 function carve(tid, a, b, skip) {
-  P.clips.slice().forEach(function(c) {
-    if (c.tr !== tid || skip && skip[c.id]) return;
-    var s = c.start, e = cEnd(c);
-    if (e <= a + EPS || s >= b - EPS) return;
-    if (s >= a - EPS && e <= b + EPS) rm(c);
-    else if (s < a && e > b) {
-      var c2 = clone(c, { id: uid("c"), start: b, in: c.in + (b - s), link: null });
-      c.out = c.in + (a - s);
-      P.clips.push(c2);
-    } else if (s < a) c.out = c.in + (a - s);
-    else {
-      c.in += b - s;
-      c.start = b;
-    }
-  });
-}
-function splitClip(c, t) {
-  if (t <= c.start + 0.04 || t >= cEnd(c) - 0.04) return null;
-  var c2 = clone(c, { id: uid("c"), start: t, in: c.in + (t - c.start) });
-  c.out = c.in + (t - c.start);
-  P.clips.push(c2);
-  return c2;
+  carve$1(ctx(), tid, a, b, skip);
 }
 function splitList(L, t) {
-  var re = {}, made = [];
-  L.forEach(function(c) {
-    var c2 = splitClip(c, t);
-    if (!c2) return;
-    if (c.link) {
-      re[c.link] = re[c.link] || uid("L");
-      c2.link = re[c.link];
-    }
-    made.push(c2);
-  });
-  return made;
+  return splitList$1(ctx(), L, t);
 }
 function splitAt(t, ids) {
-  var L = ids && ids.length ? ids.map(C).filter(Boolean) : activeAt(t);
-  L = L.filter(function(c) {
-    return !locked(c) && t > c.start + 0.04 && t < cEnd(c) - 0.04;
-  });
+  var L = splittable(P, t, ids && ids.length ? ids.map(C).filter(Boolean) : activeAt(t));
   if (!L.length) return toast("再生ヘッドの位置に、分割できるクリップがありません");
   mark();
   var made = splitList(L, t);
@@ -1537,27 +1677,10 @@ function splitAt(t, ids) {
   toast("分割しました");
 }
 function closeRange(tid, a, b) {
-  var d = b - a;
-  if (d <= EPS) return;
-  P.tracks.forEach(function(tr) {
-    if (tr.lock) return;
-    if (tr.id !== tid && P.clips.some(function(c) {
-      return c.tr === tr.id && c.start < b - EPS && cEnd(c) > a + EPS;
-    })) return;
-    P.clips.forEach(function(c) {
-      if (c.tr === tr.id && c.start >= b - EPS) c.start -= d;
-    });
-  });
+  closeRange$1(P, tid, a, b);
 }
 function openRange(t, len, skip) {
-  var spans = P.clips.filter(function(c) {
-    return !locked(c) && c.start < t - EPS && cEnd(c) > t + EPS;
-  });
-  splitList(spans, t);
-  P.clips.forEach(function(c) {
-    if (locked(c)) return;
-    if (c.start >= t - EPS) c.start += len;
-  });
+  openRange$1(ctx(), t, len);
 }
 function delClips(ids, ripple) {
   var L = ids.map(C).filter(function(c) {
@@ -1565,84 +1688,34 @@ function delClips(ids, ripple) {
   });
   if (!L.length) return toast("削除するクリップを選んでください");
   mark();
-  L.sort(function(a, b) {
-    return b.start - a.start;
-  }).forEach(function(c) {
-    var a = c.start, b = cEnd(c), tid = c.tr;
-    rm(c);
-    if (ripple) closeRange(tid, a, b);
-  });
+  deleteClips(ctx(), L, ripple);
   S.sel = [];
   changed();
   toast(ripple ? "削除して、後ろを詰めました" : "削除しました（すき間は Shift＋Delete で詰められます）");
 }
 function gapAt(tid, t) {
-  var L = onTrack(tid), a = 0;
-  for (var i = 0; i < L.length; i++) {
-    var s = L[i].start, e = cEnd(L[i]);
-    if (t >= s - EPS && t < e) return null;
-    if (e <= t + EPS) a = Math.max(a, e);
-    else if (s > t) return s - a > EPS ? [a, s] : null;
-  }
-  return null;
-}
-function newClip(m, tid, start, a, b, link) {
-  return { id: uid("c"), tr: tid, type: "media", m: m.id, start, in: a, out: b, link: link || null };
+  return gapAt$1(P, tid, t);
 }
 function freeAudio(a, b) {
-  var L = aTracks().filter(function(t) {
-    return !t.lock;
-  });
-  return (L.filter(function(t) {
-    return !P.clips.some(function(c) {
-      return c.tr === t.id && c.start < b - EPS && cEnd(c) > a + EPS;
-    });
-  })[0] || L[0] || {}).id;
+  return freeAudio$1(P, a, b);
 }
 function placeMedia(m, tid, start, a, b, ins) {
-  var tr = T(tid), len = b - a, made = [];
-  if (!tr || tr.lock) {
-    toast("ロックしたトラックには置けません");
-    return made;
+  var r = placeMedia$1(ctx(), m, tid, start, a, b, ins);
+  if (r.error) {
+    toast(r.error);
+    return r.made;
   }
-  if (len < 0.05) return made;
-  start = Math.max(0, start);
-  var isV = m.k === "映像" || m.k === "画像", vt = null, at = null, L = null;
-  if (!isV) at = tr.kind === "a" ? tid : freeAudio(start, start + len);
-  else if (tr.kind === "a") {
-    if (!hasAudio(m)) {
-      toast("この素材には音声がありません");
-      return made;
-    }
-    at = tid;
-  } else {
-    vt = tid;
-    if (hasAudio(m)) {
-      at = freeAudio(start, start + len);
-      L = uid("L");
-    }
-  }
-  if (ins) openRange(start, len);
-  else {
-    if (vt) carve(vt, start, start + len);
-    if (at) carve(at, start, start + len);
-  }
-  if (vt) made.push(newClip(m, vt, start, a, b, at ? L : null));
-  if (at) made.push(newClip(m, at, start, a, b, vt ? L : null));
-  made.forEach(function(c) {
-    P.clips.push(c);
-  });
-  S.sel = made.map(function(c) {
+  if (r.made.length || !(b - a < 0.05)) S.sel = r.made.map(function(c) {
     return c.id;
   });
-  return made;
+  return r.made;
 }
 function insPoint() {
   var p = primary();
   return p && p.tr === "V1" ? cEnd(p) : v1End();
 }
 function insertSegs(m, segs, t0) {
-  var t = t0, all = [];
+  var all = [], t = t0;
   segs.forEach(function(g) {
     all = all.concat(placeMedia(m, "V1", t, g[0], g[1], true));
     t += g[1] - g[0];
@@ -1677,34 +1750,16 @@ function addToTimeline(m) {
 function reorderV1(id, toId, after) {
   var c = C(id), tg = C(toId);
   if (!c || !tg || c === tg) return;
-  var grp = [c].concat(linked(c)), len = cLen(c), a = c.start;
+  [c].concat(linked(c));
+  cLen(c);
+  c.start;
   mark();
-  grp.forEach(function(g) {
-    P.clips.splice(P.clips.indexOf(g), 1);
-  });
-  closeRange("V1", a, a + len);
-  var t = after ? cEnd(tg) : tg.start;
-  openRange(t, len);
-  grp.forEach(function(g) {
-    g.start = t;
-    P.clips.push(g);
-  });
+  reorderV1$1(ctx(), c, tg, after);
   changed();
 }
 function addTitle(st, t, tid) {
-  t = Math.max(0, t || 0);
-  var d = st === "credit" ? 8 : 4, free = function(tr2) {
-    return !tr2.lock && !P.clips.some(function(c2) {
-      return c2.tr === tr2.id && c2.start < t + d - EPS && cEnd(c2) > t + EPS;
-    });
-  };
   mark();
-  var tr = tid && T(tid) && T(tid).kind === "v" && free(T(tid)) ? T(tid) : vTracks().filter(function(x) {
-    return x.id !== "V1";
-  }).reverse().filter(free)[0];
-  if (!tr) tr = addTrack("v");
-  var c = { id: uid("t"), tr: tr.id, type: "title", start: t, in: 0, out: d, st, sz: "中", label: { name: "名前・肩書き", q: "質問を入力", sub: "字幕を入力", credit: "出演\n協力\n制作" }[st] };
-  P.clips.push(c);
+  var c = addTitle$1(ctx(), st, t, tid), tr = T(c.tr);
   S.sel = [c.id];
   S.open.clip = 1;
   if (S.page !== "edit") go("edit");
@@ -1717,24 +1772,13 @@ function addTitle(st, t, tid) {
   }
 }
 function addTrack(kind) {
-  var n = P.tracks.filter(function(t2) {
-    return t2.kind === kind;
-  }).reduce(function(a, t2) {
-    return Math.max(a, +t2.id.slice(1) || 0);
-  }, 0) + 1, t = { id: (kind === "v" ? "V" : "A") + n, kind, h: kind === "v" ? 48 : 44 };
-  if (kind === "v") P.tracks.unshift(t);
-  else P.tracks.push(t);
-  return t;
+  return addTrack$1(P, kind);
 }
 function delTrack(id) {
   var t = T(id);
   if (!t) return;
-  if (P.clips.some(function(c) {
-    return c.tr === id;
-  })) return toast("クリップが残っているトラックは削除できません");
-  if (P.tracks.filter(function(x) {
-    return x.kind === t.kind;
-  }).length <= 1) return toast("最後の" + (t.kind === "v" ? "映像" : "音声") + "トラックは削除できません");
+  var why = cannotDeleteTrack(P, t);
+  if (why) return toast(why);
   mark();
   P.tracks.splice(P.tracks.indexOf(t), 1);
   changed();
@@ -1742,29 +1786,14 @@ function delTrack(id) {
 function copySel() {
   var L = selClips();
   if (!L.length) return toast("コピーするクリップを選んでください");
-  var base = Math.min.apply(null, L.map(function(c) {
-    return c.start;
-  }));
-  S.clipboard = { base, clips: JSON.parse(JSON.stringify(L)) };
+  S.clipboard = copyClips(L);
   return L;
 }
 function pasteAt(t, src) {
   src = src || S.clipboard;
   if (!src) return toast("貼り付けるものがありません");
-  var re = {}, made = [];
   mark();
-  src.clips.forEach(function(o) {
-    var tr = T(o.tr);
-    if (!tr || tr.lock) return;
-    var c = clone(o, { id: uid("c"), start: t + (o.start - src.base) });
-    if (o.link) {
-      re[o.link] = re[o.link] || uid("L");
-      c.link = re[o.link];
-    }
-    carve(c.tr, c.start, cEnd(c));
-    P.clips.push(c);
-    made.push(c);
-  });
+  var made = pasteClips(ctx(), t, src);
   if (!made.length) {
     HIST.pop();
     return toast("貼り付けられるトラックがありません");
@@ -1802,17 +1831,10 @@ function nudge(dt) {
   var L = selClips();
   if (!L.length) return;
   if (L.some(function(c) {
-    return c.start + dt < -EPS;
+    return c.start + dt < -1e-6;
   })) return;
   mark();
-  var skip = {};
-  L.forEach(function(c) {
-    skip[c.id] = 1;
-    c.start += dt;
-  });
-  L.forEach(function(c) {
-    carve(c.tr, c.start, cEnd(c), skip);
-  });
+  nudge$1(ctx(), L, dt);
   changed();
 }
 function zoomVal() {
@@ -3664,8 +3686,8 @@ var lateDraw;
 function drawWhenIdle() {
   if (lateDraw) return;
   lateDraw = setTimeout(function again() {
-    var a = document.activeElement, busy = PDOWN || (a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT" && a.type !== "range" && a.type !== "checkbox") || a && a.isContentEditable);
-    if (busy) {
+    var a = document.activeElement, busy2 = PDOWN || (a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT" && a.type !== "range" && a.type !== "checkbox") || a && a.isContentEditable);
+    if (busy2) {
       lateDraw = setTimeout(again, 400);
       return;
     }
