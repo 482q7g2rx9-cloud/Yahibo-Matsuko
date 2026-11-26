@@ -72,6 +72,11 @@ jobs:
             os: macos-latest
             target: aarch64-apple-darwin
             bundles: app,dmg
+          # Intel の Mac 向け。Apple シリコンのランナーでクロスコンパイルする（Intel のランナーは廃止が進んでいるため）
+          - name: macOS（Intel）
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bundles: app,dmg
           - name: Linux
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -107,6 +112,10 @@ jobs:
         with:
           path: apps/editor/src-tauri/binaries
           key: ffmpeg-${{ matrix.target }}-${{ hashFiles('apps/editor/scripts/fetch-ffmpeg.sh', 'apps/editor/scripts/build-ffmpeg-macos.sh') }}
+
+      - name: Intel 版 FFmpeg の高速化に使う nasm
+        if: matrix.target == 'x86_64-apple-darwin' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: brew install nasm
 
       - name: FFmpeg を用意する
         if: steps.ffmpeg-cache.outputs.cache-hit != 'true'

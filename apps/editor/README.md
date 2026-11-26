@@ -50,6 +50,22 @@ scripts/fetch-ffmpeg.sh x86_64-pc-windows-msvc
 scripts/fetch-ffmpeg.sh --system
 ```
 
+Intel の Mac 向けは、Apple シリコンの Mac でも作れます（クロスコンパイル）。
+
+```bash
+rustup target add x86_64-apple-darwin
+```
+
+```bash
+scripts/fetch-ffmpeg.sh x86_64-apple-darwin
+```
+
+```bash
+npm run tauri build -- --target x86_64-apple-darwin
+```
+
+できたものは `target/x86_64-apple-darwin/release/bundle/` に入ります。FFmpeg を速くするには、先に `brew install nasm` をしておきます。
+
 開発用に起動します（画面を変えると自動で読み直します）。
 
 ```bash
@@ -111,6 +127,6 @@ apps/editor/
 
 `.github/workflows/editor.yml` で、次のことを行います。
 - 中心部分のテストと画面のビルド、デスクトップ側のテスト（Linux）
-- Windows（NSIS）・macOS（dmg）・Linux（deb / AppImage）のインストーラー作成
+- Windows（NSIS）・macOS（dmg。Apple シリコン版と Intel 版）・Linux（deb / AppImage）のインストーラー作成
 
 できたインストーラーは、実行結果の「Artifacts」からダウンロードできます。署名はまだしていないため、初回起動時に OS の警告が出ます。署名は M5 で対応します。

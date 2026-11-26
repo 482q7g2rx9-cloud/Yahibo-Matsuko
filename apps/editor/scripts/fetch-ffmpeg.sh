@@ -54,12 +54,18 @@ elif [[ "$target" == x86_64-unknown-linux-gnu ]]; then
   tar -xJf "$work/ff.tar.xz" -C "$work"
   put "$(dirname "$(find "$work" -name ffmpeg -type f | head -1)")"
 elif [[ "$target" == *apple-darwin ]]; then
-  "$here/build-ffmpeg-macos.sh" "$work/out"
+  "$here/build-ffmpeg-macos.sh" "$work/out" "$target"
   put "$work/out"
 else
   echo "未対応のターゲット: $target" >&2; exit 2
 fi
 
+# 別の CPU 向け（Apple シリコンの Mac で作った Intel 版など）は、この Mac では動かせないことがある。
+# macOS 版はこのスクリプトが LGPL 構成でビルドしたものなので、そのときは確認を省く
+if ! "$bin/ffmpeg-$target$ext" -hide_banner -version >/dev/null 2>&1; then
+  if [[ "$target" == *apple-darwin ]]; then echo "（この Mac では $target の FFmpeg を動かせないため、版の表示を省きます）"; exit 0; fi
+  echo "エラー: 用意した FFmpeg を起動できません" >&2; exit 1
+fi
 for t in ffmpeg ffprobe; do "$bin/$t-$target$ext" -hide_banner -version | head -1; done
 if "$bin/ffmpeg-$target$ext" -hide_banner -buildconf 2>/dev/null | grep -q -- '--enable-gpl'; then
   if [[ "$mode" == system ]]; then echo "注意: 手元の FFmpeg は GPL 構成です。開発用にだけ使い、配布物には入れないでください" >&2
