@@ -4115,8 +4115,8 @@ function elFor(c, m, audio) {
   e._audio = audio;
   if (!audio) {
     e.muted = true;
-    e.addEventListener("seeked", redrawProg);
-    e.addEventListener("loadeddata", redrawProg);
+    e.addEventListener("seeked", idleRedraw);
+    e.addEventListener("loadeddata", idleRedraw);
   } else route(e);
   e.addEventListener("error", function() {
     playErr(m, e);
@@ -4243,6 +4243,18 @@ function drawClip(cx, W, H, c) {
         w = src.videoWidth;
         hh = src.videoHeight;
       }
+      if (E.playing) {
+        var st = E.stats, lt = c.in + (S.t.edit - c.start);
+        st.vframes++;
+        if (!w) {
+          st.blank++;
+          if (st.at.length < 40) st.at.push("blank@" + S.t.edit.toFixed(2));
+        } else if (src.paused || src.seeking) st.stale++;
+        else if (Math.abs(src.currentTime - lt) > 0.15) {
+          st.late++;
+          if (st.at.length < 40) st.at.push("late@" + S.t.edit.toFixed(2) + "(" + (src.currentTime - lt).toFixed(2) + ")");
+        }
+      }
     }
   }
   var sc = (c.scale == null ? 100 : c.scale) / 100;
@@ -4314,6 +4326,9 @@ function drawTitle(cx, W, H, ti, t) {
     });
   }
 }
+function idleRedraw() {
+  if (!E.playing) redrawProg();
+}
 function redrawProg() {
   if (X && X.run) return;
   [].forEach.call(document.querySelectorAll("canvas[data-prog]"), function(c) {
@@ -4361,23 +4376,58 @@ function progPlay() {
   if (E.ctx && E.ctx.state === "suspended") E.ctx.resume();
   if (S.t.edit >= progDur() - 0.05) S.t.edit = 0;
   E.playing = true;
-  E.base = S.t.edit;
-  E.t0 = performance.now();
   syncPlayBtn();
-  (function loop() {
+  sync(S.t.edit, false);
+  var w0 = performance.now();
+  (function ready2() {
     if (!E.playing) return;
-    var t = E.base + (performance.now() - E.t0) / 1e3;
-    if (t >= progDur()) {
-      S.t.edit = progDur();
-      progStop();
+    var wait = activeVideos(S.t.edit).some(function(e) {
+      return e.readyState < 2 || e.seeking;
+    });
+    if (wait && performance.now() - w0 < 1500) {
+      E.raf = requestAnimationFrame(ready2);
       return;
     }
-    S.t.edit = t;
-    sync(t, true);
-    heads(true);
-    redrawProg();
-    E.raf = requestAnimationFrame(loop);
+    start();
   })();
+  function start() {
+    E.base = S.t.edit;
+    E.t0 = performance.now();
+    E.stats = { frames: 0, vframes: 0, blank: 0, stale: 0, late: 0, maxGap: 0, slow: 0, last: 0, at: [] };
+    (function loop() {
+      if (!E.playing) return;
+      var now = performance.now(), st = E.stats;
+      if (st.last) {
+        var gap = now - st.last;
+        st.maxGap = Math.max(st.maxGap, gap);
+        if (gap > 50) {
+          st.slow++;
+          if (st.at.length < 40) st.at.push("gap@" + S.t.edit.toFixed(2) + "(" + Math.round(gap) + ")");
+        }
+      }
+      st.last = now;
+      st.frames++;
+      var t = E.base + (now - E.t0) / 1e3;
+      if (t >= progDur()) {
+        S.t.edit = progDur();
+        progStop();
+        return;
+      }
+      S.t.edit = t;
+      sync(t, true);
+      heads(true);
+      redrawProg();
+      E.raf = requestAnimationFrame(loop);
+    })();
+  }
+}
+function activeVideos(t) {
+  return P.clips.filter(function(c) {
+    var m = c.type === "media" && M(c.m), tr = T(c.tr);
+    return m && m.url && m.k === "映像" && tr && tr.kind === "v" && !tr.hide && t >= c.start - 1e-6 && t < cEnd(c);
+  }).map(function(c) {
+    return E.els[c.id];
+  }).filter(Boolean);
 }
 function progStop() {
   E.playing = false;
@@ -4388,7 +4438,7 @@ function progStop() {
   syncPlayBtn();
 }
 function init$8() {
-  E = { ctx: null, master: null, mon: null, els: {}, imgs: {}, playing: false, raf: 0, base: 0, t0: 0 };
+  E = { ctx: null, master: null, mon: null, els: {}, imgs: {}, playing: false, raf: 0, base: 0, t0: 0, stats: { frames: 0, vframes: 0, blank: 0, stale: 0, late: 0, maxGap: 0, slow: 0, last: 0, at: [] } };
   PLAYERR = {};
   TST = { name: "店名テロップ", q: "質問テロップ", sub: "字幕", credit: "クレジット" };
 }
@@ -5451,6 +5501,9 @@ function init$1() {
   });
 }
 function init() {
+  window.__matsuko = { E, P: function() {
+    return P;
+  }, setP, changed };
   if (HOST) {
     refreshRecent();
     HOST.project.openLast().then(function(o) {

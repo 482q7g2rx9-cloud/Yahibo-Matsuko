@@ -20,7 +20,7 @@ export function route(e){if(!E.ctx||e._routed||!e._audio)return;try{var s=E.ctx.
 export function imgFor(m){var e=E.imgs[m.id];if(!e||e._src!==m.url){e=new Image();if(HOST)e.crossOrigin='anonymous';e.onload=redrawProg;e._src=m.url;e.src=m.url;E.imgs[m.id]=e;}return e;}
 export function elFor(c,m,audio){var e=E.els[c.id];if(e&&e._src===m.url&&!!e._audio===audio)return e;if(e)dropEl(c.id);
   e=document.createElement(audio?'audio':'video');if(HOST)e.crossOrigin='anonymous';e.preload='auto';e.playsInline=true;e.src=m.url;e._src=m.url;e._audio=audio;
-  if(!audio){e.muted=true;e.addEventListener('seeked',redrawProg);e.addEventListener('loadeddata',redrawProg);}else route(e);
+  if(!audio){e.muted=true;e.addEventListener('seeked',idleRedraw);e.addEventListener('loadeddata',idleRedraw);}else route(e);
   e.addEventListener('error',function(){playErr(m,e);});
   E.els[c.id]=e;return e;}
 /* 再生できなかった素材は、1回だけ知らせる（デスクトップ版の Linux で GStreamer のプラグインが足りないときなど） */
@@ -41,6 +41,8 @@ export function sync(t,play){var want={};
     if(Math.abs(e.currentTime-w.lt)>(play?0.3:0.02)){try{e.currentTime=w.lt;}catch(x){}}
     if(play&&e.paused){var pr=e.play();if(pr&&pr.catch)pr.catch(function(){});}if(!play&&!e.paused)e.pause();});
   Object.keys(E.els).forEach(function(id){if(id in want)return;var e=E.els[id],c=C(id);if(!e.paused)e.pause();if(!c||Math.min(Math.abs(c.start-t),Math.abs(cEnd(c)-t))>30)dropEl(id);});}
+/* 再生の様子（テストで途切れを数える）：frames 描いた回数、vframes 映像を描いた回数、blank 間に合わず描けなかった回数、
+   stale 止まった映像を描いた回数、maxGap・slow 描く間隔の最大（ミリ秒）と 50 ミリ秒を超えた回数 */
 /* 1フレームを描く：V1 から上へ重ねる。見本の素材は色の画面に名前を出す */
 export function drawFrame(cx,W,H,t){cx.fillStyle='#000';cx.fillRect(0,0,W,H);
   vTracks().slice().reverse().forEach(function(tr){if(tr.hide)return;P.clips.forEach(function(c){if(c.tr!==tr.id||t<c.start-1e-9||t>=cEnd(c))return;
@@ -48,7 +50,7 @@ export function drawFrame(cx,W,H,t){cx.fillStyle='#000';cx.fillRect(0,0,W,H);
     else if(c.type==='adj')adjust(cx,W,H);else drawClip(cx,W,H,c);});});}
 export function adjust(cx,W,H){try{var tmp=adjust.c||(adjust.c=document.createElement('canvas'));tmp.width=W;tmp.height=H;tmp.getContext('2d').drawImage(cx.canvas,0,0);cx.filter='saturate(1.08) contrast(1.04)';cx.drawImage(tmp,0,0);cx.filter='none';}catch(e){}}
 export function drawClip(cx,W,H,c){var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='映像'&&m.k!=='画像')return;
-  if(m.url&&!m.loading){if(m.k==='画像'){src=imgFor(m);if(src.complete){w=src.naturalWidth;hh=src.naturalHeight;}}else{src=E.els[c.id]||elFor(c,m,false);if(src.readyState>=2){w=src.videoWidth;hh=src.videoHeight;}}}
+  if(m.url&&!m.loading){if(m.k==='画像'){src=imgFor(m);if(src.complete){w=src.naturalWidth;hh=src.naturalHeight;}}else{src=E.els[c.id]||elFor(c,m,false);if(src.readyState>=2){w=src.videoWidth;hh=src.videoHeight;}if(E.playing){var st=E.stats,lt=c.in+(S.t.edit-c.start);st.vframes++;if(!w){st.blank++;if(st.at.length<40)st.at.push('blank@'+S.t.edit.toFixed(2));}else if(src.paused||src.seeking)st.stale++;else if(Math.abs(src.currentTime-lt)>0.15){st.late++;if(st.at.length<40)st.at.push('late@'+S.t.edit.toFixed(2)+'('+(src.currentTime-lt).toFixed(2)+')');}}}}
   var sc=(c.scale==null?100:c.scale)/100;cx.save();cx.globalAlpha=Math.max(0,Math.min(1,(c.op==null?100:c.op)/100));
   cx.translate(W/2+(c.x||0)/100*W,H/2+(c.y||0)/100*H);cx.rotate((c.rot||0)*Math.PI/180);
   if(w){var s=Math.min(W/w,H/hh)*sc;cx.drawImage(src,-w*s/2,-hh*s/2,w*s,hh*s);}
@@ -65,6 +67,8 @@ export function drawTitle(cx,W,H,ti,t){var sz={'小':.042,'中':.055,'大':.075}
   else if(ti.st==='sub'){cx.textAlign='center';var y0=H*.92-bh;cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect((W-tw)/2-pad,y0-pad*.4,tw+pad*2,bh+pad*.8);cx.fillStyle='#fff';lines.forEach(function(l,i){cx.fillText(l,W/2,y0+lh*(i+.5));});}
   else if(ti.st==='credit'){cx.textAlign='center';var pr=Math.max(0,Math.min(1,(t-ti.t)/ti.d)),y=H-(H+bh)*pr;lines.forEach(function(l,i){outl(l,W/2,y+lh*(i+.5));});}
   else{cx.textAlign='left';var yb=H*.9-bh;lines.forEach(function(l,i){outl(l,W*.06,yb+lh*(i+.5));});}}
+/* 止まっているときだけ描き直す（再生中は毎フレーム描くので、素材の読み込みのたびに描くと重くなる） */
+export function idleRedraw(){if(!E.playing)redrawProg();}
 export function redrawProg(){if(X&&X.run)return;[].forEach.call(document.querySelectorAll('canvas[data-prog]'),function(c){drawFrame(c.getContext('2d'),c.width,c.height,S.t.edit);});}
 export function clampProg(){var d=progDur();S.t.edit=Math.max(0,Math.min(d,S.t.edit));if(P.pout!=null&&P.pout>d)P.pout=d;if(P.pin!=null&&P.pin>=(P.pout!=null?P.pout:d))P.pin=null;}
 export function setProg(t){S.t.edit=Math.max(0,Math.min(progDur(),t));heads();if(!E.playing){sync(S.t.edit,false);redrawProg();}}
@@ -75,13 +79,21 @@ export function heads(follow){var t=S.t.edit,d=progDur()||1,pps=S.pps||10;
   if(follow&&PREF.follow){var b=document.querySelector('[data-body]');if(b){var x=t*pps;if(x>b.scrollLeft+b.clientWidth-30||x<b.scrollLeft)b.scrollLeft=Math.max(0,x-60);}}}
 export function progPlay(){if(X&&X.run)return toast('書き出し中は再生できません');if(E.playing)return progStop();if(!P.clips.length)return toast('タイムラインにクリップがありません');
   audioInit();if(E.ctx&&E.ctx.state==='suspended')E.ctx.resume();if(S.t.edit>=progDur()-0.05)S.t.edit=0;
-  E.playing=true;E.base=S.t.edit;E.t0=performance.now();syncPlayBtn();
-  (function loop(){if(!E.playing)return;var t=E.base+(performance.now()-E.t0)/1000;if(t>=progDur()){S.t.edit=progDur();progStop();return;}S.t.edit=t;sync(t,true);heads(true);redrawProg();E.raf=requestAnimationFrame(loop);})();}
+  E.playing=true;syncPlayBtn();
+  /* 再生を始める位置の映像が描ける状態になってから、時計を進め始める（最長 1.5 秒待つ） */
+  sync(S.t.edit,false);var w0=performance.now();
+  (function ready(){if(!E.playing)return;var wait=activeVideos(S.t.edit).some(function(e){return e.readyState<2||e.seeking;});
+    if(wait&&performance.now()-w0<1500){E.raf=requestAnimationFrame(ready);return;}start();})();
+  function start(){E.base=S.t.edit;E.t0=performance.now();
+  E.stats={frames:0,vframes:0,blank:0,stale:0,late:0,maxGap:0,slow:0,last:0,at:[]};
+  (function loop(){if(!E.playing)return;var now=performance.now(),st=E.stats;if(st.last){var gap=now-st.last;st.maxGap=Math.max(st.maxGap,gap);if(gap>50){st.slow++;if(st.at.length<40)st.at.push('gap@'+S.t.edit.toFixed(2)+'('+Math.round(gap)+')');}}st.last=now;st.frames++;var t=E.base+(now-E.t0)/1000;if(t>=progDur()){S.t.edit=progDur();progStop();return;}S.t.edit=t;sync(t,true);heads(true);redrawProg();E.raf=requestAnimationFrame(loop);})();}}
+/* 時刻 t に映っている映像のクリップの要素 */
+export function activeVideos(t){return P.clips.filter(function(c){var m=c.type==='media'&&M(c.m),tr=T(c.tr);return m&&m.url&&m.k==='映像'&&tr&&tr.kind==='v'&&!tr.hide&&t>=c.start-1e-6&&t<cEnd(c);}).map(function(c){return E.els[c.id];}).filter(Boolean);}
 export function progStop(){E.playing=false;cancelAnimationFrame(E.raf);sync(S.t.edit,false);heads();redrawProg();syncPlayBtn();}
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
-E={ctx:null,master:null,mon:null,els:{},imgs:{},playing:false,raf:0,base:0,t0:0};
+E={ctx:null,master:null,mon:null,els:{},imgs:{},playing:false,raf:0,base:0,t0:0,stats:{frames:0,vframes:0,blank:0,stale:0,late:0,maxGap:0,slow:0,last:0,at:[]}};
 PLAYERR={};
 TST={name:'店名テロップ',q:'質問テロップ',sub:'字幕',credit:'クレジット'};
 }
