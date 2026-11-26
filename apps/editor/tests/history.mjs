@@ -40,7 +40,7 @@ await p.evaluate(() => { window.__shift += 120_000; });
 await del('c1');                       // さらに2分後：写し 2（自動）
 const now = await clips();
 
-await p.click('#top >> text=履歴・復元');
+await p.click('#mb >> text=プロジェクト'); await p.click('#dd >> text=変更履歴・復元…');
 await p.waitForTimeout(400);
 const rows = await p.evaluate(() => [...document.querySelectorAll('.hlist .hsnap')].map((r) => r.innerText.replace(/\s+/g, ' ')));
 check('写しは2件（間隔が短いものは残さない）', rows.length === 2, rows);
@@ -57,7 +57,7 @@ await p.keyboard.press('Control+z');
 await p.waitForTimeout(300);
 check('Ctrl+Z で復元の前に戻る', (await clips()) === now, [await clips(), now]);
 
-await p.click('#top >> text=履歴・復元');
+await p.click('#mb >> text=プロジェクト'); await p.click('#dd >> text=変更履歴・復元…');
 await p.waitForTimeout(400);
 const rows2 = await p.evaluate(() => [...document.querySelectorAll('.hlist .hsnap')].map((r) => r.innerText.replace(/\s+/g, ' ')));
 check('「復元する前」の写しが増える', rows2.length === 3 && rows2[0].includes('復元する前'), rows2);
@@ -66,7 +66,7 @@ await p.keyboard.press('Escape');
 // 開き直すと「開いたとき」の写しが残る
 await p.reload();
 await p.waitForTimeout(800);
-await p.click('#top >> text=履歴・復元');
+await p.click('#mb >> text=プロジェクト'); await p.click('#dd >> text=変更履歴・復元…');
 await p.waitForTimeout(400);
 const rows3 = await p.evaluate(() => [...document.querySelectorAll('.hlist .hsnap')].map((r) => r.innerText.replace(/\s+/g, ' ')));
 check('開き直すと「開いたとき」が増える', rows3.length === 4 && rows3.some((r) => r.includes('開いたとき')), rows3);
