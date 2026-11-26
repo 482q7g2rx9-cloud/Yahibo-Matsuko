@@ -312,6 +312,27 @@ input[type=checkbox],input[type=radio]{accent-color:var(--ac);width:14px;height:
 .pr2 .inp{height:26px;padding:0 6px;text-align:right}
 input[type=range]{accent-color:var(--ac)}
 kbd{display:inline-block;padding:1px 6px;border:1px solid var(--bd);border-bottom-width:2px;border-radius:4px;background:var(--bg3);font:inherit;font-size:11px}
+
+/* タイムライン下部の拡大率（目立たない色。マウスを乗せると濃くなる） */
+.tlfoot{height:20px;flex:none;display:flex;align-items:center;justify-content:flex-end;gap:4px;padding:0 10px;background:var(--bg1);border-top:1px solid var(--ln);opacity:.55;transition:opacity .15s}
+.tlfoot:hover,.tlfoot:focus-within{opacity:1}
+.tlfoot button{width:16px;height:16px;padding:0;border:0;background:none;color:var(--mu);font-size:12px;line-height:16px;border-radius:3px}
+.tlfoot button:hover{color:var(--tx);background:var(--bg3)}
+.tlfoot input[type=range]{width:110px;height:12px;accent-color:var(--bd2)}
+/* 環境設定 */
+.dlg.prefs{width:760px;height:560px;max-height:calc(100vh - 40px);padding:0;display:flex;flex-direction:column}
+.prefs .ph2{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--dv)}.prefs .ph2 h2{margin:0;flex:1}
+.prefs .pbody{flex:1;min-height:0;display:flex}
+.pnav{width:160px;flex:none;padding:8px;border-right:1px solid var(--dv);display:flex;flex-direction:column;gap:2px}
+.pnav button{height:32px;border:0;border-radius:4px;background:none;color:var(--tx2);text-align:left;padding:0 10px}
+.pnav button:hover{background:var(--bg3)}.pnav button[aria-current=true]{background:var(--sel);color:var(--wt);font-weight:600}
+.pcont{flex:1;min-width:0;overflow:auto;padding:6px 20px 18px}
+.pcont h3{font-size:14px;margin:10px 0 12px}
+.prow{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--dv);line-height:1.5}
+.pgrp{font-weight:700;margin:14px 0 4px;color:var(--tx2)}
+.krow{display:grid;grid-template-columns:1fr 170px 112px;gap:8px;align-items:center;min-height:32px;border-bottom:1px solid var(--dv)}
+.krow.cap{background:var(--sel)}
+.sw{width:24px;height:24px;border-radius:50%;border:2px solid transparent;padding:0}.sw.on{box-shadow:0 0 0 2px var(--bg2),0 0 0 4px var(--tx)}
 </style>
 <div id="app">
 <header id="top"></header>
@@ -647,7 +668,7 @@ function heads(follow){var t=S.t.edit,d=progDur()||1,pps=S.pps||10;
   [].forEach.call(document.querySelectorAll('[data-head="edit"]'),function(e){e.style.left=(t*pps)+'px';});
   [].forEach.call(document.querySelectorAll('[data-bar="edit"]'),function(e){e.style.width=(t/d*100)+'%';});
   [].forEach.call(document.querySelectorAll('[data-time="edit"]'),function(e){e.textContent=tc(t);});
-  if(follow){var b=document.querySelector('[data-body]');if(b){var x=t*pps;if(x>b.scrollLeft+b.clientWidth-30||x<b.scrollLeft)b.scrollLeft=Math.max(0,x-60);}}}
+  if(follow&&PREF.follow){var b=document.querySelector('[data-body]');if(b){var x=t*pps;if(x>b.scrollLeft+b.clientWidth-30||x<b.scrollLeft)b.scrollLeft=Math.max(0,x-60);}}}
 function progPlay(){if(X&&X.run)return toast('書き出し中は再生できません');if(E.playing)return progStop();if(!P.clips.length)return toast('タイムラインにクリップがありません');
   audioInit();if(E.ctx&&E.ctx.state==='suspended')E.ctx.resume();if(S.t.edit>=progDur()-0.05)S.t.edit=0;
   E.playing=true;E.base=S.t.edit;E.t0=performance.now();syncPlayBtn();
@@ -985,7 +1006,7 @@ R.edit=function(){
       (can?'<button class="b s" aria-label="「'+h(m.n)+'」をタイムラインに追加" title="タイムラインに追加"'+A('addtl',m.id)+' style="position:absolute;right:4px;top:4px;width:24px;height:24px;padding:0;border-radius:50%">'+ic('plus',14)+'</button>':'')+
       '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(m.k==='音声'?h(m.c)+' ':'')+h(m.n)+'</div><div class="'+(m.r==='wn'?'t-wn':'t-ok')+'">'+r[0]+'</div></div>';}).join('')+'</div>'+(L.length?'':'<div class="mu" style="padding:0 14px">「＋ 読込」で動画・音声・画像を読み込めます。</div>')+'</div>';}
   else left='<div class="scroll" style="padding:14px;display:flex;flex-direction:column;gap:8px">'+(S.etab==='text'?'<div class="mu" style="line-height:1.6">押すと、再生ヘッドの位置にテロップを追加します（T キーでも追加できます）。</div>':'')+D.templates[S.etab].map(function(t,i){var st=['name','q','sub','credit'][i];return S.etab==='text'?'<div class="card" role="button" tabindex="0"'+A('addTitle',st)+'><b>'+h(t[0])+'　<span style="display:inline;color:var(--ac)">＋ 追加</span></b><span>'+h(t[1])+'</span></div>':'<div class="card"><b>'+h(t[0])+'</b><span>'+h(t[1])+'</span></div>';}).join('')+'</div>';
-  var tools=[['select','選択','V'],['split','分割','C'],['trash','削除',''],['hand','ハンド','H'],['text','文字','']],ins=inspector(),rngOn=P.pin!=null||P.pout!=null;
+  var tools=[['select','選択',keyOf('tSel')],['split','分割',keyOf('tSplit')],['trash','削除',''],['hand','ハンド',keyOf('tHand')],['text','文字','']],ins=inspector(),rngOn=P.pin!=null||P.pout!=null;
   return '<div class="pn l" style="width:250px">'+ph('素材')+tabs([['assets','アセット'],['templates','テンプレート'],['text','テロップ'],['audio','音声']],S.etab,'etab','素材の種類')+left+'</div>'+
   '<div class="pc" style="background:var(--bg0)">'+
     '<div style="height:280px;flex:none;display:flex;flex-direction:column;background:#000">'+ph('プレビュー','<span class="x">全長 '+mmss(progDur())+'</span>')+'<div class="mon" style="flex:1;min-height:0"><canvas data-prog width="640" height="360" style="width:360px;height:203px;display:block"></canvas></div>'+
@@ -996,9 +1017,8 @@ R.edit=function(){
         '<button class="b s'+(S.snap?' on':'')+'" aria-pressed="'+S.snap+'"'+A('snapT')+' title="スナップ（N キー）">スナップ</button>'+
         btn('＋ トラック','addTrk','','s','トラックを追加')+
         (rngOn?'<span class="t-ac" style="margin-left:6px">書き出し範囲 '+tc(P.pin||0)+' – '+tc(P.pout!=null?P.pout:progDur())+'</span>'+btn('範囲を消去','pclear','','s'):'')+
-        '<span class="grow"></span>'+btn('ショートカット','keys','','s')+'<span class="vsep"></span>'+
-        '<button class="ib" aria-label="縮小（- キー）" title="縮小（- キー）"'+A('zout')+'>−</button><input type="range" min="0" max="100" value="'+zoomVal()+'" data-in="zoom" aria-label="拡大率" style="width:90px"><button class="ib" aria-label="拡大（+ キー）" title="拡大（+ キー）"'+A('zin')+'>＋</button>'+btn('全体','zfit','','s','全体を表示（\\ キー）')+
-      '</div><div class="tl tl2" data-tlwrap>'+tlInner()+'</div></div></div></div>'+
+        '</div><div class="tl tl2" data-tlwrap>'+tlInner()+'</div>'+
+      '<div class="tlfoot"><button aria-label="縮小" title="縮小（'+keyOf('zout')+'）"'+A('zout')+'>−</button><input type="range" min="0" max="100" value="'+zoomVal()+'" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（'+keyOf('zin')+'）"'+A('zin')+'>＋</button></div></div></div></div>'+
   '<div class="pn r" style="width:320px">'+ph('インスペクタ','<span class="x">'+h(ins.name)+'</span>')+'<div class="scroll">'+ins.html+
     (P.sample?'<div style="padding:10px 16px 12px"><div style="font-weight:700;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>':'')+'</div></div>';
 };
@@ -1145,16 +1165,17 @@ function draw(){var pg=document.getElementById('page'),f=document.activeElement,
 function go(p){if(!R[p])return;stopAll();closeMenu();S.page=p;persist();draw();}
 
 /* ---------- メニュー ---------- */
-var MENUS=[{n:'ファイル',i:[['新規プロジェクト…','new'],['見本プロジェクトを開く…','sample'],'-',['素材を読み込む…','imp','Ctrl+I'],['保存','save','Ctrl+S'],'-',['書き出し…','go:export','Ctrl+M']]},
+var MENUS=[{n:'ファイル',i:[['新規プロジェクト…','new'],['見本プロジェクトを開く…','sample'],'-',['素材を読み込む…','imp'],['保存','save'],'-',['書き出し…','go:export'],'-',['環境設定…','prefs']]},
   {n:'編集',i:[['元に戻す','undo','Ctrl+Z'],['やり直し','redo','Ctrl+Y'],'-',['切り取り','cut2','Ctrl+X'],['コピー','copy','Ctrl+C'],['貼り付け','paste','Ctrl+V'],['複製','dup','Ctrl+D'],'-',['再生ヘッドで分割','split','S'],['削除','delSel','Delete'],['削除して詰める','rdel','Shift+Delete'],'-',['すべて選択','selAll','Ctrl+A'],['リンク／リンク解除','lnk','Ctrl+L'],'-',['映像トラックを追加','addV'],['音声トラックを追加','addA']]},
   {n:'表示',i:'view'},
   {n:'プロジェクト',i:[['プロジェクト設定…'],['メンバーと権限…'],['変更履歴・復元…'],'-',['台本アプリと紐づけ…','go:script']]},
-  {n:'ヘルプ',i:[['使い方','help'],['キーボードショートカット','keys'],['バージョン情報','about']]}];
+  {n:'ヘルプ',i:[['使い方','help'],['キーボードショートカット…','keys'],['バージョン情報','about']]}];
 function viewItems(){var o=[{h:'ページ'}];D.pages.forEach(function(p,i){o.push([p[1],'go:'+p[0],'Alt+'+(i+1),S.page===p[0]]);});
   o.push('-',{h:'テーマ'});[['ライト','light'],['ダーク','dark'],['システムに合わせる','system']].forEach(function(t){o.push([t[0],'th:'+t[1],'',S.theme===t[1]]);});
   o.push('-',{h:'アクセントカラー'});[['青','blue'],['緑','green'],['オレンジ','orange'],['紫','purple']].forEach(function(t){o.push([t[0],'ac:'+t[1],'',S.accent===t[1]]);});return o;}
 function items(its){return its.map(function(x){if(x==='-')return '<div class="sep"></div>';if(x.h)return '<div class="dh">'+x.h+'</div>';
-  return '<button class="it" role="menuitem"'+(x[4]?' disabled':'')+' data-m="'+(x[1]||'todo')+'"><span class="ck">'+(x[3]?'✓':'')+'</span><span class="lb">'+x[0]+'</span><span class="sc">'+(x[2]||'')+'</span></button>';}).join('');}
+  return '<button class="it" role="menuitem"'+(x[4]?' disabled':'')+' data-m="'+(x[1]||'todo')+'"><span class="ck">'+(x[3]?'✓':'')+'</span><span class="lb">'+x[0]+'</span><span class="sc">'+h(menuKey(x[1])||x[2]||'')+'</span></button>';}).join('');}
+function menuKey(a){if(!a)return '';if(a==='go:export')a='toExport';return KEYMAP[a]?keyOf(a):'';}
 var mbOpen=null;
 function buildMb(){document.getElementById('mb').innerHTML=MENUS.map(function(m,i){return '<button data-menu="'+i+'" aria-haspopup="true" aria-expanded="false">'+m.n+'</button>';}).join('');}
 function closeMenu(){document.getElementById('dd').hidden=true;document.getElementById('cx').hidden=true;mbOpen=null;[].forEach.call(document.querySelectorAll('[data-menu]'),function(b){b.setAttribute('aria-expanded','false');});}
@@ -1172,12 +1193,76 @@ function ask(title,msg,ok,fn){var d=document.getElementById('dlg');d.innerHTML='
 function resetProject(np){stopAll();Object.keys(E.els).forEach(dropEl);E.imgs={};P.media.forEach(function(m){if(m.url)URL.revokeObjectURL(m.url);});
   IDB.clear('files');P=np;HIST=[];REDO=[];S.media=np.media[0]?np.media[0].id:null;S.src=np.sample?'v03':null;S.sel=np.sample?['c3','c3a']:[];S.t.edit=0;S.t.cut=0;S.bin='all';S.pps=null;S.tlx=S.tly=0;SRC.id=null;SRC.el=null;saveP();draw();}
 function infoDlg(title,html){var d=document.getElementById('dlg');d.innerHTML='<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT" style="width:560px"><h2 id="dlgT">'+h(title)+'</h2><div style="max-height:60vh;overflow:auto">'+html+'</div><div class="row" style="justify-content:flex-end;margin-top:14px">'+btn('閉じる','dlgNo','','pri')+'</div></div>';d.hidden=false;d.querySelector('[data-a="dlgNo"]').focus();}
-var KEYS=[['再生',[['Space','再生／停止'],['← / →','1 フレーム移動'],['Shift＋← / →','1 秒移動'],['↑ / ↓','前／次の編集点へ'],['Home / End','先頭／最後へ'],['I / O','書き出し範囲のイン点／アウト点']]],
-  ['道具',[['V','選択ツール'],['C','分割ツール（クリックした位置で分割）'],['H','ハンドツール（ドラッグで画面を動かす）'],['T','再生ヘッドの位置にテロップを追加'],['N','スナップの入／切']]],
-  ['選択',[['クリック','選ぶ（リンクしたクリップも一緒に）'],['Shift／Ctrl＋クリック','選択に足す・外す'],['Alt＋クリック','リンク先を含めずに選ぶ'],['何もないところからドラッグ','囲んで選ぶ'],['Ctrl＋A','すべて選ぶ'],['Esc','選択を外す']]],
-  ['編集',[['ドラッグ','移動（トラックの間も）。重なった部分は上書き'],['Ctrl を押しながら離す','挿入（後ろをずらす）'],['Alt を押しながら離す','複製して置く'],['端をドラッグ','長さの調整（Ctrl でリップル）'],['S','再生ヘッドで分割'],['Delete','削除（すき間を残す）'],['Shift＋Delete','削除して詰める'],['Alt＋← / →','選んだクリップを 1 フレーム動かす'],['Ctrl＋C / X / V','コピー／切り取り／再生ヘッドに貼り付け'],['Ctrl＋D','すぐ後ろに複製'],['Ctrl＋L','リンク／リンク解除'],['Ctrl＋Z / Y','元に戻す／やり直し']]],
-  ['表示',[['+ / -','拡大／縮小'],['Ctrl＋ホイール','拡大／縮小'],['\\','全体を表示'],['Shift＋ホイール','横に動かす']]]];
-function keysHtml(){return KEYS.map(function(g){return '<div style="font-weight:700;margin:12px 0 4px">'+g[0]+'</div>'+g[1].map(function(k){return '<div class="kv" style="grid-template-columns:200px 1fr;padding:0;min-height:26px"><span><kbd>'+h(k[0])+'</kbd></span><span>'+h(k[1])+'</span></div>';}).join('');}).join('');}
+/* ---------- キーボードショートカット（ファイル → 環境設定 で変えられる） ----------
+   [動作の id, 分類, 名前, 初期のキー]。キーは「Ctrl+Shift+Z」のように書く（Ctrl は Mac の ⌘ も含む） */
+var KB=[['play','再生','再生／停止',['Space']],
+  ['fb','再生','1 フレーム戻る',['ArrowLeft']],['ff','再生','1 フレーム進む',['ArrowRight']],['sb','再生','1 秒戻る',['Shift+ArrowLeft']],['sf','再生','1 秒進む',['Shift+ArrowRight']],
+  ['prev','再生','前の編集点へ',['ArrowUp']],['next','再生','次の編集点へ',['ArrowDown']],['top','再生','先頭へ',['Home']],['end','再生','最後へ',['End']],
+  ['pin','再生','イン点（編集：書き出し範囲／カット：ソース）',['I']],['pout','再生','アウト点',['O']],
+  ['tSel','道具','選択ツール',['V']],['tSplit','道具','分割ツール',['C']],['tHand','道具','ハンドツール',['H']],['addTitle','道具','テロップを追加',['T']],['snapT','道具','スナップの入／切',['N']],
+  ['split','編集','再生ヘッドで分割',['S']],['delSel','編集','削除（すき間を残す）',['Delete','Backspace']],['rdel','編集','削除して詰める',['Shift+Delete','Shift+Backspace']],
+  ['nl','編集','選んだクリップを左へ 1 フレーム',['Alt+ArrowLeft']],['nr','編集','選んだクリップを右へ 1 フレーム',['Alt+ArrowRight']],
+  ['cut2','編集','切り取り',['Ctrl+X']],['copy','編集','コピー',['Ctrl+C']],['paste','編集','再生ヘッドに貼り付け',['Ctrl+V']],['dup','編集','すぐ後ろに複製',['Ctrl+D']],
+  ['selAll','編集','すべて選択',['Ctrl+A']],['lnk','編集','リンク／リンク解除',['Ctrl+L']],['undo','編集','元に戻す',['Ctrl+Z']],['redo','編集','やり直し',['Ctrl+Y','Ctrl+Shift+Z']],
+  ['zin','表示','タイムラインを拡大',['+','=',';']],['zout','表示','タイムラインを縮小',['-']],['zfit','表示','タイムライン全体を表示',['\\','¥']],
+  ['save','ファイル','保存',['Ctrl+S']],['imp','ファイル','素材を読み込む',['Ctrl+I']],['toExport','ファイル','書き出し',['Ctrl+M']],['prefs','ファイル','環境設定',['Ctrl+,']]];
+/* 変えられないマウス操作（一覧に参考として出す） */
+var MOUSE=[['クリック','選ぶ（リンクしたクリップも一緒に）'],['Shift／Ctrl＋クリック','選択に足す・外す'],['Alt＋クリック','リンク先を含めずに選ぶ'],['何もないところからドラッグ','囲んで選ぶ'],
+  ['ドラッグ','移動（トラックの間も）。重なった部分は上書き'],['Ctrl を押しながら離す','挿入（後ろをずらす）'],['Alt を押しながら離す','複製して置く'],['端をドラッグ','長さの調整（Ctrl でリップル）'],
+  ['Ctrl＋ホイール','タイムラインの拡大・縮小'],['Shift＋ホイール','タイムラインを横に動かす'],['Esc','選択を外す'],['Alt＋1〜7','ページを切り替える']];
+var IS_MAC=/Mac|iPhone|iPad/.test(navigator.platform||'');
+var KEYMAP={};
+function loadKeys(){KEYMAP={};KB.forEach(function(k){KEYMAP[k[0]]=k[3].slice();});try{var o=JSON.parse(localStorage.getItem('matsuko.keys')||'{}');Object.keys(o).forEach(function(id){if(KEYMAP[id]&&Array.isArray(o[id]))KEYMAP[id]=o[id];});}catch(e){}}
+function saveKeys(){var o={};KB.forEach(function(k){if(JSON.stringify(KEYMAP[k[0]])!==JSON.stringify(k[3]))o[k[0]]=KEYMAP[k[0]];});try{localStorage.setItem('matsuko.keys',JSON.stringify(o));}catch(e){}}
+loadKeys();
+/* 押されたキーを「Ctrl+Shift+Z」の形にする。記号のキーは Shift を付けない（キーボードの配列で変わるため） */
+function comboOf(e){var k=e.key;if(!k||['Control','Shift','Alt','Meta','Dead','Process','Unidentified'].indexOf(k)>=0)return null;if(k===' ')k='Space';else if(k.length===1)k=k.toUpperCase();
+  var sym=k.length===1&&!/[A-Z0-9]/.test(k),p=[];if(e.ctrlKey||e.metaKey)p.push('Ctrl');if(e.altKey)p.push('Alt');if(e.shiftKey&&!sym)p.push('Shift');p.push(k);return p.join('+');}
+function keyLabel(c){if(!c)return '';return c.split('+').map(function(x){return {Ctrl:IS_MAC?'⌘':'Ctrl',Alt:IS_MAC?'⌥':'Alt',Shift:IS_MAC?'⇧':'Shift',ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Space:'Space',Escape:'Esc'}[x]||x;}).join(IS_MAC?'':'+');}
+function keyOf(id){return KEYMAP[id]&&KEYMAP[id][0]?keyLabel(KEYMAP[id][0]):'';}
+function actionFor(c){for(var i=0;i<KB.length;i++)if(KEYMAP[KB[i][0]].indexOf(c)>=0)return KB[i][0];return null;}
+/* 動作を実行する（ページによって意味が変わるものはここで振り分ける） */
+var KEY_GLOBAL={save:function(){ACT.save();},imp:function(){openPicker();},toExport:function(){go('export');},prefs:function(){openPrefs();}};
+function runKey(a,e){var pg=S.page;
+  if(KEY_GLOBAL[a]){e.preventDefault();KEY_GLOBAL[a]();return;}
+  if(a==='undo'||a==='redo'){e.preventDefault();a==='undo'?undo():redo();return;}
+  if(a==='play'){if(['edit','export','cut','fx'].indexOf(pg)>=0){e.preventDefault();ACT.play();}return;}
+  if(pg==='cut'){var cm={pin:'setIn',pout:'setOut',fb:'sfb',ff:'sff'};if(cm[a]){e.preventDefault();ACT[cm[a]]();}
+    else if((a==='delSel'||a==='rdel')&&primary()&&primary().tr==='V1'){e.preventDefault();ACT.rdel();}return;}
+  if(pg!=='edit')return;e.preventDefault();
+  var step={fb:-1/30,ff:1/30,sb:-1,sf:1};if(a in step){if(E.playing)progStop();setProg(S.t.edit+step[a]);heads(true);return;}
+  if(a==='prev'||a==='next'){jump(a==='prev'?-1:1);return;}if(a==='top'||a==='end'){ACT[a]();heads(true);return;}
+  var tool={tSel:'select',tSplit:'split',tHand:'hand'};if(tool[a]){S.tool=tool[a];draw();return;}
+  if(a==='nl'||a==='nr'){nudge(a==='nl'?-1/30:1/30);return;}
+  if(a==='addTitle'){ACT.addTitle('name');return;}if(ACT[a])ACT[a]();}
+
+/* ---------- 環境設定（ファイル → 環境設定） ---------- */
+var PREF={snap:true,follow:true};
+try{var pf=JSON.parse(localStorage.getItem('matsuko.pref')||'{}');if(typeof pf.snap==='boolean')PREF.snap=pf.snap;if(typeof pf.follow==='boolean')PREF.follow=pf.follow;}catch(e){}
+function savePref(){try{localStorage.setItem('matsuko.pref',JSON.stringify(PREF));}catch(e){}}
+function openPrefs(tab){closeMenu();S.ptab=tab||S.ptab||'general';S.capture=null;renderPrefs();}
+function prefRow(label,ctl,note){return '<div class="prow"><div><div>'+label+'</div>'+(note?'<div class="mu" style="margin-top:2px">'+note+'</div>':'')+'</div><div>'+ctl+'</div></div>';}
+function renderPrefs(){var d=document.getElementById('dlg'),t=S.ptab,body='';
+  if(t==='general')body='<h3>一般</h3>'+
+    prefRow('テーマ','<span class="seg">'+[['light','ライト'],['dark','ダーク'],['system','システムに合わせる']].map(function(x){return btn(x[1],'pTheme',x[0],'s'+(S.theme===x[0]?' on':''));}).join('')+'</span>')+
+    prefRow('アクセントカラー','<span class="row" style="gap:8px">'+[['blue','青','#378ef0'],['green','緑','#2d9d78'],['orange','オレンジ','#e68619'],['purple','紫','#9256d9']].map(function(x){return '<button class="sw'+(S.accent===x[0]?' on':'')+'" aria-label="'+x[1]+'" aria-pressed="'+(S.accent===x[0])+'" title="'+x[1]+'"'+A('pAcc',x[0])+' style="background:'+x[2]+'"></button>';}).join('')+'</span>');
+  else if(t==='timeline')body='<h3>タイムライン</h3>'+
+    prefRow('スナップ','<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"'+(PREF.snap?' checked':'')+'>最初から入れておく</label>','クリップの端・再生ヘッド・イン点／アウト点に吸い付きます。編集中は '+(keyOf('snapT')||'—')+' キーで切り替えられます。')+
+    prefRow('再生中の表示','<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"'+(PREF.follow?' checked':'')+'>再生ヘッドを追いかける</label>','再生ヘッドが画面の外に出たら、タイムラインを自動で動かします。');
+  else{var groups=[];KB.forEach(function(k){if(groups.indexOf(k[1])<0)groups.push(k[1]);});
+    body='<h3>ショートカット</h3><div class="mu" style="margin-bottom:10px;line-height:1.6">「変更」を押してから、割り当てたいキーを押してください。Esc で取り消します。ほかの動作で使っているキーを選ぶと、そちらからは外れます。</div>'+
+    groups.map(function(g){return '<div class="pgrp">'+g+'</div>'+KB.filter(function(k){return k[1]===g;}).map(function(k){var cap=S.capture===k[0],keys=KEYMAP[k[0]],custom=JSON.stringify(keys)!==JSON.stringify(k[3]);
+      return '<div class="krow'+(cap?' cap':'')+'" data-krow="'+k[0]+'"><span>'+h(k[2])+'</span><span class="row" style="gap:4px;flex-wrap:wrap">'+(cap?'<span class="t-ac">キーを押してください…</span>':keys.length?keys.map(function(c){return '<kbd>'+h(keyLabel(c))+'</kbd>';}).join(''):'<span class="mu">なし</span>')+'</span>'+
+        '<span class="row" style="gap:4px;justify-content:flex-end">'+(cap?btn('取り消し','kCancel','','s'):btn('変更','kSet',k[0],'s'))+(custom&&!cap?btn('戻す','kReset',k[0],'s'):'')+'</span></div>';}).join('');}).join('')+
+    '<div class="pgrp">マウスなど（変えられません）</div>'+MOUSE.map(function(m){return '<div class="krow"><span>'+h(m[1])+'</span><span><kbd>'+h(m[0])+'</kbd></span><span></span></div>';}).join('')+
+    '<div class="row" style="justify-content:flex-end;margin-top:12px">'+btn('すべて初期設定に戻す','kResetAll','','s')+'</div>';}
+  d.innerHTML='<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">環境設定</h2>'+btn('閉じる','dlgNo','','s')+'</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">'+
+    [['general','一般'],['timeline','タイムライン'],['keys','ショートカット']].map(function(x){return '<button'+(t===x[0]?' aria-current="true"':'')+A('ptab',x[0])+'>'+x[1]+'</button>';}).join('')+'</nav><div class="pcont">'+body+'</div></div></div>';
+  d.hidden=false;var sc=d.querySelector('.pcont');if(sc&&renderPrefs.st&&renderPrefs.tab===t)sc.scrollTop=renderPrefs.st;renderPrefs.tab=t;
+  if(sc)sc.addEventListener('scroll',function(){renderPrefs.st=sc.scrollTop;});
+  var fr=S.kFocus&&d.querySelector('[data-krow="'+S.kFocus+'"]');if(fr)fr.scrollIntoView({block:'nearest'});}
+function assignKey(id,c){KB.forEach(function(k){if(k[0]!==id){var i=KEYMAP[k[0]].indexOf(c);if(i>=0){KEYMAP[k[0]].splice(i,1);toast('「'+keyLabel(c)+'」を「'+k[2]+'」から外しました');}}});KEYMAP[id]=[c];saveKeys();}
+S.snap=PREF.snap;
 /* ---------- 操作 ---------- */
 var ACT={
   go:go,
@@ -1222,7 +1307,10 @@ var ACT={
   thide:function(v){var t=T(v);if(!t)return;mark();t.hide=!t.hide;changed();},tlock:function(v){var t=T(v);if(!t)return;mark();t.lock=!t.lock;if(t.lock)S.sel=S.sel.filter(function(id){var c=C(id);return c&&c.tr!==v;});changed();},
   tmute:function(v){var t=T(v);if(!t)return;mark();t.mute=!t.mute;changed();},tsolo:function(v){var t=T(v);if(!t)return;mark();t.solo=!t.solo;changed();},
   mreset:function(v){var c=C(v);if(!c)return;mark();['x','y','scale','rot','op'].forEach(function(k){delete c[k];});changed();},
-  keys:function(){infoDlg('キーボードショートカット（編集ページ）',keysHtml());},
+  keys:function(){openPrefs('keys');},prefs:function(){openPrefs();},ptab:function(v){S.ptab=v;S.capture=null;S.kFocus=null;renderPrefs.st=0;renderPrefs();},
+  pTheme:function(v){S.theme=v;applyDesign();renderPrefs();},pAcc:function(v){S.accent=v;applyDesign();renderPrefs();},
+  kSet:function(v){S.capture=v;S.kFocus=v;renderPrefs();},kCancel:function(){S.capture=null;renderPrefs();},kReset:function(v){var k=KB.filter(function(x){return x[0]===v;})[0];if(k){KEYMAP[v]=k[3].slice();saveKeys();}renderPrefs();},
+  kResetAll:function(){try{localStorage.removeItem('matsuko.keys');}catch(e){}loadKeys();renderPrefs();toast('ショートカットを初期設定に戻しました');},
   undo:undo,redo:redo,
   sfb:function(){srcSeek(S.t.cut-1/30);},sff:function(){srcSeek(S.t.cut+1/30);},
   etab:function(v){S.etab=v;draw();},tool:function(v){S.tool=v;draw();if(v==='text')toast('タイムラインをクリックした位置にテロップを追加します');},
@@ -1251,7 +1339,7 @@ var ACT={
     if(host&&host.envInfo)host.envInfo().then(function(i){show([['版',i.appVersion+'（デスクトップ版）'],['OS',i.os+' / '+i.arch],['FFmpeg',i.ffmpeg||'見つかりません'],['FFprobe',i.ffprobe||'見つかりません']]);}).catch(function(e){show([['版','デスクトップ版'],['エラー',String(e)]]);});
     else show([['版','ブラウザ版（試作）'],['動作環境',navigator.userAgent]]);},
   help:function(){toast('メディアで読み込み → カットでイン・アウトを決めて追加 → 編集で並べ替え・分割 → 出力で書き出し');},
-  dlgOk:function(){document.getElementById('dlg').hidden=true;var f=ask.fn;ask.fn=null;if(f)f();},dlgNo:function(){document.getElementById('dlg').hidden=true;ask.fn=null;},
+  dlgOk:function(){document.getElementById('dlg').hidden=true;var f=ask.fn;ask.fn=null;if(f)f();},dlgNo:function(){document.getElementById('dlg').hidden=true;ask.fn=null;S.capture=null;if(S.page==='edit')draw();},
   todo:function(){toast('この機能は、まだ使えません');}
 };
 /* 前・次の編集点（クリップの端） */
@@ -1379,35 +1467,23 @@ document.addEventListener('change',function(e){var k=e.target.dataset&&e.target.
   if(k==='mtype'){S.mtype=e.target.value;draw();}else if(k==='msort'){S.msort=e.target.value;draw();}else if(k==='countin')S.countin=e.target.checked;
   else if(k==='tst'||k==='tsz'||k==='tstart'||k==='tdur'){var ti=selTitle();if(ti){mark();if(k==='tst')ti.st=e.target.value;else if(k==='tsz')ti.sz=e.target.value;else if(k==='tstart')ti.start=Math.max(0,+e.target.value||0);else ti.out=ti.in+Math.max(0.5,+e.target.value||0.5);var sk={};sk[ti.id]=1;carve(ti.tr,ti.start,cEnd(ti),sk);changed();}}
   else if(k==='ttext'||k==='cp'||k==='cpn'){drawTL();}
+  else if(k==='pSnap'){PREF.snap=e.target.checked;S.snap=PREF.snap;savePref();}else if(k==='pFollow'){PREF.follow=e.target.checked;savePref();}
   else if(k==='silthr'||k==='silmin'){S.sil[k==='silthr'?'thr':'min']=e.target.value;draw();}
   else if(k==='rights'){var m=M(S.media);if(m){mark();m.r=e.target.value;saveP();draw();}}
   else if(k.charAt(0)==='x'&&k!=='xfile'){S.x[k.slice(1)]=e.target.value;draw();}});
 document.getElementById('fileIn').addEventListener('change',function(e){importFiles(e.target.files);});
 document.addEventListener('keydown',function(e){
+  if(S.capture){e.preventDefault();e.stopPropagation();if(e.key==='Escape'){S.capture=null;renderPrefs();return;}var k=comboOf(e);if(!k)return;assignKey(S.capture,k);S.capture=null;renderPrefs();return;}
   if(e.key==='Escape'){closeMenu();if(!document.getElementById('dlg').hidden)ACT.dlgNo();else if(S.page==='edit'&&S.sel.length){S.sel=[];draw();}return;}
   var dd=e.target.closest&&e.target.closest('.dd');
   if(dd&&(e.key==='ArrowDown'||e.key==='ArrowUp')){e.preventDefault();var L=[].filter.call(dd.querySelectorAll('.it'),function(x){return !x.disabled;}),i=L.indexOf(e.target);(L[(i+(e.key==='ArrowDown'?1:-1)+L.length)%L.length]).focus();return;}
   if(e.altKey&&/^[1-7]$/.test(e.key)){e.preventDefault();go(D.pages[+e.key-1][0]);return;}
-  var ctl=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
-  if(ctl&&k==='s'){e.preventDefault();ACT.save();return;}
-  if(ctl&&k==='i'){e.preventDefault();openPicker();return;}
-  if(ctl&&k==='m'){e.preventDefault();go('export');return;}
+  var c=comboOf(e),a=c&&actionFor(c);
+  /* 保存・読み込み・書き出し・環境設定は、入力欄の中でも効く */
+  if(a&&KEY_GLOBAL[a]){runKey(a,e);return;}
   var tag=e.target.tagName;if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return;
   if(!document.getElementById('dlg').hidden)return;
-  if(ctl&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();return;}
-  if(ctl&&k==='y'){e.preventDefault();redo();return;}
-  if(e.key===' '&&['edit','export','cut','fx'].indexOf(S.page)>=0&&e.target.getAttribute('role')!=='button'){e.preventDefault();ACT.play();return;}
-  if(S.page==='cut'&&!ctl){if(k==='i'){ACT.setIn();return;}if(k==='o'){ACT.setOut();return;}if(e.key==='ArrowLeft'){ACT.sfb();return;}if(e.key==='ArrowRight'){ACT.sff();return;}if((e.key==='Delete'||e.key==='Backspace')&&primary()&&primary().tr==='V1'){e.preventDefault();ACT.rdel();return;}}
-  if(S.page==='edit'){
-    if(ctl){var map={c:'copy',x:'cut2',v:'paste',d:'dup',a:'selAll',l:'lnk'};if(map[k]){e.preventDefault();ACT[map[k]]();}return;}
-    if(e.altKey&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){e.preventDefault();nudge(e.key==='ArrowLeft'?-1/30:1/30);return;}
-    if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();e.shiftKey?ACT.rdel():ACT.delSel();return;}
-    if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();if(E.playing)progStop();setProg(S.t.edit+(e.key==='ArrowLeft'?-1:1)*(e.shiftKey?1:1/30));heads(true);return;}
-    if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();jump(e.key==='ArrowUp'?-1:1);return;}
-    if(e.key==='Home'){ACT.top();heads(true);return;}if(e.key==='End'){ACT.end();heads(true);return;}
-    if(e.key==='+'||e.key===';'||e.key==='='){ACT.zin();return;}if(e.key==='-'){ACT.zout();return;}if(e.key==='\\'||e.code==='IntlYen'||e.code==='Backslash'){ACT.zfit();return;}
-    var tk={v:'select',c:'split',h:'hand'};if(tk[k]){S.tool=tk[k];draw();return;}
-    if(k==='s'){ACT.split();return;}if(k==='i'){ACT.pin();return;}if(k==='o'){ACT.pout();return;}if(k==='t'){ACT.addTitle('name');return;}if(k==='n'){ACT.snapT();return;}}
+  if(a&&!(a==='play'&&e.target.getAttribute('role')==='button')){runKey(a,e);return;}
   if((e.key==='Enter'||e.key===' ')&&e.target.getAttribute('role')==='button'){e.preventDefault();e.target.click();}
 });
 /* 画面が小さいときは全体を縮小して表示する（横スクロールを出さない） */
