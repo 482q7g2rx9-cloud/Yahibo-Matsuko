@@ -1,4 +1,5 @@
 // @ts-nocheck
+import * as KS from '../../core/silence';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from '../data';
 import { C, M, P, T, cEnd, cLen, hasFx, progDur } from '../project';
@@ -92,12 +93,9 @@ export function inspector(){var L=S.sel.map(C).filter(Boolean),c=primary();
   return {name:m?m.n:c.label||'',html:h2};}
 export function ms1(s){var m=Math.floor(s/60),x=s-m*60;return m+':'+(x<10?'0':'')+x.toFixed(1);}
 /* 無音の検出：音量のピークがしきい値より小さい部分が、最短の長さ以上続いたところ */
-export function detectSilence(m){var pk=m.peaks;if(!pk||!m.d)return null;var thr=Math.pow(10,-num(S.sil.thr)/20),mn=num(S.sil.min),N=pk.length,dt=m.d/N,out=[],st=-1;
-  for(var i=0;i<=N;i++){var q=i<N&&pk[i]<thr;if(q&&st<0)st=i;if(!q&&st>=0){var a=st*dt,b=i*dt;if(b-a>=mn){var a2=st===0?0:a+0.1,b2=i===N?m.d:b-0.1;if(b2-a2>=0.2)out.push({a:a2,b:b2,k:'無音',done:false});}st=-1;}}
-  return out;}
+export function detectSilence(m){if(!m.peaks||!m.d)return null;return KS.detectSilence(m.peaks,m.d,{thresholdDb:num(S.sil.thr),minLength:num(S.sil.min)});}
 /* イン〜アウトから、削除にした無音を除いた部分 */
-export function keepSegs(m,a,b){var cuts=(m.marks||[]).filter(function(k){return k.done;}).map(function(k){return [Math.max(a,k.a),Math.min(b,k.b)];}).filter(function(c){return c[1]>c[0];}).sort(function(x,y){return x[0]-y[0];}),out=[],p=a;
-  cuts.forEach(function(c){if(c[0]-p>=0.1)out.push([p,c[0]]);p=Math.max(p,c[1]);});if(b-p>=0.1)out.push([p,b]);return out;}
+export function keepSegs(m,a,b){return KS.keepSegments(m.marks,a,b);}
 export function silPanel(m){if(m.k==='画像')return '';var L=m.marks||[];
   return '<div class="blk"><div class="cap">不要部分（無音）</div><div class="row" style="gap:6px;margin-bottom:8px"><span class="mu">音量</span>'+sel('無音とみなす音量',['-45 dB','-40 dB','-35 dB','-30 dB','-25 dB'],S.sil.thr,'height:26px;width:84px','silthr')+'<span class="mu">長さ</span>'+sel('最短の長さ',['0.3 秒','0.5 秒','1 秒','2 秒'],S.sil.min,'height:26px;width:76px','silmin')+btn('検出','detect','','s')+'</div>'+
     (L.length?'<div style="max-height:220px;overflow:auto">'+L.map(function(k,i){return '<div style="display:grid;grid-template-columns:1fr 44px 56px;gap:8px;align-items:center;height:36px;border-bottom:1px solid var(--dv)"><span>'+ms1(k.a)+'–'+ms1(k.b)+'</span>'+(k.done?'<span class="t-ok">削除</span>':'<span class="t-wn">残す</span>')+btn(k.done?'戻す':'削除','smk',i,'s')+'</div>';}).join('')+'</div>'+

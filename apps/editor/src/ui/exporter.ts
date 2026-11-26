@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { numberIn } from '../core/silence';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
 import { P, progDur } from './project';
@@ -18,7 +19,7 @@ export var AM;
 export function supported(list){if(!window.MediaRecorder||!MediaRecorder.isTypeSupported)return [];var seen={},o=[];list.forEach(function(x){try{if(!seen[x[0]]&&MediaRecorder.isTypeSupported(x[1])){seen[x[0]]=1;o.push(x);}}catch(e){}});return o;}
 export function presetX(i){var p=D.presets[i],fm=supported(p.audio?AM:VM);return {file:p.file,res:p.res,fps:p.fps,br:p.br,au:p.au,audio:!!p.audio,fmt:fm.length?fm[0][0]:'—'};}
 export function xFmt(){var L=supported(S.x.audio?AM:VM);for(var i=0;i<L.length;i++)if(L[i][0]===S.x.fmt)return L[i];return L[0]||null;}
-export function num(s){var m=String(s).match(/[\d.]+/);return m?parseFloat(m[0]):0;}
+export var num=numberIn;
 export function xBits(){return {v:S.x.audio?0:num(S.x.br)*1e6,a:num(S.x.au)*1e3};}
 export var X; /* 実行中の書き出し */
 export function xNext(){if(X&&X.run)return;var j=S.queue.filter(function(q){return q.st==='wait';})[0];if(j)xStart(j);}

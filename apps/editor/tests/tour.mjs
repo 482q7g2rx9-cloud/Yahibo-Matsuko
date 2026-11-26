@@ -80,9 +80,23 @@ await key('Alt+1');
 await p.setInputFiles('#fileIn', [join(mediaDir, 'test1.mp4'), join(mediaDir, 'bgm.wav'), join(mediaDir, 'talk.webm')]);
 await p.waitForTimeout(3500);
 await rec('media list', await text('.mt.r'));
-// 4. カット
+// 4. カット：素材を選び、無音を検出して、すべて削除にしてから仮編集に追加する
 await key('Alt+3');
+const pick = await p.$('text=素材の選別');
+if (pick) await pick.click();
+await p.waitForTimeout(200);
 await rec('cut sources', (await p.$$('[data-a="csrc"]')).length);
+const talk = await p.$('[data-a="csrc"] >> text=talk');
+if (talk) await talk.click();
+await p.waitForTimeout(400);
+const det = await p.$('[data-a="detect"]');
+if (det) { await det.click(); await p.waitForTimeout(200); }
+await rec('marks', await text('[data-a="smk"]'));
+const markAll = await p.$('[data-a="delAll"]');
+if (markAll) await markAll.click();
+const ins = await p.$('[data-a="cutIns"]');
+if (ins) { await ins.click(); await p.waitForTimeout(200); }
+await rec('rough', await text('[data-rc]'));
 await rec('cut page', await text('#page .ph'));
 // 5. 出力ページ
 await key('Alt+7');

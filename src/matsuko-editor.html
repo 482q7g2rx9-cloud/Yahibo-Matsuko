@@ -1063,6 +1063,41 @@ function init$n() {
   FXP = null;
   REC = null;
 }
+const SILENCE_PAD = 0.1;
+const SILENCE_MIN_MARK = 0.2;
+const MIN_KEEP = 0.1;
+function detectSilence$1(peaks, duration2, o) {
+  const thr = Math.pow(10, -o.thresholdDb / 20), N = peaks.length, dt = duration2 / N, out = [];
+  let st = -1;
+  for (let i = 0; i <= N; i++) {
+    const quiet = i < N && peaks[i] < thr;
+    if (quiet && st < 0) st = i;
+    if (!quiet && st >= 0) {
+      const a = st * dt, b = i * dt;
+      if (b - a >= o.minLength) {
+        const a2 = st === 0 ? 0 : a + SILENCE_PAD, b2 = i === N ? duration2 : b - SILENCE_PAD;
+        if (b2 - a2 >= SILENCE_MIN_MARK) out.push({ a: a2, b: b2, k: "無音", done: false });
+      }
+      st = -1;
+    }
+  }
+  return out;
+}
+function keepSegments(marks, a, b) {
+  const cuts = (marks || []).filter((k) => k.done).map((k) => [Math.max(a, k.a), Math.min(b, k.b)]).filter((c) => c[1] > c[0]).sort((x, y) => x[0] - y[0]);
+  const out = [];
+  let p = a;
+  for (const c of cuts) {
+    if (c[0] - p >= MIN_KEEP) out.push([p, c[0]]);
+    p = Math.max(p, c[1]);
+  }
+  if (b - p >= MIN_KEEP) out.push([p, b]);
+  return out;
+}
+function numberIn(s) {
+  const m = String(s).match(/[\d.]+/);
+  return m ? parseFloat(m[0]) : 0;
+}
 var IMP;
 function kindOf(f) {
   var t = f.type || "", n = f.name.toLowerCase();
@@ -1533,39 +1568,11 @@ function ms1(s) {
   return m + ":" + (x < 10 ? "0" : "") + x.toFixed(1);
 }
 function detectSilence(m) {
-  var pk = m.peaks;
-  if (!pk || !m.d) return null;
-  var thr = Math.pow(10, -num(S.sil.thr) / 20), mn = num(S.sil.min), N = pk.length, dt = m.d / N, out = [], st = -1;
-  for (var i = 0; i <= N; i++) {
-    var q = i < N && pk[i] < thr;
-    if (q && st < 0) st = i;
-    if (!q && st >= 0) {
-      var a = st * dt, b = i * dt;
-      if (b - a >= mn) {
-        var a2 = st === 0 ? 0 : a + 0.1, b2 = i === N ? m.d : b - 0.1;
-        if (b2 - a2 >= 0.2) out.push({ a: a2, b: b2, k: "無音", done: false });
-      }
-      st = -1;
-    }
-  }
-  return out;
+  if (!m.peaks || !m.d) return null;
+  return detectSilence$1(m.peaks, m.d, { thresholdDb: num(S.sil.thr), minLength: num(S.sil.min) });
 }
 function keepSegs(m, a, b) {
-  var cuts = (m.marks || []).filter(function(k) {
-    return k.done;
-  }).map(function(k) {
-    return [Math.max(a, k.a), Math.min(b, k.b)];
-  }).filter(function(c) {
-    return c[1] > c[0];
-  }).sort(function(x, y) {
-    return x[0] - y[0];
-  }), out = [], p = a;
-  cuts.forEach(function(c) {
-    if (c[0] - p >= 0.1) out.push([p, c[0]]);
-    p = Math.max(p, c[1]);
-  });
-  if (b - p >= 0.1) out.push([p, b]);
-  return out;
+  return keepSegments(m.marks, a, b);
 }
 function silPanel(m) {
   if (m.k === "画像") return "";
@@ -3090,10 +3097,7 @@ function xFmt() {
   for (var i = 0; i < L.length; i++) if (L[i][0] === S.x.fmt) return L[i];
   return L[0] || null;
 }
-function num(s) {
-  var m = String(s).match(/[\d.]+/);
-  return m ? parseFloat(m[0]) : 0;
-}
+var num = numberIn;
 function xBits() {
   return { v: S.x.audio ? 0 : num(S.x.br) * 1e6, a: num(S.x.au) * 1e3 };
 }
