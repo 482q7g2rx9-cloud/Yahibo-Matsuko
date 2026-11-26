@@ -1085,7 +1085,7 @@ R.edit=function(){
   var tools=[['select','選択',keyOf('tSel')],['split','分割',keyOf('tSplit')],['trash','削除',''],['hand','ハンド',keyOf('tHand')],['text','文字','']],ins=inspector(),rngOn=P.pin!=null||P.pout!=null;
   return '<div class="pn l" style="width:250px">'+ph('素材')+tabs([['assets','アセット'],['templates','テンプレート'],['text','テロップ'],['audio','音声']],S.etab,'etab','素材の種類')+left+'</div>'+
   '<div class="pc" style="background:var(--bg0)">'+
-    '<div style="height:280px;flex:none;display:flex;flex-direction:column;background:#000">'+ph('プレビュー','<span class="x">全長 '+mmss(progDur())+'</span>')+'<div class="mon" style="flex:1;min-height:0"><canvas data-prog width="640" height="360" style="width:360px;height:203px;display:block"></canvas></div>'+
+    '<div style="height:280px;flex:none;display:flex;flex-direction:column;background:#000">'+ph('プレビュー','<span class="x">全長 '+mmss(progDur())+'</span>')+'<div class="mon" style="flex:1;min-height:0"><canvas data-prog width="960" height="540" style="width:360px;height:203px;display:block"></canvas></div>'+
       '<div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">'+tc(S.t.edit)+'</span><span class="mid">'+ibtn('inPt','イン点を設定（I キー）','pin')+ibtn('outPt','アウト点を設定（O キー）','pout')+'<span class="vsep"></span>'+ibtn('prevCut','前の編集点へ（↑）','prev')+ibtn('back','1フレーム戻る（←）','fb')+playBtn(E.playing)+ibtn('fwd','1フレーム進む（→）','ff')+ibtn('nextCut','次の編集点へ（↓）','next')+'<span class="vsep"></span>'+ibtn('split','再生ヘッドで分割（S キー）','split')+'</span><span class="end row" style="justify-content:flex-end;gap:6px">フル画質'+ibtn('full','全画面','todo')+'</span></div></div>'+
     '<div style="flex:1;min-height:0;display:flex"><div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px;background:var(--bg1);border-right:1px solid var(--ln)">'+
       tools.map(function(t){var on=S.tool===t[0];return '<button aria-label="'+t[1]+'" title="'+t[1]+(t[2]?'（'+t[2]+' キー）':'')+'" aria-pressed="'+on+'"'+A('tool',t[0])+' style="width:38px;height:44px;padding:0;border:0;border-radius:4px;background:'+(on?'var(--bg4)':'transparent')+';color:'+(on?'var(--ac)':'var(--tx2)')+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">'+ic(t[0],16)+'<span style="font-size:10px;color:var(--tx2)">'+t[1]+'</span></button>';}).join('')+'</div>'+
@@ -1193,7 +1193,7 @@ R.export=function(){
     ext=f?f[2]:'mp4',fmts=supported(x.audio?AM:VM).map(function(z){return z[0];});
   var pl=S.queue.filter(function(q){return q.id===S.xplay;})[0];
   var mon=pl?'<video src="'+pl.url+'" controls autoplay style="width:400px;height:225px;background:#000"></video><button class="b s" style="position:absolute;right:8px;top:8px"'+A('xback')+'>プレビューに戻る</button>'
-    :'<canvas data-prog width="640" height="360" style="width:400px;height:225px;display:block"></canvas>';
+    :'<canvas data-prog width="960" height="540" style="width:400px;height:225px;display:block"></canvas>';
   return '<div class="pn l" style="width:280px">'+ph('書き出しプリセット（用途別）')+'<div class="scroll">'+D.presets.map(function(p,i){return '<div class="li'+(S.preset===i?' selr':'')+'" role="button" tabindex="0"'+A('preset',i)+' style="padding:16px 16px 14px;border-bottom:1px solid var(--dv)"><div style="font-size:13px">'+h(p.n)+'</div><div class="t2" style="margin-top:8px">'+h(p.d)+'</div></div>';}).join('')+
     '<div style="padding:14px">'+btn('＋ プリセットを追加','todo','','','','width:100%')+'</div></div></div>'+
   '<div class="pc">'+ph('プレビュー　シーケンス全体','<span class="x">'+(x.audio?'音声のみ':h(x.res)+'　'+h(x.fps))+'　'+mmss(dur)+'</span>')+
@@ -1255,9 +1255,9 @@ function menuKey(a){if(!a)return '';if(a==='go:export')a='toExport';return KEYMA
 var mbOpen=null;
 function buildMb(){document.getElementById('mb').innerHTML=MENUS.map(function(m,i){return '<button data-menu="'+i+'" aria-haspopup="true" aria-expanded="false">'+m.n+'</button>';}).join('');}
 function closeMenu(){document.getElementById('dd').hidden=true;document.getElementById('cx').hidden=true;mbOpen=null;[].forEach.call(document.querySelectorAll('[data-menu]'),function(b){b.setAttribute('aria-expanded','false');});}
-function openMenu(b){closeMenu();var m=MENUS[+b.dataset.menu],d=document.getElementById('dd'),r=b.getBoundingClientRect();d.innerHTML=items(m.i==='view'?viewItems():m.i);d.style.left=r.left+'px';d.style.top=r.bottom+'px';d.style.position='fixed';d.hidden=false;mbOpen=b.dataset.menu;b.setAttribute('aria-expanded','true');var f=d.querySelector('.it');if(f)f.focus();}
+function openMenu(b){closeMenu();var m=MENUS[+b.dataset.menu],d=document.getElementById('dd'),r=b.getBoundingClientRect();d.innerHTML=items(m.i==='view'?viewItems():m.i);d.style.left=(r.left/SCALE)+'px';d.style.top=(r.bottom/SCALE)+'px';d.style.position='fixed';d.hidden=false;mbOpen=b.dataset.menu;b.setAttribute('aria-expanded','true');var f=d.querySelector('.it');if(f)f.focus();}
 function openCx(x,y,list){var c=document.getElementById('cx');c.innerHTML=items(list||[['キーフレームを追加'],['キーフレームを削除'],'-'].concat(['リニア','ベジェ','停止'].map(function(k){return [k,'kfm:'+k,'',S.kfMode===k];})).concat(['-',['イーズイン'],['イーズアウト'],'-',['コピー'],['貼り付け','','','',1]]));
-  c.hidden=false;var w=c.offsetWidth,hh=c.offsetHeight;c.style.left=Math.min(x,innerWidth-w-4)+'px';c.style.top=Math.min(y,innerHeight-hh-4)+'px';var f=c.querySelector('.it');if(f)f.focus();}
+  c.hidden=false;var w=c.offsetWidth,hh=c.offsetHeight;c.style.left=Math.min(x/SCALE,innerWidth/SCALE-w-4)+'px';c.style.top=Math.min(y/SCALE,innerHeight/SCALE-hh-4)+'px';var f=c.querySelector('.it');if(f)f.focus();}
 function menuAct(a){closeMenu();if(a.indexOf('th:')===0){S.theme=a.slice(3);applyDesign();}else if(a.indexOf('ac:')===0){S.accent=a.slice(3);applyDesign();}
   else if(a.indexOf('go:')===0)go(a.slice(3));else if(a.indexOf('kfm:')===0){S.kfMode=a.slice(4);draw();}else if(ACT[a])ACT[a]();else toast('この機能は、まだ使えません');}
 var mq=matchMedia('(prefers-color-scheme: light)');
@@ -1313,14 +1313,15 @@ function runKey(a,e){var pg=S.page;
   if(a==='addTitle'){ACT.addTitle('name');return;}if(ACT[a])ACT[a]();}
 
 /* ---------- 環境設定（ファイル → 環境設定） ---------- */
-var PREF={snap:true,follow:true};
-try{var pf=JSON.parse(localStorage.getItem('matsuko.pref')||'{}');if(typeof pf.snap==='boolean')PREF.snap=pf.snap;if(typeof pf.follow==='boolean')PREF.follow=pf.follow;}catch(e){}
+var PREF={snap:true,follow:true,ui:1};
+try{var pf=JSON.parse(localStorage.getItem('matsuko.pref')||'{}');if(typeof pf.snap==='boolean')PREF.snap=pf.snap;if(typeof pf.follow==='boolean')PREF.follow=pf.follow;if([0.8,0.9,1].indexOf(pf.ui)>=0)PREF.ui=pf.ui;}catch(e){}
 function savePref(){try{localStorage.setItem('matsuko.pref',JSON.stringify(PREF));}catch(e){}}
 function openPrefs(tab){closeMenu();S.ptab=tab||S.ptab||'general';S.capture=null;renderPrefs();}
 function prefRow(label,ctl,note){return '<div class="prow"><div><div>'+label+'</div>'+(note?'<div class="mu" style="margin-top:2px">'+note+'</div>':'')+'</div><div>'+ctl+'</div></div>';}
 function renderPrefs(){var d=document.getElementById('dlg'),t=S.ptab,body='';
   if(t==='general')body='<h3>一般</h3>'+
     prefRow('テーマ','<span class="seg">'+[['light','ライト'],['dark','ダーク'],['system','システムに合わせる']].map(function(x){return btn(x[1],'pTheme',x[0],'s'+(S.theme===x[0]?' on':''));}).join('')+'</span>')+
+    prefRow('表示の大きさ','<span class="seg">'+[[0.8,'小さめ'],[0.9,'やや小さめ'],[1,'標準']].map(function(x){return btn(x[1],'pUi',x[0],'s'+(PREF.ui===x[0]?' on':''));}).join('')+'</span>','画面の大きさに合わせて、全体を同じ比率で拡大・縮小します。小さくすると、一度に見える範囲が広がります。')+
     prefRow('アクセントカラー','<span class="row" style="gap:8px">'+[['blue','青','#378ef0'],['green','緑','#2d9d78'],['orange','オレンジ','#e68619'],['purple','紫','#9256d9']].map(function(x){return '<button class="sw'+(S.accent===x[0]?' on':'')+'" aria-label="'+x[1]+'" aria-pressed="'+(S.accent===x[0])+'" title="'+x[1]+'"'+A('pAcc',x[0])+' style="background:'+x[2]+'"></button>';}).join('')+'</span>');
   else if(t==='timeline')body='<h3>タイムライン</h3>'+
     prefRow('スナップ','<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"'+(PREF.snap?' checked':'')+'>最初から入れておく</label>','クリップの端・再生ヘッド・イン点／アウト点に吸い付きます。編集中は '+(keyOf('snapT')||'—')+' キーで切り替えられます。')+
@@ -1386,7 +1387,7 @@ var ACT={
   kfTodo:function(){toast('キーフレームは、エフェクトページの本実装で使えるようになります');},
   mreset:function(v){var c=C(v);if(!c)return;mark();['x','y','scale','rot','op'].forEach(function(k){delete c[k];});changed();},
   keys:function(){openPrefs('keys');},prefs:function(){openPrefs();},ptab:function(v){S.ptab=v;S.capture=null;S.kFocus=null;renderPrefs.st=0;renderPrefs();},
-  pTheme:function(v){S.theme=v;applyDesign();renderPrefs();},pAcc:function(v){S.accent=v;applyDesign();renderPrefs();},
+  pUi:function(v){PREF.ui=+v;savePref();fit();draw();renderPrefs();},pTheme:function(v){S.theme=v;applyDesign();renderPrefs();},pAcc:function(v){S.accent=v;applyDesign();renderPrefs();},
   kSet:function(v){S.capture=v;S.kFocus=v;renderPrefs();},kCancel:function(){S.capture=null;renderPrefs();},kReset:function(v){var k=KB.filter(function(x){return x[0]===v;})[0];if(k){KEYMAP[v]=k[3].slice();saveKeys();}renderPrefs();},
   kResetAll:function(){try{localStorage.removeItem('matsuko.keys');}catch(e){}loadKeys();renderPrefs();toast('ショートカットを初期設定に戻しました');},
   undo:undo,redo:redo,
@@ -1427,7 +1428,7 @@ function jump(dir){var pts=[0,progDur()];P.clips.forEach(function(c){pts.push(c.
    移動・トラック間の移動・トリミング・囲んで選択・再生位置・ハンド。
    ドラッグ中は、始めた時点のクリップ（base）から毎回計算し直す */
 var DRAG=null;
-function bodyPos(e){var b=document.querySelector('[data-body]'),r=b.getBoundingClientRect();return {x:e.clientX-r.left+b.scrollLeft,y:e.clientY-r.top+b.scrollTop,b:b};}
+function bodyPos(e){var b=document.querySelector('[data-body]'),r=b.getBoundingClientRect();return {x:(e.clientX-r.left)/SCALE+b.scrollLeft,y:(e.clientY-r.top)/SCALE+b.scrollTop,b:b};}
 function rowAt(y){for(var i=0;i<ROWS.length;i++)if(y<ROWS[i].y+ROWS[i].h+2)return ROWS[i];return ROWS[ROWS.length-1];}
 function snapPts(skip){var p=[0,S.t.edit];if(P.pin!=null)p.push(P.pin);if(P.pout!=null)p.push(P.pout);P.clips.forEach(function(c){if(skip[c.id])return;p.push(c.start,cEnd(c));});return p;}
 function snapBy(times,pts){if(!S.snap)return null;var thr=8/(S.pps||10),best=null;times.forEach(function(t){pts.forEach(function(p){var d=p-t;if(Math.abs(d)<=thr&&(!best||Math.abs(d)<Math.abs(best.d)))best={d:d,p:p};});});return best;}
@@ -1441,7 +1442,7 @@ document.addEventListener('pointerdown',function(e){if(e.button!==0)return;
   var ru=e.target.closest('[data-rul]'),bd=e.target.closest('[data-body]');if(!ru&&!bd)return;
   var ae=document.activeElement;if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))ae.blur();
   var pps=S.pps||10;
-  if(ru){var rr=ru.getBoundingClientRect(),b0=document.querySelector('[data-body]');if(E.playing)progStop();setProg((e.clientX-rr.left+(b0?b0.scrollLeft:0))/pps);DRAG={k:'seek'};e.preventDefault();return;}
+  if(ru){var rr=ru.getBoundingClientRect(),b0=document.querySelector('[data-body]');if(E.playing)progStop();setProg(((e.clientX-rr.left)/SCALE+(b0?b0.scrollLeft:0))/pps);DRAG={k:'seek'};e.preventDefault();return;}
   if(e.target.closest('.tb2'))return;
   var p=bodyPos(e),t=p.x/pps,row=rowAt(p.y);e.preventDefault();
   if(S.tool==='hand'){DRAG={k:'pan',x0:e.clientX,y0:e.clientY,sl:p.b.scrollLeft,st:p.b.scrollTop};return;}
@@ -1462,7 +1463,7 @@ document.addEventListener('pointerdown',function(e){if(e.button!==0)return;
 document.addEventListener('pointermove',function(e){if(!DRAG)return;var d=DRAG;
   if(d.k==='hot'){var dx=e.clientX-d.x0;if(!d.moved&&Math.abs(dx)<3)return;d.moved=true;var pp=PROPS[d.el.dataset.k];setProp(d.el.dataset.cid,d.el.dataset.k,d.v0+Math.round(dx/2)*pp.step*(e.shiftKey?10:1));return;}
   if(d.k==='scut'){var r=d.el.getBoundingClientRect();srcSeek((e.clientX-r.left)/r.width*TOTAL.cut);return;}
-  if(d.k==='seek'){var ru=document.querySelector('[data-rul]'),b=document.querySelector('[data-body]');if(ru)setProg((e.clientX-ru.getBoundingClientRect().left+(b?b.scrollLeft:0))/(S.pps||10));return;}
+  if(d.k==='seek'){var ru=document.querySelector('[data-rul]'),b=document.querySelector('[data-body]');if(ru)setProg(((e.clientX-ru.getBoundingClientRect().left)/SCALE+(b?b.scrollLeft:0))/(S.pps||10));return;}
   if(d.k==='pan'){var b2=document.querySelector('[data-body]');if(b2){b2.scrollLeft=d.sl-(e.clientX-d.x0);b2.scrollTop=d.st-(e.clientY-d.y0);}return;}
   var p=bodyPos(e),pps=S.pps||10;
   if(d.k==='marq'){if(!d.moved&&Math.abs(p.x-d.x0)+Math.abs(p.y-d.y0)<4)return;d.moved=true;var x1=Math.min(d.x0,p.x),x2=Math.max(d.x0,p.x),y1=Math.min(d.y0,p.y),y2=Math.max(d.y0,p.y),q=document.querySelector('[data-marq]');
@@ -1496,7 +1497,7 @@ document.addEventListener('pointerup',function(e){var d=DRAG;DRAG=null;if(!d)ret
     L.forEach(function(c){carve(c.tr,c.start,cEnd(c),skip);});changed();return;}
   changed();});
 /* マウスホイール：Ctrl で拡大・縮小 */
-document.addEventListener('wheel',function(e){var b=e.target.closest&&e.target.closest('[data-body],[data-rul]');if(!b||!(e.ctrlKey||e.metaKey))return;e.preventDefault();var bd=document.querySelector('[data-body]'),r=bd.getBoundingClientRect(),at=(e.clientX-r.left+bd.scrollLeft)/(S.pps||10);zoomTo((S.pps||10)*(e.deltaY<0?1.25:0.8),at);},{passive:false});
+document.addEventListener('wheel',function(e){var b=e.target.closest&&e.target.closest('[data-body],[data-rul]');if(!b||!(e.ctrlKey||e.metaKey))return;e.preventDefault();var bd=document.querySelector('[data-body]'),r=bd.getBoundingClientRect(),at=((e.clientX-r.left)/SCALE+bd.scrollLeft)/(S.pps||10);zoomTo((S.pps||10)*(e.deltaY<0?1.25:0.8),at);},{passive:false});
 document.addEventListener('scroll',function(e){var t=e.target;if(t&&t.matches&&t.matches('[data-body]')){S.tlx=t.scrollLeft;S.tly=t.scrollTop;syncTLScroll();}},true);
 /* ドラッグ＆ドロップ：仮編集の並べ替え、素材をタイムラインへ、ファイルの読み込み */
 function dtHas(e,t){return [].indexOf.call(e.dataTransfer.types,t)>=0;}
@@ -1569,11 +1570,15 @@ document.addEventListener('keydown',function(e){
   if((e.key==='Enter'||e.key===' ')&&e.target.getAttribute('role')==='button'){e.preventDefault();e.target.click();}
 });
 /* 画面が小さいときは全体を縮小して表示する（横スクロールを出さない） */
-function fit(){var a=document.getElementById('app'),w=innerWidth,hh=innerHeight,s=Math.min(w/1180,hh/720);
-  if(s<1){a.classList.add('fit');document.body.classList.add('fit');a.style.width=(w/s)+'px';a.style.height=(hh/s)+'px';a.style.transform='scale('+s+')';}
-  else{a.classList.remove('fit');document.body.classList.remove('fit');a.style.width=a.style.height=a.style.transform='';}}
+/* 画面の大きさに合わせて、UI 全体を同じ比率で拡大・縮小する。
+   基準は 1180×720（このときに部品の大きさのつり合いがいちばんよい）。全画面でも同じ見た目のまま大きくなる。
+   メニュー・ダイアログ・通知も一緒に拡大されるよう #app の中に入れる。マウス位置は SCALE で割って画面内の座標にする */
+var SCALE=1,BASE_W=1180,BASE_H=720;
+function fit(){var a=document.getElementById('app'),w=innerWidth,hh=innerHeight,s=Math.min(w/BASE_W,hh/BASE_H)*(typeof PREF!=='undefined'?PREF.ui:1);
+  ['dd','cx','toast','dlg','drop'].forEach(function(id){var el=document.getElementById(id);if(el&&el.parentNode!==a)a.appendChild(el);});
+  SCALE=s;a.classList.add('fit');document.body.classList.add('fit');a.style.width=(w/s)+'px';a.style.height=(hh/s)+'px';a.style.transform='scale('+s+')';}
 addEventListener('resize',fit);
-applyDesign();buildMb();draw();fit();
+applyDesign();buildMb();fit();draw();
 /* 保存してあるプロジェクトを開く（前の形式なら変換する） */
 IDB.open().then(function(ok){if(!ok)return;return IDB.get('kv','project').then(function(o){if(!o||!o.media)return;
   return Promise.all(o.media.map(function(m){if(!m.file)return null;return IDB.get('files',m.id).then(function(b){if(b)m.url=URL.createObjectURL(b);});})).then(function(){
