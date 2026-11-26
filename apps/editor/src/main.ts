@@ -1,6 +1,6 @@
-// デスクトップ版の入り口。画面本体（src/legacy/app.js）はブラウザ版から生成する。
-import './legacy/fonts.css';
-import './legacy/styles.css';
+// デスクトップ版の入り口。画面本体（src/ui/）はブラウザ版と共通
+import '@fontsource-variable/noto-sans-jp/wght.css';
+import './ui/styles.css';
 import { host, initHost, isTauri, type Host } from './host';
 
 declare global {
@@ -10,12 +10,12 @@ declare global {
   }
 }
 
-// 画面本体は即時実行の関数なので、窓口を用意してから読み込む
+// 画面本体は読み込んだときに窓口を確かめるので、窓口を用意してから読み込む
 async function start(): Promise<void> {
   if (isTauri()) {
     await initHost();
     window.MatsukoHost = host;
   }
-  await import('./legacy/app.js');
+  await import('./ui/main');
 }
 void start();

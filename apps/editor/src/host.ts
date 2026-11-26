@@ -1,4 +1,4 @@
-// 画面本体（src/legacy/app.js）から、デスクトップ版だけの機能を呼ぶための窓口（window.MatsukoHost）。
+// 画面本体（src/ui/）から、デスクトップ版だけの機能を呼ぶための窓口（window.MatsukoHost）。
 // 型は src-tauri/src/*.rs と合わせる。画面本体はブラウザ版と同じファイルなので、
 // この窓口があるときだけデスクトップ版の動き（プロジェクトフォルダー・FFmpeg）になる。
 import { convertFileSrc, invoke, isTauri } from '@tauri-apps/api/core';

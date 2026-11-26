@@ -80,14 +80,30 @@ npm run tauri build
 
 ## 画面のコードについて
 
-M2 で TypeScript のモジュールに移植するまでは、**ブラウザ版の `src/matsuko-editor.html` が画面の唯一の元**です。
+M2 から、**画面のコードの元は `apps/editor/src/ui/`（TypeScript）**です。ブラウザ版の `src/matsuko-editor.html` は、ここから作る生成物です。
 
-- `npm run dev` / `npm run build` の前に `scripts/sync-web-ui.mjs` が自動で動きます。ブラウザ版から CSS と JavaScript を取り出し、`src/legacy/` を作ります（生成物なので Git には入れません）。
-- 日本語フォント（Noto Sans JP）はアプリに同梱します。学校の PC がネットにつながっていなくても、同じ見た目で表示するためです。
+- ブラウザ版を作り直すときは `npm run build:web` を実行します。`src/matsuko-editor.html`（1つの HTML）ができるので、それを Artifact に載せます。`src/matsuko-editor.html` を直接編集しないでください。
+- 画面のコードは、もとの1つのファイルを役割ごとのモジュールに分けたものです。読み込んだときの準備（変数の初期化やイベントの登録）は各モジュールの `init()` にまとめ、`src/ui/main.ts` がもとのファイルと同じ順番で呼びます。
+- 型は少しずつ付けていきます。まだ型を付けていないモジュールは先頭に `// @ts-nocheck` があります。
+- 日本語フォント（Noto Sans JP）は、デスクトップ版ではアプリに同梱します（学校の PC がネットにつながっていなくても同じ見た目にするため）。ブラウザ版は Google Fonts を使います。
 - デスクトップ版だけの機能は `src/host.ts` が `window.MatsukoHost` に用意し、画面側は「あれば使う」形で呼びます。そのため、ブラウザ版もそのまま動きます。
 - 画面の中のドラッグ（素材をタイムラインへ・仮編集の並べ替え）は、HTML のドラッグ＆ドロップではなくマウス操作で作っています。Windows では、OS からのファイルのドロップを受けると HTML のドラッグ＆ドロップが使えなくなるためです。
 - ファイルのダイアログは Rust 側で開き、画面からは「ダイアログで選んだ・ドロップした・プロジェクトにある」ファイルしか扱えないようにしています。
 - 素材を画面へ渡すときは、Windows・macOS は `asset:` を使います。Linux の WebKitGTK は `asset:` の動画を再生できないため、アプリの中の小さなサーバー（127.0.0.1 だけで待ち受け、起動ごとの合言葉つき）を使います。
+
+### 回帰テスト
+
+画面のコードを作り替えたら、前と後で操作の結果が変わらないことを確かめます。
+
+```bash
+tests/make-media.sh
+```
+
+```bash
+node tests/tour.mjs ../../src/matsuko-editor.html /tmp/tour-after.txt
+```
+
+作り替える前の HTML でも同じように記録を取り、2つの記録を `diff` で比べます。
 
 ## 開発中の確かめ方
 
@@ -103,9 +119,12 @@ apps/editor/
 ├─ src/
 │  ├─ main.ts            入り口（フォント・CSS・画面本体を読み込む）
 │  ├─ host.ts            画面から呼ぶデスクトップ版の機能（window.MatsukoHost）
-│  └─ legacy/            生成物（ブラウザ版から作る）
+│  ├─ web.ts             ブラウザ版の入り口
+│  └─ ui/                画面本体（ブラウザ版と共通）。main.ts が入り口、pages/ が各ページ
+├─ web.html              ブラウザ版の骨組み（npm run build:web）
+├─ tests/                回帰テスト（tour.mjs）と、テスト用の素材を作るスクリプト
 ├─ scripts/
-│  ├─ sync-web-ui.mjs    ブラウザ版から画面を作る
+│  ├─ build-web.mjs      ブラウザ版を1つの HTML にまとめる
 │  ├─ fetch-ffmpeg.sh    同梱する FFmpeg を用意する
 │  └─ build-ffmpeg-macos.sh
 └─ src-tauri/            Rust 側（Tauri）

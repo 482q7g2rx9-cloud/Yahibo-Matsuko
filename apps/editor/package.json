@@ -4,12 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "sync-ui": "node scripts/sync-web-ui.mjs",
-    "predev": "npm run sync-ui",
     "dev": "vite",
-    "prebuild": "npm run sync-ui",
     "build": "tsc --noEmit && vite build",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:web": "tsc --noEmit && vite build -c vite.web.config.ts && node scripts/build-web.mjs"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-jp": "5.3.1",

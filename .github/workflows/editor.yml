@@ -56,6 +56,11 @@ jobs:
           cache-dependency-path: apps/editor/package-lock.json
       - run: npm ci
       - run: npm run build
+      # ブラウザ版（src/matsuko-editor.html）は src/ui から作る生成物。作り直し忘れがないか確かめる
+      - name: ブラウザ版が最新か
+        run: |
+          npm run build:web
+          git diff --exit-code -- ../../src/matsuko-editor.html || { echo "::error::src/matsuko-editor.html が古いままです。apps/editor で npm run build:web を実行してください"; exit 1; }
 
   build:
     name: アプリのビルド（${{ matrix.name }}）
