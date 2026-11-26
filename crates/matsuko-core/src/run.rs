@@ -152,8 +152,11 @@ pub fn export(
                 if let Err(e) = r {
                     // 最初の区間でエンコーダーが原因で失敗したら、次のエンコーダーで組み立て直して、この区間からやり直す
                     // （フィルターなど、エンコーダーと関係のない失敗は、そのまま知らせる）
-                    let enc_err =
-                        e.to_lowercase().contains("encoder") || e.contains(encoders[ei].as_str());
+                    let low = e.to_lowercase();
+                    let enc_err = low.contains("encoder")
+                        || low.contains("unrecognized option")
+                        || low.contains("option not found")
+                        || e.contains(encoders[ei].as_str());
                     if first_video && enc_err && e != "中止しました" && ei + 1 < encoders.len()
                     {
                         ei += 1;

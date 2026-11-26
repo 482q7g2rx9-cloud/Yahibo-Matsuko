@@ -141,7 +141,7 @@ pub fn encoder_args(enc: &str, bitrate: u64, fps: Fps) -> Vec<String> {
             a.extend(["-b:v", &br, "-allow_sw", "1", "-profile:v", "high"].map(String::from))
         }
         "h264_mf" => a.extend(["-b:v", &br, "-rate_control", "cbr"].map(String::from)),
-        "libopenh264" => a.extend(["-b:v", &br, "-allow_skip_frames", "0"].map(String::from)),
+        "libopenh264" => a.extend(["-b:v", &br].map(String::from)),
         _ => a.extend(["-preset", "veryfast", "-b:v", &br].map(String::from)),
     }
     a.extend(["-g", &gop, "-pix_fmt", "yuv420p"].map(String::from));
