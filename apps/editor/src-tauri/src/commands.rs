@@ -33,5 +33,8 @@ async fn tool_version(app: &AppHandle, name: &str) -> Option<String> {
     if !out.status.success() {
         return None;
     }
-    String::from_utf8_lossy(&out.stdout).lines().next().map(|l| l.trim().to_string())
+    let text = String::from_utf8_lossy(&out.stdout);
+    // 例：「ffmpeg version 7.1.1 Copyright (c) ...」→「ffmpeg version 7.1.1」
+    let line = text.lines().next()?;
+    Some(line.split(" Copyright").next().unwrap_or(line).trim().to_string())
 }
