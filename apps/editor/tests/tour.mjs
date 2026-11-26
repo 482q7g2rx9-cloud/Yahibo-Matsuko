@@ -10,14 +10,16 @@ import { join, resolve } from 'node:path';
 // Playwright は、この環境に入っているもの（NODE_PATH）を使う
 const { chromium } = createRequire(import.meta.url)('playwright');
 
+// 画面の大きさは TOUR_SIZE（例：1180x720）で変えられる
 const [html, out, mediaDir = resolve('tests/media')] = process.argv.slice(2);
+const [vw, vh] = (process.env.TOUR_SIZE || '1280x828').split('x').map(Number);
 const dir = mkdtempSync(join(tmpdir(), 'matsuko-tour-'));
 const page0 = join(dir, 'index.html');
 writeFileSync(page0, '<!doctype html><html lang="ja"><head><meta charset="utf-8"></head><body>' + readFileSync(html, 'utf8'));
 
 const log = [];
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 828 } });
+const ctx = await browser.newContext({ viewport: { width: vw, height: vh } });
 const p = await ctx.newPage();
 const errors = [];
 p.on('pageerror', (e) => errors.push(e.message));

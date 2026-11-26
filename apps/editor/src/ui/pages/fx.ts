@@ -31,7 +31,7 @@ R.fx=function(){
   var after=S.ba==='after';
   return '<div class="pn l" style="width:260px">'+ph('エフェクト')+'<div style="padding:10px 12px"><input class="inp" type="search" placeholder="エフェクトを検索" aria-label="エフェクトを検索" style="width:100%"></div><div class="scroll">'+lib+'</div></div>'+
   '<div class="pc">'+ph('プレビュー','<span class="x">クロスディゾルブ 50%</span><span class="seg">'+btn('適用前','ba','before','s'+(after?'':' on'))+btn('適用後','ba','after','s'+(after?' on':''))+'</span>')+
-    '<div class="mon" style="height:290px"><div class="frame" style="width:440px;height:248px;color:#c8c8d8;'+(after?'background:linear-gradient(90deg,#5a4a78,#2a4e7a)':'background:#5a4a78')+'">'+(after?'八百屋 外観 → 店主 インタビュー':'八百屋 外観')+
+    '<div class="mon" style="height:calc(290px + var(--xh,0px)*.5)"><div class="frame" style="height:calc(248px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;color:#c8c8d8;'+(after?'background:linear-gradient(90deg,#5a4a78,#2a4e7a)':'background:#5a4a78')+'">'+(after?'八百屋 外観 → 店主 インタビュー':'八百屋 外観')+
       (after?'<div style="position:absolute;left:250px;top:50px;width:84px;height:120px;border:2px solid #ffb454"></div><div style="position:absolute;left:250px;top:30px;height:20px;padding:0 8px;background:#ffb454;color:#2a1a00;line-height:20px">追跡中　被写体1</div>'+
       [[150,132],[170,128],[190,125],[210,122],[230,120]].map(function(p){return '<span style="position:absolute;left:'+p[0]+'px;top:'+p[1]+'px;width:5px;height:5px;background:#ffb454"></span>';}).join('')+
       [[248,48],[330,48],[248,168],[330,168]].map(function(p){return '<span style="position:absolute;left:'+p[0]+'px;top:'+p[1]+'px;width:7px;height:7px;background:#fff;border:1px solid #ffb454"></span>';}).join(''):'')+'</div></div>'+

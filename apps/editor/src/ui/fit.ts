@@ -5,13 +5,14 @@ import { applyDesign, buildMb } from './menus';
 import { PREF } from './prefs';
 
 /* 画面が小さいときは全体を縮小して表示する（横スクロールを出さない） */
-/* 画面の大きさに合わせて、UI 全体を同じ比率で拡大・縮小する。
-   基準は 1180×720（このときに部品の大きさのつり合いがいちばんよい）。全画面でも同じ見た目のまま大きくなる。
+/* UI は等倍（環境設定の「表示の大きさ」の倍率）で表示し、ウインドウが大きいときは広くなった分を作業スペースに使う。
+   ウインドウが基準の 1180×720 より小さいときだけ、全体を同じ比率で縮小して収める（横スクロールを出さない）。
+   基準より広い分は CSS の変数 --xh（高さ）・--xw（幅）に入れ、プレビューなどの高さを伸ばすのに使う。
    メニュー・ダイアログ・通知も一緒に拡大されるよう #app の中に入れる。マウス位置は SCALE で割って画面内の座標にする */
 export var SCALE, BASE_W, BASE_H;
-export function fit(){var a=document.getElementById('app'),w=innerWidth,hh=innerHeight,s=Math.min(w/BASE_W,hh/BASE_H)*(typeof PREF!=='undefined'?PREF.ui:1);
+export function fit(){var a=document.getElementById('app'),w=innerWidth,hh=innerHeight,s=Math.min(typeof PREF!=='undefined'?PREF.ui:1,w/BASE_W,hh/BASE_H);
   ['dd','cx','toast','dlg','drop'].forEach(function(id){var el=document.getElementById(id);if(el&&el.parentNode!==a)a.appendChild(el);});
-  SCALE=s;a.classList.add('fit');document.body.classList.add('fit');a.style.width=(w/s)+'px';a.style.height=(hh/s)+'px';
+  SCALE=s;a.classList.add('fit');a.style.setProperty('--xh',Math.max(0,Math.round(hh/s-BASE_H))+'px');a.style.setProperty('--xw',Math.max(0,Math.round(w/s-BASE_W))+'px');document.body.classList.add('fit');a.style.width=(w/s)+'px';a.style.height=(hh/s)+'px';
   /* 拡大は CSS の zoom で行う（文字や部品をその大きさで描き直すので、ぼやけない）。
      zoom で位置の値が transform と同じ（画面の座標）になるブラウザでだけ使い、そうでなければ transform に戻す */
   if(ZOOM==null){a.style.transform='none';a.style.width=(w/1.25)+'px';a.style.zoom='1.25';ZOOM=Math.abs(a.getBoundingClientRect().width-w)<2;
