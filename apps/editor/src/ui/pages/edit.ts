@@ -83,7 +83,7 @@ export function titleForm(c){return '<div style="display:flex;flex-direction:col
 /* テロップのスタイルの一覧（titleStyles.ts）。テロップを選んでいればそのスタイルを変え、選んでいなければ新しく追加する */
 export function styleGallery(){var t=selTitle(),cur=t&&t.lookId;
   return '<div class="mu" style="line-height:1.6;margin-bottom:10px">'+(t?'選んでいるテロップのスタイルを変えます。':'押すと、そのスタイルのテロップを再生ヘッドの位置に追加します（T キーでも追加できます）。')+'画面の上・字幕・クレジットなどの種類は、インスペクタで変えられます。</div>'+
-    '<div class="tsg" role="list">'+TITLE_PRESETS.map(function(p){return '<button class="tsl'+(cur===p.id?' on':'')+'" role="listitem" title="'+h(p.name)+'" aria-label="'+h(p.name)+'"'+(cur===p.id?' aria-pressed="true"':'')+A('tLook',p.id)+'><img src="'+presetThumb(p)+'" alt=""></button>';}).join('')+'</div>';}
+    '<div class="tsg" role="list">'+TITLE_PRESETS.map(function(p){return '<button class="tsl'+(cur===p.id?' on':'')+'" role="listitem" title="'+h(p.name)+'" aria-label="'+h(p.name)+'"'+(cur===p.id?' aria-pressed="true"':'')+A('tLook',p.id)+'><span class="tsb"><img src="'+presetThumb(p)+'" alt=""></span><span class="tsn">'+h(p.name)+'</span></button>';}).join('')+'</div>';}
 export function selTitle(){var c=primary();return c&&c.type==='title'?c:null;}
 export function inspector(){var L=S.sel.map(C).filter(Boolean),c=primary();
   if(!c)return {name:'',html:fsec('clip','クリップ',null,'<div class="mu" style="padding:6px 0;line-height:1.7">タイムラインのクリップを選ぶと、ここに情報が出ます。<br>Shift／Ctrl＋クリック、または何もないところからドラッグすると、複数選べます。</div>')};

@@ -410,9 +410,13 @@ body.native-menu #mb{display:none}
 .split:hover::after,.split.on::after{background:var(--ac)}
 body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!important}
 
-/* テロップのスタイルの一覧（テロップタブ）。見本は、角の丸くない黒い地に描く */
-.tsg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.tsl{aspect-ratio:8/5;padding:0;border:1px solid transparent;border-radius:0;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.tsl img{width:100%;height:100%;object-fit:contain;pointer-events:none}
-.tsl:hover{border-color:var(--bdh)}
-.tsl.on{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+/* テロップのスタイルの一覧（テロップタブ）。見本は角の丸くない黒い地に描き、下に名前を出す */
+.tsg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 8px}
+.tsl{padding:0;border:0;background:none;display:flex;flex-direction:column;gap:4px;min-width:0;color:var(--tx2);text-align:center}
+.tsb{display:flex;align-items:center;justify-content:center;aspect-ratio:8/5;background:#000;border:1px solid transparent;overflow:hidden}
+.tsb img{width:100%;height:100%;object-fit:contain;pointer-events:none}
+.tsn{font-size:11px;line-height:1.35;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all}
+.tsl:hover .tsb{border-color:var(--bdh)}
+.tsl:hover .tsn{color:var(--tx)}
+.tsl.on .tsb{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+.tsl.on .tsn{color:var(--ac)}
