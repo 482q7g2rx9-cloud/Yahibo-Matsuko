@@ -12,6 +12,7 @@ mod export;
 mod files;
 mod history;
 mod media;
+mod menu;
 mod project;
 #[cfg(target_os = "linux")]
 mod server;
@@ -40,6 +41,7 @@ pub fn run() {
             let _ = app;
             Ok(())
         })
+        .on_menu_event(|app, e| menu::on_event(app, e.id().as_ref()))
         .on_window_event(|w, e| {
             // OS からのドロップは Rust で受け、使ってよいファイルとして覚えてから画面に知らせる
             if let WindowEvent::DragDrop(DragDropEvent::Drop { paths, position }) = e {
@@ -51,6 +53,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::env_info,
             commands::media_base,
+            menu::menu_set,
             project::project_default_location,
             project::project_pick_location,
             project::project_create,

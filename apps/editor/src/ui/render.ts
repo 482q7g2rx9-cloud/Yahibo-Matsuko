@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { syncNativeMenu } from './menus';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
 import { M, P } from './project';
@@ -30,7 +31,7 @@ export function draw(){var pg=document.getElementById('page'),f=document.activeE
   var box=pg.querySelector('[data-srcbox]');if(box){var m=M(S.src);var el=m&&srcEl(m);if(el)box.appendChild(el);}
   if(S.page==='edit')tlAfter();
   if(X&&X.run&&X.cv)[].forEach.call(pg.querySelectorAll('canvas[data-prog]'),function(c){c.getContext('2d').drawImage(X.cv,0,0,c.width,c.height);});else redrawProg();
-  document.title='Matsuko Editor — '+D.pages.filter(function(p){return p[0]===S.page;})[0][1];}
+  document.title='Matsuko Editor — '+D.pages.filter(function(p){return p[0]===S.page;})[0][1];syncNativeMenu();}
 export function go(p){if(!R[p])return;stopAll();closeMenu();S.page=p;persist();draw();}
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */

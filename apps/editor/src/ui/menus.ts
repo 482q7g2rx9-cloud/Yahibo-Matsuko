@@ -39,6 +39,31 @@ export function resetProject(np){historyReset();stopAll();Object.keys(E.els).for
   if(HOST){HOST.media.cancel(P.media.map(function(m){return m.id;}));setJOBS({});}else{P.media.forEach(function(m){if(m.url)URL.revokeObjectURL(m.url);});IDB.clear('files');IDB.clear('history');}setP(np);setHIST([]);setREDO([]);S.media=np.media[0]?np.media[0].id:null;S.src=np.sample?'v03':null;S.sel=np.sample?['c3','c3a']:[];S.t.edit=0;S.t.cut=0;S.bin='all';S.pps=null;S.tlx=S.tly=0;SRC.id=null;SRC.el=null;saveP();draw();}
 export function infoDlg(title,html){var d=document.getElementById('dlg');d.innerHTML='<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT" style="width:560px"><h2 id="dlgT">'+h(title)+'</h2><div style="max-height:60vh;overflow:auto">'+html+'</div><div class="row" style="justify-content:flex-end;margin-top:14px">'+btn('閉じる','dlgNo','','pri')+'</div></div>';d.hidden=false;d.querySelector('[data-a="dlgNo"]').focus();}
 
+/* ---------- macOS：メニューを Mac のメニューバーに出す（画面の中のメニューバーは隠す） ----------
+   中身はここで組み立てて Rust（src-tauri/src/menu.rs）に送り、選ばれると "menu-action" で戻ってくる。
+   ショートカットは ⌘ を使うものだけ Mac のメニューに登録する（S などの1文字は、文字の入力を邪魔しないよう登録しない）。
+   コピー・切り取り・貼り付けは Mac の標準の項目にする：文字の入力欄ではその文字に、ほかではクリップに働く */
+export var NATIVE, nativeLast;
+var NATIVE_ITEMS={copy:'copy',cut2:'cut',paste:'paste'};
+function unesc(t){return String(t).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&');}
+/* 画面のショートカット（Ctrl+Shift+Z など）を、Mac のメニューの書き方（CmdOrCtrl+Shift+Z）にする。⌘ を使わないものは null */
+export function nativeAccel(a,txt){var k=a==='go:export'?'toExport':a,L=(k&&KEYMAP[k])||[],c=L.filter(function(x){return /(^|\+)Ctrl(\+|$)/.test(x);})[0]||txt||'';
+  if(k==='redo'&&L.indexOf('Ctrl+Shift+Z')>=0)c='Ctrl+Shift+Z'; /* Mac では ⇧⌘Z がふつう */
+  if(!/(^|\+)Ctrl(\+|$)/.test(c))return null;
+  var parts=c.split('+'),key=parts.pop();key={',':'Comma','.':'Period','/':'Slash'}[key]||key;if(!/^([A-Z0-9]|Comma|Period|Slash)$/.test(key))return null;
+  return parts.map(function(m){return m==='Ctrl'?'CmdOrCtrl':m;}).concat([key]).join('+');}
+export function nativeSpec(){var used={};return MENUS.map(function(m){var its=m.i==='view'?viewItems():m.i==='file'?fileItems():m.i,out=[];
+    its.forEach(function(x){if(x==='-'){if(out.length&&out[out.length-1].kind!=='sep')out.push({kind:'sep'});return;}if(x.h){out.push({kind:'head',label:unesc(x.h)});return;}
+      var id=x[1]||'todo';if(id==='prefs'||id==='about')return; /* Mac ではアプリの名前のメニューにある */
+      if(NATIVE_ITEMS[id]){out.push({kind:'native',id:NATIVE_ITEMS[id],label:unesc(x[0])});return;}
+      var o={kind:m.i==='view'&&x[3]!==undefined?'check':'item',id:id,label:unesc(x[0]),enabled:!x[4],checked:!!x[3]},ac=nativeAccel(x[1],x[2]);if(ac&&!used[ac]){used[ac]=1;o.accel=ac;}out.push(o);}); /* 同じショートカットは最初の項目だけに付ける */
+    while(out.length&&out[out.length-1].kind==='sep')out.pop();return {label:m.n,items:out};});}
+/* 中身が変わったときだけ送り直す（draw のたびに呼ぶ） */
+export function syncNativeMenu(){if(!NATIVE)return;var sp=nativeSpec(),j=JSON.stringify(sp);if(j===nativeLast)return;nativeLast=j;Promise.resolve(HOST.menu.set(sp)).catch(function(){nativeLast='';});}
+function editing(){var a=document.activeElement;return !!a&&(a.isContentEditable||a.tagName==='TEXTAREA'||a.tagName==='INPUT'&&!/^(range|checkbox|radio|button|submit)$/.test(a.type));}
+/* Mac のメニューで選ばれたとき。文字の入力中の「元に戻す・やり直し・すべて選択」は、その文字に働かせる */
+export function onNativeMenu(id){if(editing()&&(id==='undo'||id==='redo'||id==='selAll')){document.execCommand(id==='selAll'?'selectAll':id);return;}menuAct(id);}
+
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
 MENUS=[{n:'ファイル',i:'file'},
@@ -47,6 +72,11 @@ MENUS=[{n:'ファイル',i:'file'},
   {n:'プロジェクト',i:[['プロジェクト設定…'],['メンバーと権限…'],['変更履歴・復元…','hist'],'-',['台本アプリと紐づけ…','go:script']]},
   {n:'ヘルプ',i:[['使い方','help'],['キーボードショートカット…','keys'],['バージョン情報','about']]}];
 mbOpen=null;
+nativeLast='';
+NATIVE=!!(HOST&&HOST.menu&&/Mac/.test(navigator.platform||navigator.userAgent||''));
+if(NATIVE){document.body.classList.add('native-menu');HOST.menu.onAction(onNativeMenu);
+  /* Mac の標準のコピー・切り取り・貼り付けを、文字の入力中でなければクリップの操作にする */
+  ['copy','cut','paste'].forEach(function(t){document.addEventListener(t,function(e){if(editing())return;e.preventDefault();menuAct(t==='cut'?'cut2':t);});});}
 mq=matchMedia('(prefers-color-scheme: light)');
 if(mq.addEventListener)mq.addEventListener('change',applyDesign);
 }

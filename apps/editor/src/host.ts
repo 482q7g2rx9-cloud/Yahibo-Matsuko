@@ -99,6 +99,11 @@ export interface Host {
     get(id: number): Promise<unknown>;
     del(ids: number[]): Promise<void>;
   };
+  /** macOS のメニューバー（ほかの OS では何もしない） */
+  menu: {
+    set(menus: unknown): Promise<boolean>;
+    onAction(fn: (id: string) => void): Promise<UnlistenFn>;
+  };
   /** 書き出し（FFmpeg） */
   export: {
     pick(name: string, ext: string): Promise<string | null>;
@@ -152,6 +157,10 @@ const host: Host = {
     list: () => invoke('history_list'),
     get: (id) => invoke('history_get', { id }),
     del: (ids) => invoke('history_delete', { ids }),
+  },
+  menu: {
+    set: (menus) => invoke('menu_set', { menus }),
+    onAction: (fn) => listen<string>('menu-action', (e) => fn(e.payload)),
   },
   export: {
     pick: (name, ext) => invoke('export_pick', { name, ext }),

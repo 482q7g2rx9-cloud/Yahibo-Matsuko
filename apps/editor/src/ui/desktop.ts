@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { syncNativeMenu } from './menus';
 import { historyReset, historyTick } from './history';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { C, M, P, emptyProject, migrate, setP, uid } from './project';
@@ -28,7 +29,7 @@ export function ensureProject(){if(!HOST)return Promise.resolve();if(HOST.projec
   return HOST.project.create('無題のプロジェクト',null,forDisk()).then(function(o){historyReset();historyTick('open');S.savedAt=hm();head();refreshRecent();toast('プロジェクト「'+o.name+'」を作りました（書類 › Matsuko Editor）');return o;});}
 export function saveNow(){if(!HOST||!HOST.project.current)return Promise.resolve(false);clearTimeout(saveTimer);
   return HOST.project.save(forDisk()).then(function(){S.savedAt=hm();var e=document.querySelector('[data-saved]');if(e)e.textContent='● 自動保存済み '+S.savedAt;return true;}).catch(function(e){toast('保存できませんでした：'+e);return false;});}
-export function refreshRecent(){if(HOST)HOST.project.recent().then(function(r){RECENT=r||[];}).catch(function(){});}
+export function refreshRecent(){if(HOST)HOST.project.recent().then(function(r){RECENT=r||[];syncNativeMenu();}).catch(function(){});}
 /* 素材のファイルを画面で読める URL にする：プロキシ → 元のファイル（そのまま再生できるとき） */
 export function mediaUrl(m){if(!HOST||!m.file)return null;if(m.proxyPath)return HOST.media.url(m.proxyPath);if(!m.missing&&m.path&&m.pl!==0)return HOST.media.url(m.path);return null;}
 /* 開いたプロジェクトを画面に入れる */
