@@ -5,7 +5,7 @@
 #           scripts/fetch-ffmpeg.sh --system        開発用：PATH にある ffmpeg をコピー
 #
 # ライセンス：GPL の部品（libx264 など）を含まない LGPL 版だけを使う（docs/tauri-plan.md 7章）。
-#   Windows / Linux … BtbN/FFmpeg-Builds の LGPL 版（n7.1 系）
+#   Windows / Linux … BtbN/FFmpeg-Builds の LGPL 版（最新のリリース系列）
 #   macOS          … scripts/build-ffmpeg-macos.sh でソースから LGPL 構成でビルド
 set -euo pipefail
 
@@ -18,7 +18,24 @@ if [[ "$target" == "--system" ]]; then target="$(rustc -vV | sed -n 's/^host: //
 
 ext=""; [[ "$target" == *windows* ]] && ext=".exe"
 work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
-BTBN="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
+# BtbN の最新リリースから、名前が「ffmpeg-n<版>-latest-<OS>-lgpl-<版>」の配布物を選ぶ（いちばん新しい版）。
+# 配布物の名前は版が上がると変わるので、固定しない。GH_TOKEN があれば API の回数制限を避けられる。
+btbn_url() { # btbn_url <win64|linux64> <zip|tar.xz>
+  node -e '
+    const [os, ext] = process.argv.slice(1);
+    const h = { "User-Agent": "matsuko-editor-ci", Accept: "application/vnd.github+json" };
+    if (process.env.GH_TOKEN) h.Authorization = "Bearer " + process.env.GH_TOKEN;
+    fetch("https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest", { headers: h })
+      .then(r => { if (!r.ok) throw new Error("GitHub API " + r.status); return r.json(); })
+      .then(j => {
+        const re = new RegExp("^ffmpeg-n(\\d+)\\.(\\d+)-latest-" + os + "-lgpl-[\\d.]+\\." + ext.replace(".", "\\.") + "$");
+        const c = j.assets.map(a => ({ a, m: a.name.match(re) })).filter(x => x.m)
+          .sort((x, y) => (y.m[1] - x.m[1]) || (y.m[2] - x.m[2]));
+        if (!c.length) throw new Error("LGPL 版の配布物が見つかりません: " + os);
+        console.log(c[0].a.browser_download_url);
+      }).catch(e => { console.error(e.message); process.exit(1); });
+  ' "$1" "$2"
+}
 
 put() { # put <取り出したbinフォルダ>
   for t in ffmpeg ffprobe; do cp "$1/$t$ext" "$bin/$t-$target$ext"; chmod +x "$bin/$t-$target$ext"; done
@@ -27,11 +44,13 @@ put() { # put <取り出したbinフォルダ>
 if [[ "$mode" == system ]]; then
   for t in ffmpeg ffprobe; do cp "$(command -v $t)" "$bin/$t-$target$ext"; done
 elif [[ "$target" == x86_64-pc-windows-msvc ]]; then
-  curl -fL --retry 3 -o "$work/ff.zip" "$BTBN/ffmpeg-n7.1-latest-win64-lgpl-7.1.zip"
+  url="$(btbn_url win64 zip)"; echo "取得: $url"
+  curl -fL --retry 3 -o "$work/ff.zip" "$url"
   powershell -NoProfile -Command "Expand-Archive -Path '$(cygpath -w "$work/ff.zip")' -DestinationPath '$(cygpath -w "$work")'"
   put "$(dirname "$(find "$work" -name ffmpeg.exe | head -1)")"
 elif [[ "$target" == x86_64-unknown-linux-gnu ]]; then
-  curl -fL --retry 3 -o "$work/ff.tar.xz" "$BTBN/ffmpeg-n7.1-latest-linux64-lgpl-7.1.tar.xz"
+  url="$(btbn_url linux64 tar.xz)"; echo "取得: $url"
+  curl -fL --retry 3 -o "$work/ff.tar.xz" "$url"
   tar -xJf "$work/ff.tar.xz" -C "$work"
   put "$(dirname "$(find "$work" -name ffmpeg -type f | head -1)")"
 elif [[ "$target" == *apple-darwin ]]; then
