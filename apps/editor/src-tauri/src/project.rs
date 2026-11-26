@@ -238,6 +238,14 @@ pub fn open_at(app: &AppHandle, path: &Path) -> Result<Opened, String> {
         let _ = std::fs::create_dir_all(open.cache(sub));
     }
     st.allow_dir(app, &open.cache(""));
+    // 途中で終了したときの作りかけのプロキシを片付ける（開いたあと、もう一度作る）
+    if let Ok(rd) = std::fs::read_dir(open.cache("proxy")) {
+        for e in rd.flatten() {
+            if e.file_name().to_string_lossy().contains(".part.") {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
+    }
 
     let mut missing = Vec::new();
     let mut moved = false;
