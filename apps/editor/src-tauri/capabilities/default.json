@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "メインウィンドウで使ってよい機能。FFmpeg は Rust 側からだけ起動するので、画面には許可しない",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

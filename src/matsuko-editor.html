@@ -963,7 +963,7 @@ var MENUS=[{n:'ファイル',i:[['新規プロジェクト…','new'],['見本�
   {n:'編集',i:[['元に戻す','undo','Ctrl+Z'],['やり直し','redo','Ctrl+Y'],'-',['再生ヘッドで分割','split','S'],['削除','delSel','Delete']]},
   {n:'表示',i:'view'},
   {n:'プロジェクト',i:[['プロジェクト設定…'],['メンバーと権限…'],['変更履歴・復元…'],'-',['台本アプリと紐づけ…','go:script']]},
-  {n:'ヘルプ',i:[['使い方','help'],['バージョン情報']]}];
+  {n:'ヘルプ',i:[['使い方','help'],['バージョン情報','about']]}];
 function viewItems(){var o=[{h:'ページ'}];D.pages.forEach(function(p,i){o.push([p[1],'go:'+p[0],'Alt+'+(i+1),S.page===p[0]]);});
   o.push('-',{h:'テーマ'});[['ライト','light'],['ダーク','dark'],['システムに合わせる','system']].forEach(function(t){o.push([t[0],'th:'+t[1],'',S.theme===t[1]]);});
   o.push('-',{h:'アクセントカラー'});[['青','blue'],['緑','green'],['オレンジ','orange'],['紫','purple']].forEach(function(t){o.push([t[0],'ac:'+t[1],'',S.accent===t[1]]);});return o;}
@@ -1040,6 +1040,10 @@ var ACT={
   save:function(){saveP();toast('このブラウザに保存しました');},
   new:function(){ask('新規プロジェクト','いまのプロジェクト（読み込んだ素材とタイムライン）を消して、空のプロジェクトを始めます。元のファイルはパソコンに残ります。','新規作成',function(){resetProject(emptyProject());go('media');});},
   sample:function(){ask('見本プロジェクトを開く','いまのプロジェクトを消して、見本プロジェクトに戻します。','開く',function(){resetProject(sampleProject());});},
+  about:function(){var host=window.MatsukoHost;
+    var show=function(rows){var d=document.getElementById('dlg');d.innerHTML='<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT"><h2 id="dlgT">Matsuko Editor</h2>'+rows.map(function(r){return '<div class="kv" style="padding:0"><span>'+h(r[0])+'</span><span style="word-break:break-all">'+h(r[1])+'</span></div>';}).join('')+'<div class="row" style="justify-content:flex-end;margin-top:14px">'+btn('閉じる','dlgNo','','pri')+'</div></div>';d.hidden=false;d.querySelector('button').focus();};
+    if(host&&host.envInfo)host.envInfo().then(function(i){show([['版',i.appVersion+'（デスクトップ版）'],['OS',i.os+' / '+i.arch],['FFmpeg',i.ffmpeg||'見つかりません'],['FFprobe',i.ffprobe||'見つかりません']]);}).catch(function(e){show([['版','デスクトップ版'],['エラー',String(e)]]);});
+    else show([['版','ブラウザ版（試作）'],['動作環境',navigator.userAgent]]);},
   help:function(){toast('メディアで読み込み → カットでイン・アウトを決めて追加 → 編集で並べ替え・分割 → 出力で書き出し');},
   dlgOk:function(){document.getElementById('dlg').hidden=true;var f=ask.fn;ask.fn=null;if(f)f();},dlgNo:function(){document.getElementById('dlg').hidden=true;ask.fn=null;},
   todo:function(){toast('この機能は、まだ使えません');}
