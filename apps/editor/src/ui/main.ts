@@ -1,3 +1,4 @@
+import { init as initPanels } from './panels';
 // 画面本体の入り口。各モジュールの準備（init）を、元の1ファイルのときと同じ順番で行う
 import { init as i0 } from './data';
 import { init as i1 } from './project';
@@ -27,6 +28,7 @@ import { init as i24 } from './drag';
 import { init as i25 } from './fit';
 import { init as i26 } from './boot';
 
+initPanels(); // パネルの幅（最初に描く前に読み込む）
 i0();
 i1();
 i2();

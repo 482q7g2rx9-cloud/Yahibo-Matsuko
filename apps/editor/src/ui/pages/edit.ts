@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { pw, splitter } from '../panels';
 import * as KS from '../../core/silence';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from '../data';
@@ -120,7 +121,7 @@ R.edit=function(){
       '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(m.k==='音声'?h(m.c)+' ':'')+h(m.n)+'</div><div class="'+(m.r==='wn'?'t-wn':'t-ok')+'">'+r[0]+'</div></div>';}).join('')+'</div>'+(L.length?'':'<div class="mu" style="padding:0 16px">「＋ 読込」で動画・音声・画像を読み込めます。</div>')+'</div>';}
   else left='<div class="scroll" style="padding:14px;display:flex;flex-direction:column;gap:8px">'+(S.etab==='text'?'<div class="mu" style="line-height:1.6">押すと、再生ヘッドの位置にテロップを追加します（T キーでも追加できます）。</div>':'')+D.templates[S.etab].map(function(t,i){var st=['name','q','sub','credit'][i];return S.etab==='text'?'<div class="card" role="button" tabindex="0"'+A('addTitle',st)+'><b>'+h(t[0])+'　<span style="display:inline;color:var(--ac)">＋ 追加</span></b><span>'+h(t[1])+'</span></div>':'<div class="card"><b>'+h(t[0])+'</b><span>'+h(t[1])+'</span></div>';}).join('')+'</div>';
   var tools=[['select','選択',keyOf('tSel')],['split','分割',keyOf('tSplit')],['trash','削除',''],['hand','ハンド',keyOf('tHand')],['text','文字','']],ins=inspector(),rngOn=P.pin!=null||P.pout!=null;
-  return '<div class="pn l" style="width:250px">'+ph('素材')+tabs([['assets','アセット'],['templates','テンプレート'],['text','テロップ'],['audio','音声']],S.etab,'etab','素材の種類')+left+'</div>'+
+  return '<div class="pn l" style="width:'+pw('editL')+'px">'+splitter('editL','l')+''+ph('素材')+tabs([['assets','アセット'],['templates','テンプレート'],['text','テロップ'],['audio','音声']],S.etab,'etab','素材の種類')+left+'</div>'+
   '<div class="pc" style="background:var(--bg0)">'+
     '<div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">'+ph('プレビュー','<span class="x">全長 '+mmss(progDur())+'</span>')+'<div class="mon" style="flex:1;min-height:0"><canvas data-prog width="960" height="540" style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain;display:block"></canvas></div>'+
       '<div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">'+tc(S.t.edit)+'</span><span class="mid">'+ibtn('inPt','イン点を設定（I キー）','pin')+ibtn('outPt','アウト点を設定（O キー）','pout')+'<span class="vsep"></span>'+ibtn('prevCut','前の編集点へ（↑）','prev')+ibtn('back','1フレーム戻る（←）','fb')+playBtn(E.playing)+ibtn('fwd','1フレーム進む（→）','ff')+ibtn('nextCut','次の編集点へ（↓）','next')+'<span class="vsep"></span>'+ibtn('split','再生ヘッドで分割（S キー）','split')+'</span><span class="end row" style="justify-content:flex-end;gap:6px">フル画質'+ibtn('full','全画面','todo')+'</span></div></div>'+
@@ -132,7 +133,7 @@ R.edit=function(){
         (rngOn?'<span class="t-ac" style="margin-left:6px">書き出し範囲 '+tc(P.pin||0)+' – '+tc(P.pout!=null?P.pout:progDur())+'</span>'+btn('範囲を消去','pclear','','s'):'')+
         '</div><div class="tl tl2" data-tlwrap>'+tlInner()+'</div>'+
       '<div class="tlfoot"><button aria-label="縮小" title="縮小（'+keyOf('zout')+'）"'+A('zout')+'>−</button><input type="range" min="0" max="100" value="'+zoomVal()+'" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（'+keyOf('zin')+'）"'+A('zin')+'>＋</button></div></div></div></div>'+
-  '<div class="pn r" style="width:320px">'+ph('インスペクタ','<span class="x">'+h(ins.name)+'</span>')+'<div class="scroll">'+ins.html+
+  '<div class="pn r" style="width:'+pw('editR')+'px">'+splitter('editR','r')+''+ph('インスペクタ','<span class="x">'+h(ins.name)+'</span>')+'<div class="scroll">'+ins.html+
     (P.sample?'<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>':'')+'</div></div>';
 };
 }

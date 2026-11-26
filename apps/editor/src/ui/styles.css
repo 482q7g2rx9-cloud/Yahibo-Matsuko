@@ -400,3 +400,11 @@ body.dragging,body.dragging *{cursor:grabbing!important}
 
 /* macOS のデスクトップ版：メニューは Mac のメニューバーに出すので、画面の中のメニューバーは隠す */
 body.native-menu #mb{display:none}
+
+/* パネルの幅を変えるつかみ（編集・エフェクトページ）。内側の端に重ね、乗せると青い線が出る */
+.pn{position:relative}
+.split{position:absolute;top:0;bottom:0;width:9px;z-index:20;cursor:col-resize;touch-action:none}
+.split.l{right:-5px}.split.r{left:-5px}
+.split::after{content:'';position:absolute;top:0;bottom:0;left:3px;width:3px;background:transparent;transition:background-color .12s}
+.split:hover::after,.split.on::after{background:var(--ac)}
+body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!important}

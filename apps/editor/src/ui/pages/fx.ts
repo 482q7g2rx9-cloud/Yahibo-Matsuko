@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { pw, splitter } from '../panels';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from '../data';
 import { M } from '../project';
@@ -29,7 +30,7 @@ R.fx=function(){
   var kfBtns='<button class="b s" aria-label="前のキーフレーム">'+TRI.l+'</button><button class="b s" aria-label="キーフレームを追加／削除">'+diamond(0)+'追加／削除</button><button class="b s" aria-label="次のキーフレーム">'+TRI.r+'</button><span class="vsep"></span>'+
     ['リニア','ベジェ','停止'].map(function(k){return btn(k,'kfm',k,'s'+(S.kfMode===k?' on':''));}).join('')+'<span class="vsep"></span><button class="b s" aria-label="イーズイン">イン</button><button class="b s" aria-label="イーズアウト">アウト</button>';
   var after=S.ba==='after';
-  return '<div class="pn l" style="width:260px">'+ph('エフェクト')+'<div style="padding:10px 12px"><input class="inp" type="search" placeholder="エフェクトを検索" aria-label="エフェクトを検索" style="width:100%"></div><div class="scroll">'+lib+'</div></div>'+
+  return '<div class="pn l" style="width:'+pw('fxL')+'px">'+splitter('fxL','l')+''+ph('エフェクト')+'<div style="padding:10px 12px"><input class="inp" type="search" placeholder="エフェクトを検索" aria-label="エフェクトを検索" style="width:100%"></div><div class="scroll">'+lib+'</div></div>'+
   '<div class="pc">'+ph('プレビュー','<span class="x">クロスディゾルブ 50%</span><span class="seg">'+btn('適用前','ba','before','s'+(after?'':' on'))+btn('適用後','ba','after','s'+(after?' on':''))+'</span>')+
     '<div class="mon" style="height:calc(290px + var(--xh,0px)*.5)"><div class="frame" style="height:calc(248px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;color:#c8c8d8;'+(after?'background:linear-gradient(90deg,#5a4a78,#2a4e7a)':'background:#5a4a78')+'">'+(after?'八百屋 外観 → 店主 インタビュー':'八百屋 外観')+
       (after?'<div style="position:absolute;left:250px;top:50px;width:84px;height:120px;border:2px solid #ffb454"></div><div style="position:absolute;left:250px;top:30px;height:20px;padding:0 8px;background:#ffb454;color:#2a1a00;line-height:20px">追跡中　被写体1</div>'+
@@ -38,7 +39,7 @@ R.fx=function(){
     transport('fx',ibtn('toStart','前のカットへ','todo')+playBtn(!!FXP)+ibtn('nextCut','次のカットへ','todo'),'<span class="mu">見本の画面です</span>')+
     '<div class="row" style="height:40px;flex:none;gap:6px;padding:0 12px;border-bottom:1px solid var(--dv)"><span style="font-weight:500;margin-right:4px;white-space:nowrap">キーフレーム</span>'+kfBtns+'<span class="grow"></span>'+sel('対象プロパティ',['拡大率','位置','回転','透明度'],'拡大率','height:26px')+'</div>'+
     timeline(D.fxtl,'fx',{kf:1,noTc:1})+'</div>'+
-  '<div class="pn r" style="width:320px">'+ph('エフェクトコントロール','<span class="x">店主 インタビュー</span>')+'<div class="scroll">'+
+  '<div class="pn r" style="width:'+pw('fxR')+'px">'+splitter('fxR','r')+''+ph('エフェクトコントロール','<span class="x">店主 インタビュー</span>')+'<div class="scroll">'+
     fsec('track','トラッキング',true,'<div class="fg"><span>追跡対象</span>'+sel('追跡対象',['被写体1（店主）','被写体2'],'被写体1（店主）')+'</div>'+
       '<div class="row" style="gap:6px;height:42px">'+btn(TRI.l+'後方','todo','','','後方')+btn(ic('stop',12)+'停止','todo','','','停止')+btn(TRI.r+'前方','todo','','on','前方')+'</div>'+
       '<div class="fg"><span>状態</span><span class="row" style="gap:8px"><span class="prog" style="flex:1"><i style="width:100%;background:var(--ok)"></i></span><span class="t-ok">解析済み</span></span></div>'+
