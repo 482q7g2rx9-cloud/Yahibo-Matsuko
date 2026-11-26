@@ -150,8 +150,12 @@ pub fn export(
                     }
                 });
                 if let Err(e) = r {
-                    // 最初の区間で失敗したら、次のエンコーダーで組み立て直して、この区間からやり直す
-                    if first_video && e != "中止しました" && ei + 1 < encoders.len() {
+                    // 最初の区間でエンコーダーが原因で失敗したら、次のエンコーダーで組み立て直して、この区間からやり直す
+                    // （フィルターなど、エンコーダーと関係のない失敗は、そのまま知らせる）
+                    let enc_err =
+                        e.to_lowercase().contains("encoder") || e.contains(encoders[ei].as_str());
+                    if first_video && enc_err && e != "中止しました" && ei + 1 < encoders.len()
+                    {
                         ei += 1;
                         pl = plan(p, titles, st, work, out, &encoders[ei])?;
                         continue;

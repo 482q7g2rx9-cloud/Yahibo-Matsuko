@@ -323,8 +323,11 @@ fn segment_args(
             let next = format!("b{k}");
             match c.kind {
                 ClipType::Adj => {
-                    // 調整レイヤー：それより下に重ねたもの全体の色を補正する（プレビューと同じ値）
-                    graph.push(format!("[{cur}]eq=saturation=1.08:contrast=1.04[{next}]"));
+                    // 調整レイヤー：それより下に重ねたもの全体の色を補正する（プレビューと同じ値：彩度 1.08・コントラスト 1.04）。
+                    // eq フィルターは GPL なので（配布する LGPL 版の FFmpeg にはない）、hue と lutyuv で行う
+                    graph.push(format!(
+                        "[{cur}]hue=s=1.08,lutyuv=y='clip((val-128)*1.04+128,0,255)'[{next}]"
+                    ));
                 }
                 ClipType::Title => {
                     let Some(img) = titles.iter().find(|t| t.clip == c.id) else {
@@ -739,7 +742,26 @@ mod tests {
             j.contains("-c:v h264_mf -b:v 4000000 -rate_control cbr"),
             "{j}"
         );
-        assert!(!j.contains("eq="), "調整レイヤーは 4 秒から");
+        assert!(!j.contains("hue="), "調整レイヤーは 4 秒から");
+        // 4〜6 秒：調整レイヤー（GPL の eq ではなく、hue と lutyuv）
+        let pl = plan(
+            &p,
+            &[],
+            &settings(0.0, 6.0),
+            Path::new("/w"),
+            Path::new("/o.mp4"),
+            "h264_mf",
+        )
+        .unwrap();
+        let Step::Video { args, .. } = &pl.steps[2] else {
+            panic!("区間がない")
+        };
+        let j = args.join(" ");
+        assert!(
+            j.contains("hue=s=1.08,lutyuv=y='clip((val-128)*1.04+128,0,255)'")
+                && !j.contains("eq="),
+            "{j}"
+        );
     }
 
     #[test]
