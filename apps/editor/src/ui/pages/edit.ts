@@ -52,7 +52,9 @@ export function drawTL(){var w=document.querySelector('[data-tlwrap]');if(!w)ret
 /* インスペクタ */
 /* インスペクタの数値の行（エフェクト欄と同じ形）：◇ キーフレーム／スライダー／◀▶／数値（左右ドラッグで増減、クリックで入力） */
 export var PROPS;
-export function propVal(c,key){return c[key]==null?PROPS[key].def:c[key];}
+/* テロップの文字サイズ（1080p の画面での px）。まだ決めていなければ、前の「小・中・大」から */
+export var TITLE_PX={'小':45,'中':59,'大':81};
+export function propVal(c,key){if(key==='fsz'&&c.fsz==null)return TITLE_PX[c.sz||'中']||59;return c[key]==null?PROPS[key].def:c[key];}
 export function propPct(key,v){var p=PROPS[key];return Math.max(0,Math.min(100,(v-p.min)/(p.max-p.min)*100));}
 export function propTxt(key,v){return (+v).toFixed(PROPS[key].dec);}
 export function numRow(label,c,key){var p=PROPS[key],v=propVal(c,key),id=c.id;
@@ -74,8 +76,6 @@ export function hotEdit(el){var cid=el.dataset.cid,key=el.dataset.k,c=C(cid);if(
   inp.addEventListener('blur',function(){fin(true);});}
 export function titleForm(c){return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0">'+
   '<label for="ttext" class="t2">文字（改行できます）</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" style="width:100%;height:auto;padding:6px 8px;resize:vertical">'+h(c.label)+'</textarea>'+
-  '<div class="fg"><span>種類</span><select class="inp" data-in="tst" aria-label="テロップの種類">'+Object.keys(TST).map(function(k){return '<option value="'+k+'"'+(c.st===k?' selected':'')+'>'+TST[k]+'</option>';}).join('')+'</select></div>'+
-  '<div class="fg"><span>大きさ</span>'+sel('大きさ',['小','中','大'],c.sz||'中','','tsz')+'</div>'+
   '<div class="fg"><span>スタイル</span><span class="row" style="gap:8px;min-width:0">'+(c.look?'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+h((presetById(c.lookId)||{name:'カスタム'}).name)+'</span>'+btn('外す','tLookOff','','s'):'<span class="mu">なし（テロップタブで選べます）</span>')+'</span></div>'+
   '<div class="fg"><span>開始（秒）</span><input class="inp" type="number" step="0.1" min="0" data-in="tstart" value="'+c.start.toFixed(1)+'" aria-label="開始（秒）"></div>'+
   '<div class="fg"><span>長さ（秒）</span><input class="inp" type="number" step="0.1" min="0.5" data-in="tdur" value="'+cLen(c).toFixed(1)+'" aria-label="長さ（秒）"></div>'+
@@ -84,13 +84,16 @@ export function titleForm(c){return '<div style="display:flex;flex-direction:col
 export function styleGallery(){var t=selTitle(),cur=t&&t.lookId;
   return '<div class="mu" style="line-height:1.6;margin-bottom:10px">'+(t?'選んでいるテロップのスタイルを変えます。':'押すと、そのスタイルのテロップを再生ヘッドの位置に追加します（T キーでも追加できます）。')+'画面の上・字幕・クレジットなどの種類は、インスペクタで変えられます。</div>'+
     '<div class="tsg" role="list">'+TITLE_PRESETS.map(function(p){return '<button class="tsl'+(cur===p.id?' on':'')+'" role="listitem" title="'+h(p.name)+'" aria-label="'+h(p.name)+'"'+(cur===p.id?' aria-pressed="true"':'')+A('tLook',p.id)+'><span class="tsb"><img src="'+presetThumb(p)+'" alt=""></span><span class="tsn">'+h(p.name)+'</span></button>';}).join('')+'</div>';}
+/* テロップの位置・文字サイズ・拡大率など（動画のクリップと同じ形） */
+export function titleMotion(c){return numRow('位置 X',c,'x')+numRow('位置 Y',c,'y')+numRow('文字サイズ',c,'fsz')+numRow('拡大率',c,'scale')+numRow('回転',c,'rot')+numRow('不透明度',c,'op')+
+  '<div class="row" style="justify-content:flex-end;padding-top:8px">'+btn('元に戻す','mreset',c.id,'s')+'</div>';}
 export function selTitle(){var c=primary();return c&&c.type==='title'?c:null;}
 export function inspector(){var L=S.sel.map(C).filter(Boolean),c=primary();
   if(!c)return {name:'',html:fsec('clip','クリップ',null,'<div class="mu" style="padding:6px 0;line-height:1.7">タイムラインのクリップを選ぶと、ここに情報が出ます。<br>Shift／Ctrl＋クリック、または何もないところからドラッグすると、複数選べます。</div>')};
   var pair=L.length===2&&L[0].link&&L[0].link===L[1].link;
   if(L.length>1&&!pair){var tot=L.reduce(function(a,x){return a+cLen(x);},0);
     return {name:L.length+' 個を選択',html:fsec('clip','選んだクリップ',null,kv('数',L.length+' 個')+kv('合計の長さ',mmss(tot))+'<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">'+btn('削除','delSel','','s')+btn('リップル削除','rdel','','s')+btn(L.some(function(x){return x.link;})?'リンク解除':'リンク','lnk','','s')+btn('コピー','copy','','s')+'</div>')};}
-  if(c.type==='title')return {name:TST[c.st]||'テロップ',html:fsec('clip','テロップ',null,titleForm(c))};
+  if(c.type==='title')return {name:'テロップ',html:fsec('clip','テロップ',null,titleForm(c))+fsec('motion','モーション・不透明度',null,titleMotion(c),1)};
   var m=c.m?M(c.m):null,a=pair?L.filter(function(x){return T(x.tr).kind==='a';})[0]:T(c.tr).kind==='a'?c:null,v=T(c.tr).kind==='v'?c:null;
   var info=kv('素材',h(m?m.n:c.label||'—'))+kv('トラック',c.tr+(a&&v?' / '+a.tr:''))+kv('開始',tc(c.start))+(c.type==='media'?kv('イン',tc(c.in))+kv('アウト',tc(c.out)):'')+kv('長さ',mmss(cLen(c)))+
     '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">'+btn('再生ヘッドで分割','split','','s')+btn('削除','delSel','','s')+btn('リップル削除','rdel','','s')+(c.link||pair?btn('リンク解除','lnk','','s'):'')+'</div>';
@@ -116,7 +119,7 @@ export function init(){
 ROWS=[];
 EYE='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8z"/></svg>';
 LOCK='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0110 0v3h1v11H6V10zm2 0h6V7a3 3 0 00-6 0z"/></svg>';
-PROPS={x:{min:-100,max:100,step:1,unit:'%',def:0,dec:1},y:{min:-100,max:100,step:1,unit:'%',def:0,dec:1},scale:{min:10,max:400,step:1,unit:'%',def:100,dec:1},
+PROPS={fsz:{min:12,max:300,step:1,unit:'px',def:59,dec:0},x:{min:-100,max:100,step:1,unit:'%',def:0,dec:1},y:{min:-100,max:100,step:1,unit:'%',def:0,dec:1},scale:{min:10,max:400,step:1,unit:'%',def:100,dec:1},
   rot:{min:-180,max:180,step:1,unit:'°',def:0,dec:1},op:{min:0,max:100,step:1,unit:'%',def:100,dec:1},vol:{min:-30,max:12,step:0.5,unit:'dB',def:0,dec:1}};
 R.edit=function(){
   var left;

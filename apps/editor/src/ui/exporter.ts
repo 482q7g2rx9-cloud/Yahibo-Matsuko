@@ -7,7 +7,7 @@ import { P, cEnd, progDur } from './project';
 import { S } from './state';
 import { hm, mmss } from './util';
 import { HOST, forDisk } from './desktop';
-import { E, audioInit, drawFrame, drawTitle, heads, sync } from './engine';
+import { E, audioInit, drawFrame, drawTitle, drawTitleClip, heads, sync, titleInfo } from './engine';
 import { stopAll } from './source';
 import { draw } from './render';
 import { toast } from './menus';
@@ -52,10 +52,10 @@ export function deskEnqueue(j,run){var ext=j.n.match(/\.([a-z0-9]+)$/i)[1];
     if(!run)return toast('キューに追加しました');if(X&&X.run)toast('いまの書き出しが終わったら始めます');else xStart(j);}).catch(function(e){toast(String(e));});}
 /* テロップを、プレビューと同じ描き方で PNG にする。クレジット（流れる文字）は文字の部分だけ */
 export function titleImages(from,to,W,H){var out=[];P.clips.forEach(function(c){if(c.type!=='title'||cEnd(c)<=from||c.start>=to)return;
-    var ti={label:c.label,st:c.st,sz:c.sz,look:c.look,t:c.start-c.in,d:Math.max(0.1,c.out)},cv=document.createElement('canvas'),scroll=c.st==='credit';cv.width=W;
-    if(scroll){var sz={'小':.042,'中':.055,'大':.075}[c.sz||'中']||.055,lh=Math.round(H*sz)*1.35,bh=lh*String(c.label||'').split('\n').length;
+    var ti=titleInfo(c),cv=document.createElement('canvas'),scroll=c.st==='credit';cv.width=W;
+    if(scroll){var sz={'小':.042,'中':.055,'大':.075}[c.sz||'中']||.055,lh=(c.fsz?Math.max(4,Math.round(H*c.fsz/1080)):Math.round(H*sz))*1.35,bh=lh*String(c.label||'').split('\n').length;
       cv.height=Math.max(2,Math.ceil(bh));drawTitle(cv.getContext('2d'),W,H,ti,ti.t+ti.d*H/(H+bh));}
-    else{cv.height=H;drawTitle(cv.getContext('2d'),W,H,ti,c.start);}
+    else{cv.height=H;drawTitleClip(cv.getContext('2d'),W,H,c,c.start);} /* 位置・拡大率・回転・不透明度も画像に入れる */
     out.push({clip:c.id,png:cv.toDataURL('image/png'),scroll:scroll});});return out;}
 export function deskStart(j){var set=j.set,wh=set.res.split('×'),W=+wh[0]||1920,H=+wh[1]||1080,to=set.to!=null?set.to:progDur();
   var req={id:j.id,out:j.out,project:forDisk(),titles:set.audio?[]:titleImages(set.from||0,to,W,H),width:W,height:H,fps:String(set.fps),from:set.from||0,to:to,audioOnly:!!set.audio,videoBitrate:Math.round(set.v||8e6),audioBitrate:Math.round(set.a||192e3),audioRate:ps().ar};

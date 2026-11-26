@@ -47,7 +47,7 @@ export function sync(t,play){var want={};
 /* 1フレームを描く：V1 から上へ重ねる。見本の素材は色の画面に名前を出す */
 export function drawFrame(cx,W,H,t){cx.fillStyle='#000';cx.fillRect(0,0,W,H);
   vTracks().slice().reverse().forEach(function(tr){if(tr.hide)return;P.clips.forEach(function(c){if(c.tr!==tr.id||t<c.start-1e-9||t>=cEnd(c))return;
-    if(c.type==='title')drawTitle(cx,W,H,{label:c.label,st:c.st,sz:c.sz,look:c.look,t:c.start-c.in,d:Math.max(0.1,c.out)},t);
+    if(c.type==='title')drawTitleClip(cx,W,H,c,t);
     else if(c.type==='adj')adjust(cx,W,H);else drawClip(cx,W,H,c);});});}
 export function adjust(cx,W,H){try{var tmp=adjust.c||(adjust.c=document.createElement('canvas'));tmp.width=W;tmp.height=H;tmp.getContext('2d').drawImage(cx.canvas,0,0);cx.filter='saturate(1.08) contrast(1.04)';cx.drawImage(tmp,0,0);cx.filter='none';}catch(e){}}
 export function drawClip(cx,W,H,c){var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='映像'&&m.k!=='画像')return;
@@ -60,7 +60,13 @@ export function drawClip(cx,W,H,c){var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='
   cx.restore();}
 /* テロップ：name=店名（画面下・白文字縁取り） q=質問（画面上・黄色帯） sub=字幕（下中央・半透明帯） credit=クレジット（下から上へ流れる） */
 export var TST;
-export function drawTitle(cx,W,H,ti,t){var sz={'小':.042,'中':.055,'大':.075}[ti.sz||'中']||.055,fs=Math.round(H*sz),lines=String(ti.label||'').split('\n'),lh=fs*1.35,pad=fs*.6;
+/* テロップのクリップを描く：位置・拡大率・回転・不透明度は、動画のクリップと同じく画面の中心を基準にする */
+export function titleInfo(c){return {label:c.label,st:c.st,sz:c.sz,fsz:c.fsz,look:c.look,t:c.start-c.in,d:Math.max(0.1,c.out)};}
+export function drawTitleClip(cx,W,H,c,t){var sc=(c.scale==null?100:c.scale)/100,op=c.op==null?1:Math.max(0,Math.min(1,c.op/100));
+  cx.save();cx.globalAlpha*=op;cx.translate(W/2+(c.x||0)/100*W,H/2+(c.y||0)/100*H);cx.rotate((c.rot||0)*Math.PI/180);cx.scale(sc,sc);cx.translate(-W/2,-H/2);
+  drawTitle(cx,W,H,titleInfo(c),t);cx.restore();}
+/* 文字の大きさ：fsz（1080p の画面での px）。なければ前の「小・中・大」 */
+export function drawTitle(cx,W,H,ti,t){var sz={'小':.042,'中':.055,'大':.075}[ti.sz||'中']||.055,fs=ti.fsz?Math.max(4,Math.round(H*ti.fsz/1080)):Math.round(H*sz),lines=String(ti.label||'').split('\n'),lh=fs*1.35,pad=fs*.6;
   cx.font='700 '+fs+'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';cx.textBaseline='middle';cx.lineJoin='round';
   var lk=ti.look; /* テロップのスタイル（titleStyles.ts）。あれば文字をそのスタイルで描く */
   var tw=Math.max.apply(null,lines.map(function(l){return cx.measureText(l).width;}).concat([0])),bh=lh*lines.length;
