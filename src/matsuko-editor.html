@@ -232,8 +232,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--ac);width:14px;height:
 .card:hover{border-color:var(--bdh)}
 .card b{display:block;font-weight:500}
 .card span{display:block;color:var(--mu);margin-top:2px}
-.asg{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px 14px}
-.asg .tb{height:58px;display:flex;align-items:flex-end;justify-content:space-between;padding:4px 8px;color:#e6eef8;border-radius:4px;font-weight:500}
+/* 素材のサムネイル：パネルを広げると列が増える（1つの幅は 96px 以上）。サムネイルは 16:9 のまま */
+.asg{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;padding:0 14px 14px}
+.asg .tb{height:auto;aspect-ratio:16/9;display:flex;align-items:flex-end;justify-content:space-between;padding:4px 8px;color:#e6eef8;border-radius:4px;font-weight:500}
 
 /* オーディオ */
 .mx{display:flex;justify-content:space-around;padding:12px 8px}
