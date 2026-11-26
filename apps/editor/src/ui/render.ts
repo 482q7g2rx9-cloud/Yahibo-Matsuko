@@ -17,7 +17,7 @@ import { closeMenu } from './menus';
    ================================================================ */
 export var lastPage;
 export function head(){var m=D.meta[S.page];
-  document.getElementById('top').innerHTML='<span class="logo">Matsuko Editor</span>'+(m.bare?'':'<span class="mu">/</span><span style="font-weight:500">'+h(P.sample?D.title:projName()||'新規プロジェクト')+'</span>'+(m.badge&&P.sample?'<span class="badge">'+m.badge+'</span>':'')+
+  document.getElementById('top').innerHTML='<span class="logo">Matsuko Editor</span>'+(m.bare?'':'<span class="mu">/</span><span style="font-weight:500">'+h(P.sample?D.title:projName()||'新規プロジェクト')+'</span>'+
     '<span class="grow"></span>'+(P.sample?'<span class="mu">'+m.role+'</span>':'')+'<span class="t-ok" data-saved>'+(S.savedAt?'● 自動保存済み '+S.savedAt:HOST?(projName()?'● 自動保存':P.sample?'見本（保存されません）':'● 素材を読み込むと自動保存'):'● このブラウザに自動保存')+'</span>'+
     (m.people&&P.sample?'<span class="av" aria-label="作業中のメンバー">'+D.people.map(function(p){return '<span style="background:'+p[1]+';color:'+p[2]+'">'+p[0]+'</span>';}).join('')+'</span>':''));}
 export function nav(){document.getElementById('pages').innerHTML=D.pages.map(function(p){return '<button'+A('go',p[0])+(S.page===p[0]?' aria-current="page"':'')+'>'+p[1]+'</button>';}).join('');}

@@ -80,7 +80,7 @@ D={
   opts:{res:['3840×2160','1920×1080','1280×720','1080×1920'],fps:['24 fps','29.97 fps','30 fps','60 fps'],br:['約 16 Mbps','約 12 Mbps','約 8 Mbps','約 4 Mbps'],au:['320 kbps','192 kbps','128 kbps'],range:['シーケンス全体','イン点〜アウト点']},
   pages:[['media','メディア'],['script','台本'],['cut','カット'],['edit','編集'],['fx','エフェクト'],['audio','オーディオ'],['export','出力']],
   meta:{media:{role:'素材担当：鈴木'},script:{bare:1},cut:{role:'編集担当：佐藤'},
-        edit:{role:'タイムライン編集中：佐藤（編集担当）',badge:'プロキシ編集中',people:1},
+        edit:{role:'タイムライン編集中：佐藤（編集担当）',people:1},
         fx:{role:'編集担当：佐藤'},audio:{role:'録音担当：山田（音声担当）'},export:{role:'編集担当：佐藤'}}
 };
 D.media.forEach(function(m){m.sample=1;});

@@ -68,7 +68,6 @@ body.fit{overflow:hidden}
 /* ヘッダー */
 #top{height:44px;flex:none;display:flex;align-items:center;gap:16px;padding:0 20px;background:var(--bg1);border-bottom:1px solid var(--ln);white-space:nowrap}
 #top .logo{font-size:15px;color:var(--ac);font-weight:600;letter-spacing:.01em}
-#top .badge{padding:3px 10px;border-radius:4px;background:var(--sel);color:var(--lb);font-weight:500}
 .av{display:flex}.av span{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:11px;box-shadow:0 0 0 2px var(--bg1)}.av span+span{margin-left:-6px}
 
 /* メニューバー */
