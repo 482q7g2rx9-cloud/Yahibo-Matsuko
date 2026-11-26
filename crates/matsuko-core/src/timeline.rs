@@ -19,7 +19,10 @@ pub fn audible(p: &Project, t: &Track) -> bool {
     if t.mute {
         return false;
     }
-    let any_solo = p.tracks.iter().any(|x| x.kind == TrackKind::Audio && x.solo);
+    let any_solo = p
+        .tracks
+        .iter()
+        .any(|x| x.kind == TrackKind::Audio && x.solo);
     !any_solo || t.solo
 }
 
@@ -38,7 +41,10 @@ pub fn audible_at(p: &Project, t: f64) -> Vec<&Clip> {
     p.clips
         .iter()
         .filter(|c| c.covers(t))
-        .filter(|c| p.track(&c.tr).is_some_and(|tr| tr.kind == TrackKind::Audio && audible(p, tr)))
+        .filter(|c| {
+            p.track(&c.tr)
+                .is_some_and(|tr| tr.kind == TrackKind::Audio && audible(p, tr))
+        })
         .collect()
 }
 

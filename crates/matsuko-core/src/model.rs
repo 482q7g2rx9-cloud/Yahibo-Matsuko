@@ -92,6 +92,11 @@ pub struct Media {
     /// 映像の素材に音声がないとき 1
     #[serde(rename = "noAudio")]
     pub no_audio: u8,
+    /// デスクトップ版：素材ファイルのフルパスと、プロジェクトフォルダーからの相対パス（`/` 区切り）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rel: Option<String>,
 }
 
 /// クリップの種類

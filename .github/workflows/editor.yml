@@ -123,6 +123,11 @@ jobs:
         working-directory: apps/editor
         run: npx tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
 
+      # Rust 側（Tauri）の単体テスト。画面のビルド（dist）が要るので、アプリのビルドの後に Linux だけで行う
+      - name: デスクトップ側のテスト
+        if: runner.os == 'Linux'
+        run: cargo test -p matsuko-editor --locked
+
       - name: インストーラーを保存する
         uses: actions/upload-artifact@v4
         with:

@@ -134,6 +134,12 @@ Yahibo-Matsuko/
 - M0 → M1 → M2 → M3 を先に進め、「読み込み → カット → 書き出し」をデスクトップ版で動かすことを最初の区切りにする。
 - M4 は、台本アプリ側の書き出し（link.json）の仕様が固まってから始める。
 
+進み具合：
+- M0：済み（3つの OS のビルドが CI で通る）。
+- M1：実装済み。プロジェクトフォルダー（`project.json` と `cache/`）、読み込み、ffprobe の解析、サムネイル・波形・プロキシの作業キュー、リンクし直しを作った。
+  - 変更履歴の SQLite は、M2 の「変更履歴からの復元」と一緒に作る。
+  - 画面の中のドラッグは、Windows で HTML のドラッグ＆ドロップが使えなくなる問題を避けるため、マウス操作で作り直した。
+
 ## 6. テストの方針
 
 - **Rust（`matsuko-core`）**
@@ -156,6 +162,7 @@ Yahibo-Matsuko/
 2. **WebView の違い**
    - Windows は WebView2（Chromium 系）、macOS は WKWebView（Safari 系）、Linux は WebKitGTK（GStreamer で再生）。
    - プロキシを H.264 / AAC の MP4 にそろえれば、どれでも再生できる見込み。Linux は GStreamer のプラグインの有無に左右されるので、M0 で確認する。
+   - M1 で確認：Linux の WebKitGTK は、`asset:` の動画・音声を再生できない（fetch では読める）。Linux だけ、アプリの中の小さなサーバー（127.0.0.1、起動ごとの合言葉つき）から渡す。H.264 の再生には `gstreamer1.0-libav` が要るので、deb の依存に入れた。AppImage は、GPL でビルドされたライブラリを同梱しないよう、GStreamer を同梱しない（PC に入っているものを使う）。
 3. **対象の OS の優先順位**
    - 学校の PC は Windows が多いと考え、Windows を最優先、次に macOS とする案。
    - Chromebook では Tauri が動かないため、ブラウザ版も残すかを決める必要がある（決めること 3）。
