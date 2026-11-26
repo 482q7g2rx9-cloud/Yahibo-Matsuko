@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { historyReset } from './history';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
 import { P, setP } from './project';
@@ -34,8 +35,8 @@ export function applyDesign(){var r=S.theme==='system'?(mq.matches?'light':'dark
 export function toast(m){var t=document.getElementById('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(function(){t.hidden=true;},2600);}
 /* 確認ダイアログ（confirm() は使えないため画面内に出す） */
 export function ask(title,msg,ok,fn){var d=document.getElementById('dlg');d.innerHTML='<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT"><h2 id="dlgT">'+h(title)+'</h2><p>'+h(msg)+'</p><div class="row" style="gap:8px;justify-content:flex-end">'+btn('キャンセル','dlgNo','','sec')+btn(ok,'dlgOk','','pri')+'</div></div>';d.hidden=false;ask.fn=fn;d.querySelector('[data-a="dlgOk"]').focus();}
-export function resetProject(np){stopAll();Object.keys(E.els).forEach(dropEl);E.imgs={};
-  if(HOST){HOST.media.cancel(P.media.map(function(m){return m.id;}));setJOBS({});}else{P.media.forEach(function(m){if(m.url)URL.revokeObjectURL(m.url);});IDB.clear('files');}setP(np);setHIST([]);setREDO([]);S.media=np.media[0]?np.media[0].id:null;S.src=np.sample?'v03':null;S.sel=np.sample?['c3','c3a']:[];S.t.edit=0;S.t.cut=0;S.bin='all';S.pps=null;S.tlx=S.tly=0;SRC.id=null;SRC.el=null;saveP();draw();}
+export function resetProject(np){historyReset();stopAll();Object.keys(E.els).forEach(dropEl);E.imgs={};
+  if(HOST){HOST.media.cancel(P.media.map(function(m){return m.id;}));setJOBS({});}else{P.media.forEach(function(m){if(m.url)URL.revokeObjectURL(m.url);});IDB.clear('files');IDB.clear('history');}setP(np);setHIST([]);setREDO([]);S.media=np.media[0]?np.media[0].id:null;S.src=np.sample?'v03':null;S.sel=np.sample?['c3','c3a']:[];S.t.edit=0;S.t.cut=0;S.bin='all';S.pps=null;S.tlx=S.tly=0;SRC.id=null;SRC.el=null;saveP();draw();}
 export function infoDlg(title,html){var d=document.getElementById('dlg');d.innerHTML='<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT" style="width:560px"><h2 id="dlgT">'+h(title)+'</h2><div style="max-height:60vh;overflow:auto">'+html+'</div><div class="row" style="justify-content:flex-end;margin-top:14px">'+btn('閉じる','dlgNo','','pri')+'</div></div>';d.hidden=false;d.querySelector('[data-a="dlgNo"]').focus();}
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
@@ -43,7 +44,7 @@ export function init(){
 MENUS=[{n:'ファイル',i:'file'},
   {n:'編集',i:[['元に戻す','undo','Ctrl+Z'],['やり直し','redo','Ctrl+Y'],'-',['切り取り','cut2','Ctrl+X'],['コピー','copy','Ctrl+C'],['貼り付け','paste','Ctrl+V'],['複製','dup','Ctrl+D'],'-',['再生ヘッドで分割','split','S'],['削除','delSel','Delete'],['削除して詰める','rdel','Shift+Delete'],'-',['すべて選択','selAll','Ctrl+A'],['リンク／リンク解除','lnk','Ctrl+L'],'-',['映像トラックを追加','addV'],['音声トラックを追加','addA']]},
   {n:'表示',i:'view'},
-  {n:'プロジェクト',i:[['プロジェクト設定…'],['メンバーと権限…'],['変更履歴・復元…'],'-',['台本アプリと紐づけ…','go:script']]},
+  {n:'プロジェクト',i:[['プロジェクト設定…'],['メンバーと権限…'],['変更履歴・復元…','hist'],'-',['台本アプリと紐づけ…','go:script']]},
   {n:'ヘルプ',i:[['使い方','help'],['キーボードショートカット…','keys'],['バージョン情報','about']]}];
 mbOpen=null;
 mq=matchMedia('(prefers-color-scheme: light)');

@@ -398,6 +398,13 @@ body.dragging,body.dragging *{cursor:grabbing!important}
 .dragf{position:absolute;z-index:60;pointer-events:none;max-width:220px;padding:5px 10px;border-radius:4px;background:var(--bg1);border:1px solid var(--ac);box-shadow:0 4px 14px rgba(0,0,0,.25);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dragl{box-shadow:inset 3px 0 0 var(--ac)}.dragr{box-shadow:inset -3px 0 0 var(--ac)}
 
+/* 変更履歴・復元 */
+.dlg.hist{width:640px}
+.hlist{max-height:min(52vh,420px);overflow:auto;border:1px solid var(--dv);border-radius:4px;background:var(--bg1)}
+.hsnap{display:grid;grid-template-columns:92px 86px 1fr auto;gap:12px;align-items:center;min-height:44px;padding:0 12px 0 16px;border-bottom:1px solid var(--dv);font-variant-numeric:tabular-nums}
+.hsnap:last-child{border-bottom:0}
+.hsnap .chip{justify-self:start}
+
 </style>
 <div id="app">
 <header id="top"></header>
@@ -2723,6 +2730,12 @@ function init$f() {
       S.capture = null;
       if (S.page === "edit") draw();
     },
+    hist: function() {
+      openHistory();
+    },
+    hRestore: function(v) {
+      restoreHistory(v);
+    },
     todo: function() {
       toast("この機能は、まだ使えません");
     }
@@ -3024,6 +3037,7 @@ function ask(title, msg, ok, fn) {
   d.querySelector('[data-a="dlgOk"]').focus();
 }
 function resetProject(np) {
+  historyReset();
   stopAll();
   Object.keys(E.els).forEach(dropEl);
   E.imgs = {};
@@ -3037,6 +3051,7 @@ function resetProject(np) {
       if (m.url) URL.revokeObjectURL(m.url);
     });
     IDB.clear("files");
+    IDB.clear("history");
   }
   setP(np);
   setHIST([]);
@@ -3065,7 +3080,7 @@ function init$d() {
     { n: "ファイル", i: "file" },
     { n: "編集", i: [["元に戻す", "undo", "Ctrl+Z"], ["やり直し", "redo", "Ctrl+Y"], "-", ["切り取り", "cut2", "Ctrl+X"], ["コピー", "copy", "Ctrl+C"], ["貼り付け", "paste", "Ctrl+V"], ["複製", "dup", "Ctrl+D"], "-", ["再生ヘッドで分割", "split", "S"], ["削除", "delSel", "Delete"], ["削除して詰める", "rdel", "Shift+Delete"], "-", ["すべて選択", "selAll", "Ctrl+A"], ["リンク／リンク解除", "lnk", "Ctrl+L"], "-", ["映像トラックを追加", "addV"], ["音声トラックを追加", "addA"]] },
     { n: "表示", i: "view" },
-    { n: "プロジェクト", i: [["プロジェクト設定…"], ["メンバーと権限…"], ["変更履歴・復元…"], "-", ["台本アプリと紐づけ…", "go:script"]] },
+    { n: "プロジェクト", i: [["プロジェクト設定…"], ["メンバーと権限…"], ["変更履歴・復元…", "hist"], "-", ["台本アプリと紐づけ…", "go:script"]] },
     { n: "ヘルプ", i: [["使い方", "help"], ["キーボードショートカット…", "keys"], ["バージョン情報", "about"]] }
   ];
   mbOpen = null;
@@ -3287,7 +3302,7 @@ function init$c() {
 var lastPage;
 function head() {
   var m = D.meta[S.page];
-  document.getElementById("top").innerHTML = '<span class="logo">Matsuko Editor</span>' + (m.bare ? "" : '<span class="mu">/</span><span style="font-weight:500">' + h(P.sample ? D.title : projName() || "新規プロジェクト") + "</span>" + (m.badge && P.sample ? '<span class="badge">' + m.badge + "</span>" : "") + '<span class="grow"></span>' + (P.sample ? '<span class="mu">' + m.role + "</span>" : "") + '<span class="t-ok" data-saved>' + (S.savedAt ? "● 自動保存済み " + S.savedAt : HOST ? projName() ? "● 自動保存" : P.sample ? "見本（保存されません）" : "● 素材を読み込むと自動保存" : "● このブラウザに自動保存") + '</span><button class="hb"' + A("todo") + ">履歴・復元</button>" + (m.people && P.sample ? '<span class="av" aria-label="作業中のメンバー">' + D.people.map(function(p) {
+  document.getElementById("top").innerHTML = '<span class="logo">Matsuko Editor</span>' + (m.bare ? "" : '<span class="mu">/</span><span style="font-weight:500">' + h(P.sample ? D.title : projName() || "新規プロジェクト") + "</span>" + (m.badge && P.sample ? '<span class="badge">' + m.badge + "</span>" : "") + '<span class="grow"></span>' + (P.sample ? '<span class="mu">' + m.role + "</span>" : "") + '<span class="t-ok" data-saved>' + (S.savedAt ? "● 自動保存済み " + S.savedAt : HOST ? projName() ? "● 自動保存" : P.sample ? "見本（保存されません）" : "● 素材を読み込むと自動保存" : "● このブラウザに自動保存") + '</span><button class="hb"' + A("hist") + ">履歴・復元</button>" + (m.people && P.sample ? '<span class="av" aria-label="作業中のメンバー">' + D.people.map(function(p) {
     return '<span style="background:' + p[1] + ";color:" + p[2] + '">' + p[0] + "</span>";
   }).join("") + "</span>" : ""));
 }
@@ -3351,6 +3366,7 @@ function init$b() {
 var IDB;
 var saveTimer;
 function saveP() {
+  historyTick();
   clearTimeout(saveTimer);
   if (HOST) {
     if (HOST.project.current) saveTimer = setTimeout(saveNow, 300);
@@ -3431,10 +3447,14 @@ function init$a() {
     open: function() {
       return new Promise(function(res) {
         try {
-          var r = indexedDB.open("matsuko-editor", 1);
+          var r = indexedDB.open("matsuko-editor", 2);
           r.onupgradeneeded = function() {
-            r.result.createObjectStore("files");
-            r.result.createObjectStore("kv");
+            var db = r.result, has = function(n) {
+              return db.objectStoreNames.contains(n);
+            };
+            if (!has("files")) db.createObjectStore("files");
+            if (!has("kv")) db.createObjectStore("kv");
+            if (!has("history")) db.createObjectStore("history", { keyPath: "id", autoIncrement: true });
           };
           r.onsuccess = function() {
             IDB.db = r.result;
@@ -3448,11 +3468,11 @@ function init$a() {
         }
       });
     },
-    op: function(store, mode, fn) {
+    op: function(store2, mode, fn) {
       return new Promise(function(res) {
         if (!IDB.db) return res(null);
         try {
-          var tx = IDB.db.transaction(store, mode), st = tx.objectStore(store), rq = fn(st);
+          var tx = IDB.db.transaction(store2, mode), st = tx.objectStore(store2), rq = fn(st);
           tx.oncomplete = function() {
             res(rq && rq.result !== void 0 ? rq.result : true);
           };
@@ -3489,6 +3509,158 @@ function init$a() {
   HIST = [];
   REDO = [];
 }
+const SNAPSHOT_INTERVAL = 2 * 60 * 1e3;
+const SNAPSHOT_KEEP = 100;
+const KIND_LABEL = { auto: "自動", open: "開いたとき", restore: "復元する前" };
+const SNAP_MEDIA_KEYS = ["id", "n", "k", "d", "c", "r", "f", "inP", "outP", "marks", "rate", "sample", "file"];
+function slimForSnapshot(p) {
+  const media = p.media.map((m) => {
+    const o = {};
+    for (const k of SNAP_MEDIA_KEYS) if (m[k] !== void 0) o[k] = m[k];
+    return o;
+  });
+  return JSON.parse(JSON.stringify({ v: 2, sample: p.sample, media, tracks: p.tracks, clips: p.clips, pin: p.pin, pout: p.pout }));
+}
+const mmss$1 = (s) => {
+  s = Math.round(s || 0);
+  return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + s % 60;
+};
+function summarize(p) {
+  const len = p.clips.reduce((a, c) => Math.max(a, cEnd$1(c)), 0);
+  return `クリップ ${p.clips.length}・長さ ${mmss$1(len)}・素材 ${p.media.filter((m) => !m.sample).length}`;
+}
+function dueForSnapshot(lastAt2, now, interval = SNAPSHOT_INTERVAL) {
+  return lastAt2 == null || now - lastAt2 >= interval;
+}
+function sameContent(a, b) {
+  if (!a) return false;
+  return JSON.stringify(a.clips) === JSON.stringify(b.clips) && JSON.stringify(a.tracks) === JSON.stringify(b.tracks) && JSON.stringify(a.media.map((m) => [m.id, m.inP, m.outP, m.r, m.marks])) === JSON.stringify(b.media.map((m) => [m.id, m.inP, m.outP, m.r, m.marks])) && a.pin === b.pin && a.pout === b.pout;
+}
+function toPrune(list, keep = SNAPSHOT_KEEP) {
+  return list.slice().sort((a, b) => b.at - a.at || b.id - a.id).slice(keep).map((s) => s.id);
+}
+function restoreFrom(cur, snap2) {
+  const now = new Map(cur.media.map((m) => [m.id, m]));
+  const media = cur.media.map((m) => {
+    const old = snap2.media.find((x) => x.id === m.id);
+    if (!old) return m;
+    return { ...m, inP: old.inP, outP: old.outP, r: old.r, marks: old.marks, rate: old.rate };
+  });
+  const clips = snap2.clips.filter((c) => c.type !== "media" || c.m != null && now.has(c.m));
+  return {
+    project: { ...cur, media, tracks: JSON.parse(JSON.stringify(snap2.tracks)), clips: JSON.parse(JSON.stringify(clips)), pin: snap2.pin, pout: snap2.pout },
+    dropped: snap2.clips.length - clips.length
+  };
+}
+function formatTime(at, today = Date.now()) {
+  const d = new Date(at), t = new Date(today);
+  const hm2 = (d.getHours() < 10 ? "0" : "") + d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes();
+  const same = d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+  return same ? "今日 " + hm2 : d.getMonth() + 1 + "/" + d.getDate() + " " + hm2;
+}
+var last = null, lastAt = null;
+var store = {
+  add: function(at, kind, summary, data) {
+    if (HOST) return HOST.history.add(at, kind, summary, data);
+    return IDB.op("history", "readwrite", function(st) {
+      return st.add({ at, kind, summary, data });
+    });
+  },
+  list: function() {
+    if (HOST) return HOST.history.list();
+    return IDB.op("history", "readonly", function(st) {
+      return st.getAll();
+    }).then(function(all) {
+      return (all || []).map(function(r) {
+        return { id: r.id, at: r.at, kind: r.kind, summary: r.summary };
+      }).sort(function(a, b) {
+        return b.at - a.at || b.id - a.id;
+      });
+    });
+  },
+  get: function(id) {
+    if (HOST) return HOST.history.get(id);
+    return IDB.op("history", "readonly", function(st) {
+      return st.get(id);
+    }).then(function(r) {
+      return r ? r.data : null;
+    });
+  },
+  del: function(ids) {
+    if (!ids.length) return Promise.resolve();
+    if (HOST) return HOST.history.del(ids);
+    return IDB.op("history", "readwrite", function(st) {
+      ids.forEach(function(id) {
+        st.delete(id);
+      });
+      return null;
+    });
+  }
+};
+function ready() {
+  return HOST ? !!HOST.project.current : !!(IDB && IDB.db);
+}
+function historyReset() {
+  last = null;
+  lastAt = null;
+}
+function historyTick(kind) {
+  kind = kind || "auto";
+  if (!ready()) return Promise.resolve(null);
+  var now = Date.now();
+  if (kind === "auto" && !dueForSnapshot(lastAt, now)) return Promise.resolve(null);
+  var s = slimForSnapshot(P);
+  if (kind !== "restore" && sameContent(last, s)) return Promise.resolve(null);
+  last = s;
+  lastAt = now;
+  return Promise.resolve(store.add(now, kind, summarize(P), s)).then(function(id) {
+    return store.list().then(function(L) {
+      return store.del(toPrune(L));
+    }).then(function() {
+      return id;
+    });
+  }).catch(function() {
+    return null;
+  });
+}
+function openHistory() {
+  if (!ready()) return toast(HOST ? "プロジェクトを開くと、変更履歴が残るようになります" : "このブラウザでは変更履歴を使えません");
+  var d = document.getElementById("dlg");
+  d.innerHTML = '<div class="dlg hist" role="dialog" aria-modal="true" aria-labelledby="dlgT"><h2 id="dlgT">変更履歴・復元</h2><p class="mu">編集しているあいだ、2分ごとにプロジェクトの写しを残しています（新しい順に100件）。戻したい時点の「復元」を押してください。復元したあとも、Ctrl+Z で元に戻せます。</p><div class="hlist" data-hlist><div class="mu" style="padding:16px">読み込んでいます…</div></div><div class="row" style="justify-content:flex-end;margin-top:16px">' + btn("閉じる", "dlgNo", "", "pri") + "</div></div>";
+  d.hidden = false;
+  d.querySelector('[data-a="dlgNo"]').focus();
+  Promise.resolve(store.list()).then(function(L) {
+    var box = d.querySelector("[data-hlist]");
+    if (!box) return;
+    box.innerHTML = L.length ? L.map(function(r) {
+      return '<div class="hsnap"><span>' + h(formatTime(r.at)) + '</span><span class="chip ' + (r.kind === "auto" ? "c-mu" : "c-in") + '">' + h(KIND_LABEL[r.kind] || r.kind) + '</span><span class="t2">' + h(r.summary) + "</span>" + btn("復元", "hRestore", r.id + "|" + r.at, "s") + "</div>";
+    }).join("") : '<div class="mu" style="padding:16px">まだ履歴がありません。編集すると、2分ごとに残ります。</div>';
+  }).catch(function(e) {
+    var box = d.querySelector("[data-hlist]");
+    if (box) box.innerHTML = '<div class="t-wn" style="padding:16px">変更履歴を読み込めませんでした：' + h(String(e)) + "</div>";
+  });
+}
+function restoreHistory(v) {
+  var p = String(v).split("|"), id = +p[0], at = +p[1];
+  ask("この時点に戻す", "「" + formatTime(at) + "」の状態に戻します。いまの状態は「復元する前」として履歴に残り、Ctrl+Z でも元に戻せます。", "復元", function() {
+    Promise.resolve(store.get(id)).then(function(snap2) {
+      if (!snap2) return toast("その履歴は見つかりませんでした");
+      return historyTick("restore").then(function() {
+        mark();
+        var r = restoreFrom(P, snap2);
+        Object.keys(E.els).forEach(dropEl);
+        setP(r.project);
+        S.sel = [];
+        last = slimForSnapshot(P);
+        lastAt = Date.now();
+        changed();
+        toast(r.dropped ? "復元しました（いまはない素材のクリップ " + r.dropped + "件は戻せませんでした）" : "「" + formatTime(at) + "」の状態に復元しました");
+      });
+    }).catch(function(e) {
+      toast("復元できませんでした：" + e);
+    });
+  });
+}
 var HOST;
 var JOBS;
 var RECENT;
@@ -3505,6 +3677,8 @@ function ensureProject() {
   if (HOST.project.current) return Promise.resolve(HOST.project.current);
   if (P.sample) resetProject(emptyProject());
   return HOST.project.create("無題のプロジェクト", null, forDisk()).then(function(o) {
+    historyReset();
+    historyTick("open");
     S.savedAt = hm();
     head();
     refreshRecent();
@@ -3567,6 +3741,8 @@ function loadOpened(o) {
   S.savedAt = null;
   refreshRecent();
   draw();
+  historyReset();
+  historyTick("open");
   if (o.missing && o.missing.length) toast(o.missing.length + "件の素材ファイルが見つかりません。メディアで「リンクし直す」を押してください");
   P.media.forEach(function(m) {
     queueJobs(m);
@@ -5314,6 +5490,8 @@ function init() {
         clampProg();
         S.savedAt = null;
         draw();
+        historyReset();
+        historyTick("open");
       });
     });
   });

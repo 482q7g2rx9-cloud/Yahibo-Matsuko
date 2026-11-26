@@ -393,3 +393,10 @@ b,strong,h1,h2,h3,th{font-weight:500}
 body.dragging,body.dragging *{cursor:grabbing!important}
 .dragf{position:absolute;z-index:60;pointer-events:none;max-width:220px;padding:5px 10px;border-radius:4px;background:var(--bg1);border:1px solid var(--ac);box-shadow:0 4px 14px rgba(0,0,0,.25);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dragl{box-shadow:inset 3px 0 0 var(--ac)}.dragr{box-shadow:inset -3px 0 0 var(--ac)}
+
+/* 変更履歴・復元 */
+.dlg.hist{width:640px}
+.hlist{max-height:min(52vh,420px);overflow:auto;border:1px solid var(--dv);border-radius:4px;background:var(--bg1)}
+.hsnap{display:grid;grid-template-columns:92px 86px 1fr auto;gap:12px;align-items:center;min-height:44px;padding:0 12px 0 16px;border-bottom:1px solid var(--dv);font-variant-numeric:tabular-nums}
+.hsnap:last-child{border-bottom:0}
+.hsnap .chip{justify-self:start}

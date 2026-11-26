@@ -108,7 +108,7 @@ await key('Escape');
 // 7. 保存した内容（IndexedDB）
 await p.waitForTimeout(800);
 const saved = await p.evaluate(() => new Promise((res) => {
-  const r = indexedDB.open('matsuko-editor', 1);
+  const r = indexedDB.open('matsuko-editor');
   r.onsuccess = () => {
     const g = r.result.transaction('kv').objectStore('kv').get('project');
     g.onsuccess = () => {

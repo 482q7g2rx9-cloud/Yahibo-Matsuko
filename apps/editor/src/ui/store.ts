@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { historyTick } from './history';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { C, M, P } from './project';
 import { S } from './state';
@@ -13,7 +14,7 @@ import { toast } from './menus';
    ================================================================ */
 export var IDB;
 export var saveTimer;
-export function saveP(){clearTimeout(saveTimer);if(HOST){if(HOST.project.current)saveTimer=setTimeout(saveNow,300);return;}saveTimer=setTimeout(function(){
+export function saveP(){historyTick();clearTimeout(saveTimer);if(HOST){if(HOST.project.current)saveTimer=setTimeout(saveNow,300);return;}saveTimer=setTimeout(function(){
   var o=JSON.parse(JSON.stringify(P,function(k,v){return k==='url'||k==='loading'?undefined:v;}));
   IDB.put('kv','project',o).then(function(ok){if(ok){S.savedAt=hm();var e=document.querySelector('[data-saved]');if(e)e.textContent='● 自動保存済み '+S.savedAt;}});},400);}
 
@@ -32,7 +33,7 @@ export function setREDO(v){REDO=v;}
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
 IDB={db:null,
-  open:function(){return new Promise(function(res){try{var r=indexedDB.open('matsuko-editor',1);r.onupgradeneeded=function(){r.result.createObjectStore('files');r.result.createObjectStore('kv');};r.onsuccess=function(){IDB.db=r.result;res(true);};r.onerror=function(){res(false);};}catch(e){res(false);}});},
+  open:function(){return new Promise(function(res){try{var r=indexedDB.open('matsuko-editor',2);r.onupgradeneeded=function(){var db=r.result,has=function(n){return db.objectStoreNames.contains(n);};if(!has('files'))db.createObjectStore('files');if(!has('kv'))db.createObjectStore('kv');if(!has('history'))db.createObjectStore('history',{keyPath:'id',autoIncrement:true});};r.onsuccess=function(){IDB.db=r.result;res(true);};r.onerror=function(){res(false);};}catch(e){res(false);}});},
   op:function(store,mode,fn){return new Promise(function(res){if(!IDB.db)return res(null);try{var tx=IDB.db.transaction(store,mode),st=tx.objectStore(store),rq=fn(st);tx.oncomplete=function(){res(rq&&rq.result!==undefined?rq.result:true);};tx.onerror=tx.onabort=function(){res(null);};}catch(e){res(null);}});},
   get:function(s,k){return IDB.op(s,'readonly',function(st){return st.get(k);});},
   put:function(s,k,v){return IDB.op(s,'readwrite',function(st){return st.put(v,k);});},

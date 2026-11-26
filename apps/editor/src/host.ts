@@ -92,6 +92,13 @@ export interface Host {
     /** ファイルのパスを画面（video / img）から読める URL にする */
     url(path: string): string;
   };
+  /** 変更履歴（プロジェクトフォルダーの history.sqlite） */
+  history: {
+    add(at: number, kind: string, summary: string, project: unknown): Promise<number>;
+    list(): Promise<{ id: number; at: number; kind: string; summary: string }[]>;
+    get(id: number): Promise<unknown>;
+    del(ids: number[]): Promise<void>;
+  };
   /** 書き出したファイルを、ダイアログで選んだ場所に保存する。やめたら false */
   saveFile(name: string, ext: string, data: Blob): Promise<boolean>;
   /** OS からのドラッグ：入った・動いた・離れた・落とした */
@@ -132,6 +139,12 @@ const host: Host = {
     cancel: (ids) => invoke('media_cancel', { ids }),
     onJob: (fn) => listen<JobEvent>('media-job', (e) => fn(e.payload)),
     url: (path) => (mediaBase ? mediaBase + encodeURIComponent(path) : convertFileSrc(path)),
+  },
+  history: {
+    add: (at, kind, summary, project) => invoke('history_add', { at, kind, summary, project }),
+    list: () => invoke('history_list'),
+    get: (id) => invoke('history_get', { id }),
+    del: (ids) => invoke('history_delete', { ids }),
   },
   async saveFile(name, ext, data) {
     const path = await invoke<string | null>('save_pick', { name, ext });

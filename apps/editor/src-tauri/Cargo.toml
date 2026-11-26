@@ -22,3 +22,4 @@ matsuko-core = { path = "../../../crates/matsuko-core" }
 tauri-plugin-dialog = "2"
 base64 = "0.22"
 tokio = { version = "1", features = ["process", "io-util", "sync", "time", "macros", "rt", "net", "fs"] }
+rusqlite = { version = "0.32", features = ["bundled"] }

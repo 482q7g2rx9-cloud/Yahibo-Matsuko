@@ -13,6 +13,7 @@ Rust + Tauri 2 で作る、Matsuko Editor のデスクトップアプリです�
 ```
 書類/Matsuko Editor/商店街 特集/   ← 新規プロジェクトの既定の場所（ファイル → 新規プロジェクト で変えられる）
 ├─ project.json        プロジェクト本体（編集するたびに自動保存。1つ前の版は project.json.bak）
+├─ history.sqlite      変更履歴（2分ごとの写し。新しい順に100件。「履歴・復元」から戻せる）
 └─ cache/
    ├─ proxy/           プロキシ（高さ 720 以下の軽い動画。元の素材が重い・再生できない形式のときだけ作る）
    └─ thumb/           サムネイル
@@ -105,6 +106,14 @@ node tests/tour.mjs ../../src/matsuko-editor.html /tmp/tour-after.txt
 
 作り替える前の HTML でも同じように記録を取り、2つの記録を `diff` で比べます。
 
+変更履歴・復元は、時計を進めながら確かめます。
+
+```bash
+node tests/history.mjs ../../src/matsuko-editor.html
+```
+
+中心部分（`src/core/`）の単体テストは `npm test` です。
+
 ## 開発中の確かめ方
 
 - 開発版（`npm run tauri dev` や `tauri build --debug`）は、環境変数 `MATSUKO_DEVTOOLS=1` で起動すると開発者ツールが開きます。
@@ -120,6 +129,7 @@ apps/editor/
 │  ├─ main.ts            入り口（フォント・CSS・画面本体を読み込む）
 │  ├─ host.ts            画面から呼ぶデスクトップ版の機能（window.MatsukoHost）
 │  ├─ web.ts             ブラウザ版の入り口
+│  ├─ core/              中心部分（型つき・画面に依存しない）：プロジェクトの型、タイムラインの編集、無音の検出、変更履歴
 │  └─ ui/                画面本体（ブラウザ版と共通）。main.ts が入り口、pages/ が各ページ
 ├─ web.html              ブラウザ版の骨組み（npm run build:web）
 ├─ tests/                回帰テスト（tour.mjs）と、テスト用の素材を作るスクリプト
@@ -135,6 +145,7 @@ apps/editor/
       ├─ project.rs      プロジェクトフォルダー：新規・開く・自動保存・最近使ったもの
       ├─ media.rs        素材：ダイアログ・ドロップ・ffprobe・サムネイル／波形／プロキシの作業キュー
       ├─ files.rs        書き出したファイルの保存
+      ├─ history.rs      変更履歴（history.sqlite）
       ├─ server.rs       Linux 用：素材を画面へ渡すサーバー
       ├─ state.rs        開いているプロジェクト・使ってよいファイル・動いている作業
       └─ tools.rs        同梱の FFmpeg の起動

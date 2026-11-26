@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { historyReset, historyTick } from './history';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { C, M, P, emptyProject, migrate, setP, uid } from './project';
 import { S } from './state';
@@ -24,7 +25,7 @@ export function forDisk(){return JSON.parse(JSON.stringify(P,function(k,v){retur
 /* プロジェクトがまだなければ「無題のプロジェクト」を書類フォルダーに作る（素材を読み込んだときなど） */
 export function ensureProject(){if(!HOST)return Promise.resolve();if(HOST.project.current)return Promise.resolve(HOST.project.current);
   if(P.sample)resetProject(emptyProject());
-  return HOST.project.create('無題のプロジェクト',null,forDisk()).then(function(o){S.savedAt=hm();head();refreshRecent();toast('プロジェクト「'+o.name+'」を作りました（書類 › Matsuko Editor）');return o;});}
+  return HOST.project.create('無題のプロジェクト',null,forDisk()).then(function(o){historyReset();historyTick('open');S.savedAt=hm();head();refreshRecent();toast('プロジェクト「'+o.name+'」を作りました（書類 › Matsuko Editor）');return o;});}
 export function saveNow(){if(!HOST||!HOST.project.current)return Promise.resolve(false);clearTimeout(saveTimer);
   return HOST.project.save(forDisk()).then(function(){S.savedAt=hm();var e=document.querySelector('[data-saved]');if(e)e.textContent='● 自動保存済み '+S.savedAt;return true;}).catch(function(e){toast('保存できませんでした：'+e);return false;});}
 export function refreshRecent(){if(HOST)HOST.project.recent().then(function(r){RECENT=r||[];}).catch(function(){});}
@@ -34,7 +35,7 @@ export function mediaUrl(m){if(!HOST||!m.file)return null;if(m.proxyPath)return 
 export function loadOpened(o){stopAll();Object.keys(E.els).forEach(dropEl);E.imgs={};JOBS={};
   var np=migrate(o.project);np.media.forEach(function(m){if(!m.file)return;m.px=m.np?(m.proxyPath?1:0):-1;m.url=mediaUrl(m);});
   setP(np);setHIST([]);setREDO([]);S.media=P.media[0]?P.media[0].id:null;S.src=(P.media.filter(function(m){return m.k==='映像';})[0]||{}).id||null;S.sel=[];S.t.edit=0;S.t.cut=0;S.bin='all';S.pps=null;S.tlx=S.tly=0;SRC.id=null;SRC.el=null;
-  clampProg();S.savedAt=null;refreshRecent();draw();
+  clampProg();S.savedAt=null;refreshRecent();draw();historyReset();historyTick('open');
   if(o.missing&&o.missing.length)toast(o.missing.length+'件の素材ファイルが見つかりません。メディアで「リンクし直す」を押してください');
   P.media.forEach(function(m){queueJobs(m);});}
 /* 足りないもの（サムネイル・波形・プロキシ）を作ってもらう */

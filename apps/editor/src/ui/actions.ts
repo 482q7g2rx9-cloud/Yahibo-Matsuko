@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { openHistory, restoreHistory } from './history';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
 import { C, M, P, T, cEnd, cLen, emptyProject, isUsed, progDur, sampleProject } from './project';
@@ -106,6 +107,7 @@ ACT={
     else show([['版','ブラウザ版（試作）'],['動作環境',navigator.userAgent]]);},
   help:function(){toast('メディアで読み込み → カットでイン・アウトを決めて追加 → 編集で並べ替え・分割 → 出力で書き出し');},
   dlgOk:function(){document.getElementById('dlg').hidden=true;var f=ask.fn;ask.fn=null;if(f)f();},dlgNo:function(){document.getElementById('dlg').hidden=true;ask.fn=null;S.capture=null;if(S.page==='edit')draw();},
+  hist:function(){openHistory();},hRestore:function(v){restoreHistory(v);},
   todo:function(){toast('この機能は、まだ使えません');}
 };
 }
