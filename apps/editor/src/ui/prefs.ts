@@ -13,7 +13,7 @@ export function prefRow(label,ctl,note){return '<div class="prow"><div><div>'+la
 export function renderPrefs(){var d=document.getElementById('dlg'),t=S.ptab,body='';
   if(t==='general')body='<h3>一般</h3>'+
     prefRow('テーマ','<span class="seg">'+[['light','ライト'],['dark','ダーク'],['system','システムに合わせる']].map(function(x){return btn(x[1],'pTheme',x[0],'s'+(S.theme===x[0]?' on':''));}).join('')+'</span>')+
-    prefRow('表示の大きさ','<span class="seg">'+[[0.8,'小さめ'],[0.9,'やや小さめ'],[1,'標準'],[1.25,'大きめ']].map(function(x){return btn(x[1],'pUi',x[0],'s'+(PREF.ui===x[0]?' on':''));}).join('')+'</span>','文字や部品の大きさです。ウインドウを大きくすると、広くなった分だけ作業スペース（プレビューやタイムライン）が広がります。ウインドウが小さいときは、全体を縮小して収めます。')+
+    prefRow('表示サイズ','<span class="seg">'+[[1.25,'大'],[1,'デフォルト'],[0.85,'小']].map(function(x){return btn(x[1],'pUi',x[0],'s'+(PREF.ui===x[0]?' on':''));}).join('')+'</span>','文字や部品の大きさです（大 125%・デフォルト 100%・小 85%）。ウインドウを大きくすると、広くなった分だけ作業スペース（プレビューやタイムライン）が広がります。ウインドウが小さいときは、全体を縮小して収めます。')+
     prefRow('アクセントカラー','<span class="row" style="gap:8px">'+[['blue','青','#378ef0'],['green','緑','#2d9d78'],['orange','オレンジ','#e68619'],['purple','紫','#9256d9']].map(function(x){return '<button class="sw'+(S.accent===x[0]?' on':'')+'" aria-label="'+x[1]+'" aria-pressed="'+(S.accent===x[0])+'" title="'+x[1]+'"'+A('pAcc',x[0])+' style="background:'+x[2]+'"></button>';}).join('')+'</span>');
   else if(t==='timeline')body='<h3>タイムライン</h3>'+
     prefRow('スナップ','<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"'+(PREF.snap?' checked':'')+'>最初から入れておく</label>','クリップの端・再生ヘッド・イン点／アウト点に吸い付きます。編集中は '+(keyOf('snapT')||'—')+' キーで切り替えられます。')+
@@ -35,6 +35,6 @@ export function assignKey(id,c){KB.forEach(function(k){if(k[0]!==id){var i=KEYMA
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
 PREF={snap:true,follow:true,ui:1};
-try{var pf=JSON.parse(localStorage.getItem('matsuko.pref')||'{}');if(typeof pf.snap==='boolean')PREF.snap=pf.snap;if(typeof pf.follow==='boolean')PREF.follow=pf.follow;if([0.8,0.9,1,1.25].indexOf(pf.ui)>=0)PREF.ui=pf.ui;}catch(e){}
+try{var pf=JSON.parse(localStorage.getItem('matsuko.pref')||'{}');if(typeof pf.snap==='boolean')PREF.snap=pf.snap;if(typeof pf.follow==='boolean')PREF.follow=pf.follow;if([0.85,1,1.25].indexOf(pf.ui)>=0)PREF.ui=pf.ui;else if(pf.ui===0.8||pf.ui===0.9)PREF.ui=0.85; /* 前の「小さめ」「やや小さめ」は「小」にする */}catch(e){}
 S.snap=PREF.snap;
 }
