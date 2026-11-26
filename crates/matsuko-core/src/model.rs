@@ -97,6 +97,9 @@ pub struct Media {
     pub path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rel: Option<String>,
+    /// 表示用の色（ファイルのない見本の素材は、書き出しでこの色の画面になる）
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub col: Vec<String>,
 }
 
 /// クリップの種類

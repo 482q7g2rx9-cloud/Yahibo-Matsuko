@@ -23,6 +23,16 @@ Rust + Tauri 2 で作る、Matsuko Editor のデスクトップアプリです�
 - プロキシは Windows では Media Foundation（`h264_mf`）、macOS では VideoToolbox で作ります。どちらも使えないときは OpenH264、それもなければ VP9（WebM）で作ります。
 - 保存形式は beta までは `.json`（`project.json`）です。
 
+## 書き出し
+
+出力ページの「書き出し」で、FFmpeg を使って MP4（H.264 + AAC）か M4A（音声だけ）を作ります。書き出す場所は、始める前に選びます。
+
+- タイムラインを、クリップやテロップが切り替わるところで区間に分け、区間ごとに映像を作ってからつなげます。素材は必要な部分だけを読むので、長い 4K の素材から少しだけ使うときも速く書き出せます。
+- H.264 のエンコーダーは、macOS は VideoToolbox、Windows は Media Foundation、使えなければ OpenH264 を使います。
+- テロップは、画面のプレビューと同じ描き方で画像にして重ねます。
+- 中止はできますが、一時停止はありません。
+- 組み立てと実行は [crates/matsuko-core](../../crates/matsuko-core) の `export.rs`・`run.rs` です。
+
 ## 用意するもの
 
 | OS | 必要なもの |
@@ -144,7 +154,8 @@ apps/editor/
    └─ src/
       ├─ project.rs      プロジェクトフォルダー：新規・開く・自動保存・最近使ったもの
       ├─ media.rs        素材：ダイアログ・ドロップ・ffprobe・サムネイル／波形／プロキシの作業キュー
-      ├─ files.rs        書き出したファイルの保存
+      ├─ export.rs       書き出し（保存先の選択・開始・中止・進み具合）
+      ├─ files.rs        ファイルの保存
       ├─ history.rs      変更履歴（history.sqlite）
       ├─ server.rs       Linux 用：素材を画面へ渡すサーバー
       ├─ state.rs        開いているプロジェクト・使ってよいファイル・動いている作業

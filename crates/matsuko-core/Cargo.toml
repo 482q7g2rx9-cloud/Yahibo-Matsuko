@@ -1,7 +1,7 @@
 [package]
 name = "matsuko-core"
 version = "0.1.0"
-description = "Matsuko Editor の中心部分（画面を持たない）：プロジェクトの型とタイムラインの計算"
+description = "Matsuko Editor の中心部分（画面を持たない）：プロジェクトの型・タイムラインの計算・素材の解析・書き出し"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true

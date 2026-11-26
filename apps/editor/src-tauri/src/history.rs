@@ -42,14 +42,31 @@ pub fn open_db(file: &Path) -> rusqlite::Result<Connection> {
     Ok(c)
 }
 
-pub fn add(c: &Connection, at: i64, kind: &str, summary: &str, data: &str) -> rusqlite::Result<i64> {
-    c.execute("INSERT INTO snapshots(at, kind, summary, data) VALUES (?1, ?2, ?3, ?4)", params![at, kind, summary, data])?;
+pub fn add(
+    c: &Connection,
+    at: i64,
+    kind: &str,
+    summary: &str,
+    data: &str,
+) -> rusqlite::Result<i64> {
+    c.execute(
+        "INSERT INTO snapshots(at, kind, summary, data) VALUES (?1, ?2, ?3, ?4)",
+        params![at, kind, summary, data],
+    )?;
     Ok(c.last_insert_rowid())
 }
 
 pub fn list(c: &Connection) -> rusqlite::Result<Vec<Info>> {
-    let mut st = c.prepare("SELECT id, at, kind, summary FROM snapshots ORDER BY at DESC, id DESC")?;
-    let rows = st.query_map([], |r| Ok(Info { id: r.get(0)?, at: r.get(1)?, kind: r.get(2)?, summary: r.get(3)? }))?;
+    let mut st =
+        c.prepare("SELECT id, at, kind, summary FROM snapshots ORDER BY at DESC, id DESC")?;
+    let rows = st.query_map([], |r| {
+        Ok(Info {
+            id: r.get(0)?,
+            at: r.get(1)?,
+            kind: r.get(2)?,
+            summary: r.get(3)?,
+        })
+    })?;
     rows.collect()
 }
 
@@ -71,12 +88,19 @@ pub fn delete(c: &Connection, ids: &[i64]) -> rusqlite::Result<()> {
 }
 
 /// 開いているプロジェクトのデータベースで f を行う（プロジェクトが変わっていれば、つなぎ直す）
-fn with<T>(app: &AppHandle, f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Result<T, String> {
-    let dir = state(app).current().ok_or("プロジェクトが開かれていません")?.dir;
+fn with<T>(
+    app: &AppHandle,
+    f: impl FnOnce(&Connection) -> rusqlite::Result<T>,
+) -> Result<T, String> {
+    let dir = state(app)
+        .current()
+        .ok_or("プロジェクトが開かれていません")?
+        .dir;
     let h = app.state::<History>();
     let mut g = h.0.lock().unwrap();
     if g.as_ref().map(|(d, _)| d != &dir).unwrap_or(true) {
-        let c = open_db(&dir.join(HISTORY_FILE)).map_err(|e| format!("変更履歴を開けませんでした：{e}"))?;
+        let c = open_db(&dir.join(HISTORY_FILE))
+            .map_err(|e| format!("変更履歴を開けませんでした：{e}"))?;
         *g = Some((dir, c));
     }
     let (_, c) = g.as_ref().unwrap();
@@ -84,7 +108,13 @@ fn with<T>(app: &AppHandle, f: impl FnOnce(&Connection) -> rusqlite::Result<T>) 
 }
 
 #[tauri::command]
-pub async fn history_add(app: AppHandle, at: i64, kind: String, summary: String, project: Value) -> Result<i64, String> {
+pub async fn history_add(
+    app: AppHandle,
+    at: i64,
+    kind: String,
+    summary: String,
+    project: Value,
+) -> Result<i64, String> {
     let data = serde_json::to_string(&project).map_err(|e| e.to_string())?;
     with(&app, |c| add(c, at, &kind, &summary, &data))
 }

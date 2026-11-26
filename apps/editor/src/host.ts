@@ -99,6 +99,13 @@ export interface Host {
     get(id: number): Promise<unknown>;
     del(ids: number[]): Promise<void>;
   };
+  /** 書き出し（FFmpeg） */
+  export: {
+    pick(name: string, ext: string): Promise<string | null>;
+    start(req: Record<string, unknown>): Promise<void>;
+    cancel(id: string): Promise<void>;
+    onJob(fn: (e: { id: string; state: 'progress' | 'done' | 'error'; p: number; data: Record<string, unknown> | null }) => void): Promise<UnlistenFn>;
+  };
   /** 書き出したファイルを、ダイアログで選んだ場所に保存する。やめたら false */
   saveFile(name: string, ext: string, data: Blob): Promise<boolean>;
   /** OS からのドラッグ：入った・動いた・離れた・落とした */
@@ -145,6 +152,12 @@ const host: Host = {
     list: () => invoke('history_list'),
     get: (id) => invoke('history_get', { id }),
     del: (ids) => invoke('history_delete', { ids }),
+  },
+  export: {
+    pick: (name, ext) => invoke('export_pick', { name, ext }),
+    start: (req) => invoke('export_start', { req }),
+    cancel: (id) => invoke('export_cancel', { id }),
+    onJob: (fn) => listen('export-job', (e) => fn(e.payload as Parameters<typeof fn>[0])),
   },
   async saveFile(name, ext, data) {
     const path = await invoke<string | null>('save_pick', { name, ext });

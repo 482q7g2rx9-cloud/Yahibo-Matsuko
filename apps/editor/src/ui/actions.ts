@@ -11,7 +11,7 @@ import { HOST, JOBS, createProject, ensureProject, newProjectDlg, openProject, r
 import { E, heads, progPlay, progStop, setProg } from './engine';
 import { REC, fxPlay, rec, setREC, srcPlay, srcSeek, stopAll } from './source';
 import { addTitle, addToTimeline, addTrack, carve, closeRange, copySel, delClips, delTrack, fitZoom, insPoint, insertSegs, linked, locked, pasteAt, primary, rm, selIds, splitAt, toggleLink, zoomTo } from './editOps';
-import { X, presetX, saveJob, xCancel, xPause, xStart } from './exporter';
+import { X, deskEnqueue, presetX, saveJob, xCancel, xPause, xStart } from './exporter';
 import { PROPS, detectSilence, drawTL, keepSegs, propVal, selTitle, setProp } from './pages/edit';
 import { newJob } from './pages/export';
 import { draw, go } from './render';
@@ -88,8 +88,8 @@ ACT={
   prev:function(){jump(-1);},next:function(){jump(1);},fb:function(){if(E.playing)progStop();setProg(S.t.edit-1/30);},ff:function(){if(E.playing)progStop();setProg(S.t.edit+1/30);},
   top:function(){setProg(0);},end:function(){setProg(progDur());},
   preset:function(v){S.preset=+v;S.x=presetX(S.preset);draw();},
-  qadd:function(){var j=newJob();if(j){draw();toast('キューに追加しました');}},
-  xrun:function(){var j=newJob();if(!j)return;draw();if(X&&X.run)toast('いまの書き出しが終わったら始めます');else xStart(j);},
+  qadd:function(){var j=newJob();if(!j)return;if(HOST)return deskEnqueue(j,false);draw();toast('キューに追加しました');},
+  xrun:function(){var j=newJob();if(!j)return;if(HOST)return deskEnqueue(j,true);draw();if(X&&X.run)toast('いまの書き出しが終わったら始めます');else xStart(j);},
   xpause:function(){xPause();},xcancel:function(){xCancel();},
   xdel:function(v){S.queue=S.queue.filter(function(q){return q.id!==v;});draw();},
   xsave:function(v){saveJob(S.queue.filter(function(q){return q.id===v;})[0]);},

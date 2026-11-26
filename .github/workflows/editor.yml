@@ -39,7 +39,27 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: core
+      # 書き出しの結合テストは、配布するものと同じ LGPL 版の FFmpeg で行う
+      - name: FFmpeg のキャッシュ
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: apps/editor/src-tauri/binaries
+          key: ffmpeg-x86_64-unknown-linux-gnu-${{ hashFiles('apps/editor/scripts/fetch-ffmpeg.sh', 'apps/editor/scripts/build-ffmpeg-macos.sh') }}
+      - name: FFmpeg を用意する
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: apps/editor/scripts/fetch-ffmpeg.sh x86_64-unknown-linux-gnu
+      - name: テストで使う名前にする
+        run: |
+          mkdir -p "$RUNNER_TEMP/ffmpeg"
+          cp apps/editor/src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu "$RUNNER_TEMP/ffmpeg/ffmpeg"
+          cp apps/editor/src-tauri/binaries/ffprobe-x86_64-unknown-linux-gnu "$RUNNER_TEMP/ffmpeg/ffprobe"
+          "$RUNNER_TEMP/ffmpeg/ffmpeg" -hide_banner -encoders | grep -i 264 || true
       - run: cargo test -p matsuko-core --locked
+        env:
+          MATSUKO_FFMPEG_DIR: ${{ runner.temp }}/ffmpeg
 
   frontend:
     name: 画面のビルド（TypeScript）

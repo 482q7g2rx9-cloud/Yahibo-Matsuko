@@ -69,7 +69,7 @@ export function drawTitle(cx,W,H,ti,t){var sz={'小':.042,'中':.055,'大':.075}
   else{cx.textAlign='left';var yb=H*.9-bh;lines.forEach(function(l,i){outl(l,W*.06,yb+lh*(i+.5));});}}
 /* 止まっているときだけ描き直す（再生中は毎フレーム描くので、素材の読み込みのたびに描くと重くなる） */
 export function idleRedraw(){if(!E.playing)redrawProg();}
-export function redrawProg(){if(X&&X.run)return;[].forEach.call(document.querySelectorAll('canvas[data-prog]'),function(c){drawFrame(c.getContext('2d'),c.width,c.height,S.t.edit);});}
+export function redrawProg(){if(X&&X.run&&!X.desk)return;[].forEach.call(document.querySelectorAll('canvas[data-prog]'),function(c){drawFrame(c.getContext('2d'),c.width,c.height,S.t.edit);});}
 export function clampProg(){var d=progDur();S.t.edit=Math.max(0,Math.min(d,S.t.edit));if(P.pout!=null&&P.pout>d)P.pout=d;if(P.pin!=null&&P.pin>=(P.pout!=null?P.pout:d))P.pin=null;}
 export function setProg(t){S.t.edit=Math.max(0,Math.min(progDur(),t));heads();if(!E.playing){sync(S.t.edit,false);redrawProg();}}
 export function heads(follow){var t=S.t.edit,d=progDur()||1,pps=S.pps||10;
@@ -77,7 +77,7 @@ export function heads(follow){var t=S.t.edit,d=progDur()||1,pps=S.pps||10;
   [].forEach.call(document.querySelectorAll('[data-bar="edit"]'),function(e){e.style.width=(t/d*100)+'%';});
   [].forEach.call(document.querySelectorAll('[data-time="edit"]'),function(e){e.textContent=tc(t);});
   if(follow&&PREF.follow){var b=document.querySelector('[data-body]');if(b){var x=t*pps;if(x>b.scrollLeft+b.clientWidth-30||x<b.scrollLeft)b.scrollLeft=Math.max(0,x-60);}}}
-export function progPlay(){if(X&&X.run)return toast('書き出し中は再生できません');if(E.playing)return progStop();if(!P.clips.length)return toast('タイムラインにクリップがありません');
+export function progPlay(){if(X&&X.run&&!X.desk)return toast('書き出し中は再生できません');if(E.playing)return progStop();if(!P.clips.length)return toast('タイムラインにクリップがありません');
   audioInit();if(E.ctx&&E.ctx.state==='suspended')E.ctx.resume();if(S.t.edit>=progDur()-0.05)S.t.edit=0;
   E.playing=true;syncPlayBtn();
   /* 再生を始める位置の映像が描ける状態になってから、時計を進め始める（最長 1.5 秒待つ） */
