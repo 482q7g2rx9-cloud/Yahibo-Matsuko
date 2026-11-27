@@ -158,9 +158,11 @@ R.edit=function(){
   var left;
   if(S.etab!=='text'&&S.etab!=='trans'){var L=P.media.filter(function(m){return (m.k==='映像'||m.k==='音声'||m.k==='画像'||m.k==='テイク')&&inBin(m,S.ebin||'all')&&(!S.eq||m.n.indexOf(S.eq)>=0);}),av=S.aview||'grid';
     left='<div class="row" style="padding:12px 16px 8px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="'+h(S.eq||'')+'" style="height:28px">'+btn('＋ 読込','imp')+'</div>'+
-      '<div class="row" style="padding:0 16px 10px;gap:6px"><select class="inp grow" data-in="ebin" aria-label="ビン" style="height:28px;min-width:0">'+binOptions(S.ebin||'all',['映像','音声','テイク','画像'])+'</select>'+
-      '<span class="seg">'+[['list','リスト','list'],['grid','グリッド','grid'],['large','大きいグリッド','gridL']].map(function(x){return '<button class="b s ico'+(av===x[0]?' on':'')+'" aria-label="'+x[1]+'" title="'+x[1]+'" aria-pressed="'+(av===x[0])+'"'+A('aview',x[0])+'>'+ic(x[2],14)+'</button>';}).join('')+'</span></div>'+
-      '<div class="scroll"><div class="'+(av==='list'?'asl':av==='large'?'asg lg':'asg')+'">'+L.map(function(m){return assetItem(m,av);}).join('')+'</div></div>';}
+
+      '<div class="scroll"><div class="'+(av==='list'?'asl':av==='large'?'asg lg':'asg')+'">'+L.map(function(m){return assetItem(m,av);}).join('')+'</div></div>'+
+      /* ビンと表示の切り替え（パネルの下） */
+      '<div class="row" style="flex:none;padding:8px 16px;gap:6px;border-top:1px solid var(--dv)"><select class="inp grow" data-in="ebin" aria-label="ビン" style="height:28px;min-width:0">'+binOptions(S.ebin||'all',['映像','音声','テイク','画像'])+'</select>'+
+      '<span class="seg">'+[['list','リスト','list'],['grid','グリッド','grid'],['large','大きいグリッド','gridL']].map(function(x){return '<button class="b s ico'+(av===x[0]?' on':'')+'" aria-label="'+x[1]+'" title="'+x[1]+'" aria-pressed="'+(av===x[0])+'"'+A('aview',x[0])+'>'+ic(x[2],14)+'</button>';}).join('')+'</span></div>';}
   else if(S.etab==='trans')left='<div class="scroll" style="padding:14px">'+transGallery()+'</div>';
   else left='<div class="scroll" style="padding:14px">'+styleGallery()+'</div>';
   var tools=[['select','選択',keyOf('tSel')],['split','分割',keyOf('tSplit')],['trash','削除',''],['hand','ハンド',keyOf('tHand')],['text','文字','']],ins=inspector(),rngOn=P.pin!=null||P.pout!=null;
