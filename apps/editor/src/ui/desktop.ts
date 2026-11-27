@@ -24,7 +24,8 @@ export var HOST;
 export var JOBS;/* 素材id → {thumb:p, peaks:p, proxy:p}（動いている作業の進み具合） */
 export var RECENT;
 export function projName(){return HOST&&HOST.project.current?HOST.project.current.name:null;}
-export function forDisk(){return JSON.parse(JSON.stringify(P,function(k,v){return k==='url'||k==='loading'?undefined:v;}));}
+/* project.json に書く形。詳しい波形（wf）は大きいので、プロジェクトの cache/wave に置く（開くたびに読み直す） */
+export function forDisk(){return JSON.parse(JSON.stringify(P,function(k,v){return k==='url'||k==='loading'||k==='wf'?undefined:v;}));}
 /* プロジェクトがまだなければ「無題のプロジェクト」を書類フォルダーに作る（素材を読み込んだときなど） */
 export function ensureProject(){if(!HOST)return Promise.resolve();if(HOST.project.current)return Promise.resolve(HOST.project.current);
   if(P.sample)resetProject(emptyProject());
@@ -43,7 +44,7 @@ export function loadOpened(o){stopAll();Object.keys(E.els).forEach(dropEl);E.img
   P.media.forEach(function(m){queueJobs(m);});}
 /* 足りないもの（サムネイル・波形・プロキシ）を作ってもらう */
 export function queueJobs(m,force){if(!HOST||!m.file||m.missing||!m.path||!HOST.project.current)return;
-  var r={id:m.id,path:m.path,kind:m.k,duration:m.d||0,thumb:m.k!=='音声'&&(force||!m.thumb),peaks:m.k!=='画像'&&!m.noAudio&&(force||!m.peaks),proxy:!!m.np&&(force||!m.proxyPath),proxyHeight:ps().proxy};
+  var r={id:m.id,path:m.path,kind:m.k,duration:m.d||0,thumb:m.k!=='音声'&&(force||!m.thumb),peaks:m.k!=='画像'&&!m.noAudio&&(force||!m.peaks||!m.wf),proxy:!!m.np&&(force||!m.proxyPath),proxyHeight:ps().proxy};
   if(!r.thumb&&!r.peaks&&!r.proxy)return;JOBS[m.id]=JOBS[m.id]||{};['thumb','peaks','proxy'].forEach(function(k){if(r[k])JOBS[m.id][k]=0;});
   HOST.media.process([r]).catch(function(e){delete JOBS[m.id];toast(String(e));});}
 /* ファイルのパスから読み込む（ダイアログ・ドロップ） */
@@ -78,7 +79,7 @@ export function onJob(e){var m=M(e.id),j=JOBS[e.id]=JOBS[e.id]||{};if(!m){delete
   delete j[e.kind];if(!Object.keys(j).length)delete JOBS[e.id];var d=e.data||{};
   if(e.state==='error'){if(e.kind==='proxy'){m.px=-2;toast('「'+m.n+'」のプロキシを作れませんでした。元のファイルで編集します');}else if(e.kind==='peaks'&&m.k==='映像')m.noAudio=1;drawWhenIdle();return;}
   if(e.kind==='thumb'){m.thumb=d.thumb;if(d.col)m.col=d.col;}
-  else if(e.kind==='peaks'){if(d.peaks)m.peaks=d.peaks;else if(m.k==='映像')m.noAudio=1;}
+  else if(e.kind==='peaks'){if(d.peaks){m.peaks=d.peaks;if(d.wf)m.wf=d.wf;}else if(m.k==='映像')m.noAudio=1;}
   else if(e.kind==='proxy'){m.proxyPath=d.proxyPath;m.px=1;m.url=mediaUrl(m);delete E.imgs[m.id];redrawProg();}
   saveP();drawWhenIdle();}
 /* 見つからない素材を、選んだファイルに付け替える */

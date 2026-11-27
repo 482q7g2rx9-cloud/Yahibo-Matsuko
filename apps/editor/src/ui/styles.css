@@ -294,6 +294,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--ac);width:14px;height:
 .tl2 .ci.snd .wv{position:absolute;inset:0}
 .tl2 .ci .cl{position:absolute;left:6px;top:2px;line-height:14px;font-weight:500;pointer-events:none;z-index:1;color:#06222f;text-shadow:0 0 3px rgba(255,255,255,.5)}
 .tl2 .ci.wave .cl{color:#fff;text-shadow:0 0 3px rgba(0,0,0,.8)}
+/* 音声のクリップ：無地の背景に、明るい色で波形を描く */
+.tl2 .ci.snd.wave{background:#22639a;border-color:#7fbde8}
+.tl2 .ci.snd.bgm{background:#157a63;border-color:#6fd8b8}
+.tl2 .ci.snd.na{background:#5b3fa3;border-color:#bba5ee}
+.tl2 .ci.snd .cl{color:#fff;text-shadow:0 0 3px rgba(0,0,0,.8)}
 .tl2 .ci.on{box-shadow:0 0 0 2px var(--wt);z-index:2}
 .tl2 .ci.mv{opacity:.82;z-index:3}
 .tl2 .ci.lkd{pointer-events:none;filter:saturate(.6)}

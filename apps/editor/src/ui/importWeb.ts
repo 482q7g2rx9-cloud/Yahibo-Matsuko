@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { WaveformBuilder } from '../core/waveform';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { P, uid } from './project';
 import { S } from './state';
@@ -36,9 +37,13 @@ export function probe(m,f){
   el.onseeked=function(){if(m.k!=='映像'||!m.loading)return;clearTimeout(to);m.thumb=thumbOf(el,el.videoWidth,el.videoHeight);m.col=grabColor(el)||m.col;m.inP=0;m.outP=m.d;peaksOf(m,f);probeDone(m,true);el.removeAttribute('src');el.load();};}
 /* 音声の波形（音量のピーク）を求める。大きすぎるファイルは省略 */
 export function peaksOf(m,f){if(f.size>400e6)return;var AC=window.OfflineAudioContext||window.webkitOfflineAudioContext;if(!AC)return;
-  f.arrayBuffer().then(function(buf){var ac=new AC(1,44100,44100);return ac.decodeAudioData(buf);}).then(function(ab){
-    var ch=ab.getChannelData(0),N=Math.min(12000,Math.max(50,Math.round(ab.duration*10))),step=Math.floor(ch.length/N),pk=[],mx=0;
-    for(var i=0;i<N;i++){var v=0;for(var j=i*step;j<(i+1)*step;j+=4){var a=Math.abs(ch[j]);if(a>v)v=a;}pk.push(v);if(v>mx)mx=v;}
+  f.arrayBuffer().then(function(buf){var ac=new AC(1,22050,22050);return ac.decodeAudioData(buf);}).then(function(ab){
+    var nc=Math.min(2,ab.numberOfChannels),chs=[];for(var c=0;c<nc;c++)chs.push(ab.getChannelData(c));
+    /* 詳しい波形（左右別・ピークと実効値。core/waveform.ts） */
+    var wb=new WaveformBuilder(ab.duration,ab.sampleRate,nc);wb.push(chs);m.wf=wb.finish();
+    /* 無音の検出に使うピーク（10 個/秒、いちばん大きい音を 1 にそろえる） */
+    var ch=chs[0],N=Math.min(12000,Math.max(50,Math.round(ab.duration*10))),step=Math.floor(ch.length/N),pk=[],mx=0;
+    for(var i=0;i<N;i++){var v=0;for(var j=i*step;j<(i+1)*step;j+=4){for(var c=0;c<nc;c++){var a=Math.abs(chs[c][j]);if(a>v)v=a;}}pk.push(v);if(v>mx)mx=v;}
     m.peaks=pk.map(function(v){return Math.round(v/(mx||1)*1000)/1000;});saveP();draw();}).catch(function(){if(m.k==='映像'){m.noAudio=1;saveP();draw();}});}
 export function openPicker(){if(HOST){HOST.media.pick(true).then(function(p){importPaths(p);if(p&&p.length&&S.page!=='media'&&S.page!=='edit'&&S.page!=='cut')go('media');}).catch(function(e){toast(String(e));});return;}var i=document.getElementById('fileIn');i.value='';i.click();}
 

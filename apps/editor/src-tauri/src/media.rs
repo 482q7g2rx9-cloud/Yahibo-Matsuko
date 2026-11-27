@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use base64::Engine;
 use matsuko_core::{
-    peaks::{PeakAccumulator, PEAK_RATE},
+    peaks::{WaveformAccumulator, WAVE_RATE},
     probe::{self, MediaInfo},
 };
 use serde::{Deserialize, Serialize};
@@ -236,7 +236,10 @@ pub async fn media_process(app: AppHandle, items: Vec<JobReq>) -> Result<(), Str
                 } else {
                     match kind {
                         "thumb" => make_thumb(&it2, &src2, &dir.cache("thumb")).await,
-                        "peaks" => make_peaks(&app2, &it2, &src2, rx.clone()).await,
+                        "peaks" => {
+                            make_peaks_cached(&app2, &it2, &src2, &dir.cache("wave"), rx.clone())
+                                .await
+                        }
                         _ => make_proxy(&app2, &it2, &src2, &dir.cache("proxy"), rx.clone()).await,
                     }
                 };
@@ -339,22 +342,67 @@ async fn make_thumb(it: &JobReq, src: &Path, dir: &Path) -> Result<Value, String
     Ok(json!({"thumb": url, "col": col}))
 }
 
-/// 波形：8kHz モノラルの f32 を流してもらい、ピークを集める
+/// 波形はプロジェクトの cache/wave に覚えておき、元のファイルが変わっていなければ作り直さない。
+/// 詳しい波形は大きいので project.json には入れず（画面の forDisk で外す）、開くたびにここから読む
+async fn make_peaks_cached(
+    app: &AppHandle,
+    it: &JobReq,
+    src: &Path,
+    dir: &Path,
+    cancel: watch::Receiver<bool>,
+) -> Result<Value, String> {
+    let file = dir.join(format!("{}.json", it.id));
+    let stamp = std::fs::metadata(src).ok().map(|m| {
+        let t = m
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        json!([m.len(), t])
+    });
+    if let (Some(st), Ok(text)) = (&stamp, std::fs::read_to_string(&file)) {
+        if let Ok(v) = serde_json::from_str::<Value>(&text) {
+            if v.get("stamp") == Some(st) && v.get("wf").is_some() {
+                return Ok(json!({"peaks": v["peaks"], "wf": v["wf"]}));
+            }
+        }
+    }
+    let v = make_peaks(app, it, src, cancel).await?;
+    if let (Some(st), Some(_)) = (stamp, v.get("wf")) {
+        let _ = std::fs::create_dir_all(dir);
+        let mut o = v.clone();
+        o["stamp"] = st;
+        let _ = std::fs::write(&file, o.to_string());
+    }
+    Ok(v)
+}
+
+/// 波形：16kHz の f32（左右があれば 2 チャンネル）を流してもらい、
+/// タイムラインに描く詳しい波形と、無音の検出に使うピークを集める
 async fn make_peaks(
     app: &AppHandle,
     it: &JobReq,
     src: &Path,
     mut cancel: watch::Receiver<bool>,
 ) -> Result<Value, String> {
+    // チャンネル数（3 つ以上は 2 つにまとめる）。調べられなければモノラルにする
+    let ch = match probe_one(src).await {
+        Ok(info) if !info.has_audio => {
+            return Ok(json!({"peaks": null, "noAudio": 1}));
+        }
+        Ok(info) => (info.channels as usize).clamp(1, 2),
+        Err(_) => 1,
+    };
     let mut child = tools::command("ffmpeg")
         .args(["-hide_banner", "-nostdin", "-v", "error", "-i"])
         .arg(src)
         .args([
             "-vn",
             "-ac",
-            "1",
+            &ch.to_string(),
             "-ar",
-            &PEAK_RATE.to_string(),
+            &WAVE_RATE.to_string(),
             "-f",
             "f32le",
             "pipe:1",
@@ -365,10 +413,10 @@ async fn make_peaks(
         .stdout
         .take()
         .ok_or("FFmpeg の出力を読めませんでした")?;
-    let mut acc = PeakAccumulator::new(it.duration, PEAK_RATE);
+    let mut acc = WaveformAccumulator::new(it.duration, WAVE_RATE, ch);
     let mut buf = vec![0u8; 64 * 1024];
     let mut carry: Vec<u8> = Vec::new();
-    let total = (it.duration * PEAK_RATE as f64).max(1.0);
+    let total = (it.duration * WAVE_RATE as f64).max(1.0);
     let mut last = Instant::now();
     loop {
         let n = tokio::select! {
@@ -398,7 +446,18 @@ async fn make_peaks(
         // 映像だけの素材など。画面では「音声なし」にする
         return Ok(json!({"peaks": null, "noAudio": 1}));
     }
-    Ok(json!({"peaks": acc.finish()}))
+    let (rate, n) = (acc.rate, acc.n);
+    let (bytes, peaks) = acc.finish();
+    Ok(json!({
+        "peaks": peaks,
+        "wf": {
+            "v": 1,
+            "r": rate,
+            "ch": ch,
+            "n": n,
+            "d": base64::engine::general_purpose::STANDARD.encode(bytes),
+        }
+    }))
 }
 
 /// プロキシの作り方（エンコーダーごと）。上から順に、使えるものを試す。

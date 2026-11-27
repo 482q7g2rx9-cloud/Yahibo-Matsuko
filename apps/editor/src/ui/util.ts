@@ -3,6 +3,7 @@
 import { S } from './state';
 import { E } from './engine';
 import { SIM, SRC } from './source';
+import { waveColumns } from '../core/waveform';
 
 /* ---------- 小道具 ---------- */
 export function h(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
@@ -29,9 +30,50 @@ export function diamond(on){return on?'<svg width="12" height="12" viewBox="0 0 
 export function wave(n,seed,fill){var r=rng(seed),a=[];for(var i=0;i<n;i++){var v=r();a.push(.1+(v>.85?.7:v*.55)+r()*.15);}return waveSvg(a,fill);}
 export function waveSvg(a,fill){var b='';for(var i=0;i<a.length;i++){var hh=Math.max(2,Math.min(96,a[i]*100));b+='<rect x="'+(i+.3).toFixed(1)+'" y="'+(50-hh/2).toFixed(1)+'" width=".4" height="'+hh.toFixed(1)+'"/>';}
   return '<svg class="wv" viewBox="0 0 '+Math.max(1,a.length)+' 100" preserveAspectRatio="none" aria-hidden="true" fill="'+(fill||'#a9d6f5')+'">'+b+'</svg>';}
-export function waveOf(m,a,b,n,fill){if(m&&m.peaks&&m.d){var pk=m.peaks,N=pk.length,i0=Math.floor(a/m.d*N),i1=Math.max(i0+1,Math.ceil(b/m.d*N)),seg=pk.slice(i0,i1),out=[],step=Math.max(1,seg.length/n);
-    for(var x=0;x<seg.length;x+=step){var mx=0;for(var y=Math.floor(x);y<Math.min(seg.length,Math.floor(x+step));y++)mx=Math.max(mx,seg[y]);out.push(mx);}return waveSvg(out,fill);}
-  if(m&&m.file&&!m.peaks)return '';return wave(n,(m?hashN(m.id):3)+Math.round(a),fill);}
+/* 波形：素材の a〜b 秒を、幅 n 列で描く（SVG）。
+   m.wf（core/waveform.ts）があれば、左右チャンネル別に「ピーク（上下の端）」と「実効値（RMS、内側の濃い部分）」を描く。
+   opt.gain はクリップの音量（倍率）。opt.split が真ならチャンネルごとに上下に分ける。
+   0 dBFS を超えた（音が割れる）ところは、上下の端を赤くする */
+var WCACHE={},WKEYS=[];
+export function waveOf(m,a,b,n,fill,opt){opt=opt||{};n=Math.max(2,Math.min(2000,Math.round(n)));var g=opt.gain==null?1:opt.gain,sp=!!opt.split;
+  var key=(m?m.id:'')+'|'+(m&&m.wf?m.wf.d.length+':'+m.wf.n:m&&m.peaks?'p'+m.peaks.length:'s')+'|'+a.toFixed(3)+'|'+b.toFixed(3)+'|'+n+'|'+g.toFixed(4)+'|'+sp+'|'+(fill||'');
+  if(WCACHE[key])return WCACHE[key];
+  var cols;
+  if(m&&m.wf&&m.wf.d)cols=waveColumns(m.wf,a,b,n,g);
+  else if(m&&m.peaks&&m.d)cols=peakCols(m,a,b,n,g);
+  else if(m&&m.file)return '';
+  else cols=fakeCols(m,a,b,n,g);
+  var out=waveSvgReal(cols,fill||'#a9d6f5',sp);
+  WCACHE[key]=out;WKEYS.push(key);if(WKEYS.length>600){delete WCACHE[WKEYS.shift()];}
+  return out;}
+/* 前の形式（10 個/秒の、いちばん大きい音を 1 にそろえたピーク）から列を作る */
+function peakCols(m,a,b,n,g){var pk=m.peaks,N=pk.length,mx=new Float32Array(n),mn=new Float32Array(n),rm=new Float32Array(n);
+  for(var x=0;x<n;x++){var i0=Math.floor((a+(b-a)*x/n)/m.d*N),i1=Math.max(i0+1,Math.ceil((a+(b-a)*(x+1)/n)/m.d*N)),v=0;for(var i=Math.max(0,i0);i<Math.min(N,i1);i++)v=Math.max(v,pk[i]);mx[x]=v*g;mn[x]=-v*g;rm[x]=v*.5*g;}
+  return {ch:1,n:n,max:mx,min:mn,rms:rm};}
+/* 見本の素材（ファイルがない）の波形：話し声のように、強弱が続く形を作る */
+function fakeCols(m,a,b,n,g){var seed=m?hashN(m.id):3,mx=new Float32Array(n*2),mn=new Float32Array(n*2),rm=new Float32Array(n*2);
+  for(var x=0;x<n;x++){var t=a+(b-a)*(x+.5)/n,r=rng(seed+Math.floor(t*20)),env=.35+.3*Math.sin(t*1.7+seed)*Math.sin(t*.37+seed*.1),gap=(Math.sin(t*2.9+seed)>.82)?.08:1;
+    for(var c=0;c<2;c++){var v=Math.max(.02,Math.min(1,(env+r()*.35)*gap))*(c?.9:1),j=x*2+c;mx[j]=v*g;mn[j]=-v*(.9+r()*.1)*g;rm[j]=v*.42*g;}}
+  return {ch:2,n:n,max:mx,min:mn,rms:rm};}
+/* 高さは dB で決める（-54 dB 〜 0 dB を 0〜1 に）。小さい音も形が見え、大きい音の差もわかる */
+var WDB=54;
+function dbH(v){if(!(v>0))return 0;var d=20*Math.log10(Math.min(1,v));return Math.max(0,(d+WDB)/WDB);}
+function f1(v){return (Math.round(v*10)/10).toString();}
+export function waveSvgReal(cols,fill,split){var n=cols.n,ch=cols.ch,lanes=split&&ch>1?ch:1,LH=100/lanes,body='',clip='';
+  for(var L=0;L<lanes;L++){var cy=LH*(L+.5),hh=LH/2*.96,top='',bot=[],rt='',rb=[];
+    for(var x=0;x<n;x++){var hi,lo,rr;
+      if(lanes===ch){var j=x*ch+L;hi=cols.max[j];lo=cols.min[j];rr=cols.rms[j];}
+      else{hi=0;lo=0;rr=0;for(var c=0;c<ch;c++){var k=x*ch+c;hi=Math.max(hi,cols.max[k]);lo=Math.min(lo,cols.min[k]);rr+=cols.rms[k]*cols.rms[k];}rr=Math.sqrt(rr/ch);}
+      if(hi>=.995||lo<=-.995)clip+='<rect x="'+x+'" y="'+f1(cy-hh)+'" width="1" height="'+f1(hh*.12)+'"/><rect x="'+x+'" y="'+f1(cy+hh*.88)+'" width="1" height="'+f1(hh*.12)+'"/>';
+      hi=dbH(hi);lo=-dbH(-lo);rr=dbH(rr);
+      /* 1 列の中で上下が同じでも、細い線は見えるようにする */
+      var yh=cy-Math.max(hi*hh,.6),yl=cy-Math.min(lo*hh,-.6);
+      var px=x+.5,ry=Math.min(rr*hh,Math.max(hi,-lo)*hh);
+      top+=(x?'L':'M')+px+' '+f1(yh);bot.push(px+' '+f1(yl));rt+=(x?'L':'M')+px+' '+f1(cy-ry);rb.push(px+' '+f1(cy+ry));}
+    bot='L'+bot.reverse().join('L');rb='L'+rb.reverse().join('L');
+    body+='<path d="'+top+bot+'Z" fill-opacity=".55"/><path d="'+rt+rb+'Z"/><line x1="0" x2="'+n+'" y1="'+f1(cy)+'" y2="'+f1(cy)+'" stroke="'+fill+'" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"/>';
+    if(L>0)body+='<line x1="0" x2="'+n+'" y1="'+f1(LH*L)+'" y2="'+f1(LH*L)+'" stroke="rgba(0,0,0,.25)" stroke-width="1" vector-effect="non-scaling-stroke"/>';}
+  return '<svg class="wv" viewBox="0 0 '+n+' 100" preserveAspectRatio="none" aria-hidden="true" fill="'+fill+'">'+body+(clip?'<g fill="#ff3b30">'+clip+'</g>':'')+'</svg>';}
 export function film(m){var c=(m&&m.col)||['#555','#444'];return 'background:repeating-linear-gradient(90deg,'+c[0]+' 0 46px,'+c[1]+' 46px 92px)';}
 export function filmStyle(m){if(m&&m.thumb)return 'background:url('+m.thumb+') left center / auto 100% repeat-x,'+((m.col||['#555'])[0]);return film(m);}
 

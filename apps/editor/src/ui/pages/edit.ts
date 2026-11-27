@@ -31,8 +31,8 @@ export function clipHtml(c,r,pps){var m=c.m?M(c.m):null,on=S.sel.indexOf(c.id)>=
     if(c.type==='title')return '<div class="ci title'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'line-height:'+(r.h-2)+'px">'+fx+nm+tm+'</div>';
     if(c.type==='adj')return '<div class="ci adj'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'line-height:'+(r.h-2)+'px">'+nm+tm+'</div>';
     return '<div class="ci video'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'"><div class="chd">'+fx+nm+(c.link?'<span class="lnk" aria-hidden="true">⛓</span>':'')+'</div>'+(r.h>=40?'<div class="fm" style="'+filmStyle(m)+'"></div>':'')+tm+'</div>';}
-  var k=m&&m.k==='音声'?'bgm':m&&m.k==='テイク'?'na':'wave',fill={wave:'#a9d6f5',bgm:'rgba(3,42,32,.45)',na:'rgba(20,7,46,.5)'}[k];
-  return '<div class="ci '+k+' snd'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'">'+(m&&m.k!=='画像'?waveOf(m,c.in,c.out,Math.max(4,Math.min(400,Math.round(w/3))),fill):'')+'<span class="cl">'+nm+(c.vol?'　'+(c.vol>0?'+':'')+c.vol+' dB':'')+'</span>'+tm+'</div>';}
+  var k=m&&m.k==='音声'?'bgm':m&&m.k==='テイク'?'na':'wave',fill={wave:'#cfe9ff',bgm:'#c4f5e4',na:'#e4dafc'}[k];
+  return '<div class="ci '+k+' snd'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'">'+(m&&m.k!=='画像'?waveOf(m,c.in,c.out,Math.max(4,Math.round(w)),fill,{gain:Math.pow(10,(c.vol||0)/20),split:r.h>=36}):'')+'<span class="cl">'+nm+(c.vol?'　'+(c.vol>0?'+':'')+c.vol+' dB':'')+'</span>'+tm+'</div>';}
 export function tlInner(){var pps=S.pps||10,dur=progDur(),b=document.querySelector('[data-body]'),bw=b?b.clientWidth:900,W=Math.ceil(Math.max(dur*pps+400,bw+200)),y=0,hd='',ln='',cl='';ROWS=[];
   P.tracks.forEach(function(tr){ROWS.push({id:tr.id,kind:tr.kind,y:y,h:tr.h});var off=tr.kind==='v'?tr.hide:!audible(tr);
     hd+='<div class="hrow'+(tr.lock?' lk':'')+(off?' off':'')+'" data-trh="'+tr.id+'" style="top:'+y+'px;height:'+tr.h+'px"><b>'+tr.id+'</b><span class="mu nm">'+h(tr.name||'')+'</span>'+

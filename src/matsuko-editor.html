@@ -298,6 +298,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--ac);width:14px;height:
 .tl2 .ci.snd .wv{position:absolute;inset:0}
 .tl2 .ci .cl{position:absolute;left:6px;top:2px;line-height:14px;font-weight:500;pointer-events:none;z-index:1;color:#06222f;text-shadow:0 0 3px rgba(255,255,255,.5)}
 .tl2 .ci.wave .cl{color:#fff;text-shadow:0 0 3px rgba(0,0,0,.8)}
+/* 音声のクリップ：無地の背景に、明るい色で波形を描く */
+.tl2 .ci.snd.wave{background:#22639a;border-color:#7fbde8}
+.tl2 .ci.snd.bgm{background:#157a63;border-color:#6fd8b8}
+.tl2 .ci.snd.na{background:#5b3fa3;border-color:#bba5ee}
+.tl2 .ci.snd .cl{color:#fff;text-shadow:0 0 3px rgba(0,0,0,.8)}
 .tl2 .ci.on{box-shadow:0 0 0 2px var(--wt);z-index:2}
 .tl2 .ci.mv{opacity:.82;z-index:3}
 .tl2 .ci.lkd{pointer-events:none;filter:saturate(.6)}
@@ -439,6 +444,9 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 <div id="drop" class="ov" hidden><div class="dz">ここにドロップして素材を読み込む</div></div>
 <input type="file" id="fileIn" multiple accept="video/*,audio/*,image/*" hidden aria-label="素材ファイルを選ぶ">
 <script type="module">
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var D;
 function init$r() {
   D = {
@@ -1562,6 +1570,123 @@ function init$n() {
   FXP = null;
   REC = null;
 }
+const WAVE_MAX_RATE = 100;
+const WAVE_MIN_RATE = 10;
+const WAVE_MAX_BUCKETS = 15e4;
+function waveRate(duration2) {
+  if (!(duration2 > 0)) return WAVE_MAX_RATE;
+  return Math.max(WAVE_MIN_RATE, Math.min(WAVE_MAX_RATE, Math.floor(WAVE_MAX_BUCKETS / duration2)));
+}
+function q8(v) {
+  const x = Math.round(Math.max(-1, Math.min(1, v)) * 127);
+  return x + 128;
+}
+function dq8(b) {
+  return (b - 128) / 127;
+}
+class WaveformBuilder {
+  constructor(duration2, sampleRate, channels) {
+    __publicField(this, "rate");
+    __publicField(this, "ch");
+    __publicField(this, "n");
+    __publicField(this, "perBucket");
+    __publicField(this, "seen", 0);
+    __publicField(this, "mx");
+    __publicField(this, "mn");
+    __publicField(this, "sq");
+    __publicField(this, "cnt");
+    this.rate = waveRate(duration2);
+    this.ch = Math.max(1, Math.min(2, channels));
+    this.n = Math.max(1, Math.ceil(Math.max(0, duration2) * this.rate));
+    this.perBucket = Math.max(1, sampleRate / this.rate);
+    this.mx = new Float32Array(this.n * this.ch);
+    this.mn = new Float32Array(this.n * this.ch);
+    this.sq = new Float64Array(this.n * this.ch);
+    this.cnt = new Float64Array(this.n);
+  }
+  push(chans) {
+    const len = chans[0] ? chans[0].length : 0;
+    for (let i = 0; i < len; i++) {
+      const b = Math.min(this.n - 1, Math.floor(this.seen / this.perBucket));
+      for (let c = 0; c < this.ch; c++) {
+        const s = (chans[c] || chans[0])[i];
+        if (!Number.isFinite(s)) continue;
+        const k = b * this.ch + c;
+        if (s > this.mx[k]) this.mx[k] = s;
+        if (s < this.mn[k]) this.mn[k] = s;
+        this.sq[k] += s * s;
+      }
+      this.cnt[b]++;
+      this.seen++;
+    }
+  }
+  /** 受け取ったサンプル数（1 チャンネルあたり） */
+  samples() {
+    return this.seen;
+  }
+  bytes() {
+    const out = new Uint8Array(this.n * this.ch * 3);
+    for (let b = 0; b < this.n; b++) {
+      for (let c = 0; c < this.ch; c++) {
+        const k = b * this.ch + c, o = k * 3;
+        out[o] = q8(this.mx[k]);
+        out[o + 1] = q8(this.mn[k]);
+        out[o + 2] = Math.round(Math.min(1, this.cnt[b] ? Math.sqrt(this.sq[k] / this.cnt[b]) : 0) * 255);
+      }
+    }
+    return out;
+  }
+  finish() {
+    return { v: 1, r: this.rate, ch: this.ch, n: this.n, d: toBase64(this.bytes()) };
+  }
+}
+function toBase64(b) {
+  let s = "";
+  for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, Array.from(b.subarray(i, i + 32768)));
+  return btoa(s);
+}
+function fromBase64(s) {
+  const bin = atob(s), out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+const cache = /* @__PURE__ */ new Map();
+function waveBytes(w) {
+  let b = cache.get(w.d);
+  if (!b) {
+    b = fromBase64(w.d);
+    if (cache.size > 64) cache.clear();
+    cache.set(w.d, b);
+  }
+  return b;
+}
+function waveColumns(w, a, b, n, gain = 1) {
+  const by = waveBytes(w), ch = w.ch, cols = Math.max(1, Math.round(n));
+  const max = new Float32Array(cols * ch), min = new Float32Array(cols * ch), rms = new Float32Array(cols * ch);
+  const per = (b - a) * w.r / cols;
+  for (let x = 0; x < cols; x++) {
+    const f0 = a * w.r + x * per, f12 = f0 + per;
+    let i0 = Math.floor(f0), i1 = Math.max(i0 + 1, Math.ceil(f12));
+    i0 = Math.max(0, i0);
+    i1 = Math.min(w.n, i1);
+    for (let c = 0; c < ch; c++) {
+      let hi = 0, lo = 0, sq = 0, k = 0;
+      for (let i = i0; i < i1; i++) {
+        const o = (i * ch + c) * 3;
+        const u = dq8(by[o]), d = dq8(by[o + 1]), r = by[o + 2] / 255;
+        if (u > hi) hi = u;
+        if (d < lo) lo = d;
+        sq += r * r;
+        k++;
+      }
+      const j = x * ch + c;
+      max[j] = hi * gain;
+      min[j] = lo * gain;
+      rms[j] = (k ? Math.sqrt(sq / k) : 0) * gain;
+    }
+  }
+  return { ch, n: cols, max, min, rms };
+}
 var IMP;
 function kindOf(f) {
   var t = f.type || "", n = f.name.toLowerCase();
@@ -1717,15 +1842,22 @@ function peaksOf(m, f) {
   var AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   if (!AC) return;
   f.arrayBuffer().then(function(buf) {
-    var ac = new AC(1, 44100, 44100);
+    var ac = new AC(1, 22050, 22050);
     return ac.decodeAudioData(buf);
   }).then(function(ab) {
-    var ch = ab.getChannelData(0), N = Math.min(12e3, Math.max(50, Math.round(ab.duration * 10))), step = Math.floor(ch.length / N), pk = [], mx = 0;
+    var nc = Math.min(2, ab.numberOfChannels), chs = [];
+    for (var c = 0; c < nc; c++) chs.push(ab.getChannelData(c));
+    var wb = new WaveformBuilder(ab.duration, ab.sampleRate, nc);
+    wb.push(chs);
+    m.wf = wb.finish();
+    var ch = chs[0], N = Math.min(12e3, Math.max(50, Math.round(ab.duration * 10))), step = Math.floor(ch.length / N), pk = [], mx = 0;
     for (var i = 0; i < N; i++) {
       var v = 0;
       for (var j = i * step; j < (i + 1) * step; j += 4) {
-        var a = Math.abs(ch[j]);
-        if (a > v) v = a;
+        for (var c = 0; c < nc; c++) {
+          var a = Math.abs(chs[c][j]);
+          if (a > v) v = a;
+        }
       }
       pk.push(v);
       if (v > mx) mx = v;
@@ -2212,8 +2344,8 @@ function clipHtml(c, r, pps) {
     if (c.type === "adj") return '<div class="ci adj' + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + "line-height:" + (r.h - 2) + 'px">' + nm + tm + "</div>";
     return '<div class="ci video' + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + '"><div class="chd">' + fx + nm + (c.link ? '<span class="lnk" aria-hidden="true">⛓</span>' : "") + "</div>" + (r.h >= 40 ? '<div class="fm" style="' + filmStyle(m) + '"></div>' : "") + tm + "</div>";
   }
-  var k = m && m.k === "音声" ? "bgm" : m && m.k === "テイク" ? "na" : "wave", fill = { wave: "#a9d6f5", bgm: "rgba(3,42,32,.45)", na: "rgba(20,7,46,.5)" }[k];
-  return '<div class="ci ' + k + " snd" + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + '">' + (m && m.k !== "画像" ? waveOf(m, c.in, c.out, Math.max(4, Math.min(400, Math.round(w / 3))), fill) : "") + '<span class="cl">' + nm + (c.vol ? "　" + (c.vol > 0 ? "+" : "") + c.vol + " dB" : "") + "</span>" + tm + "</div>";
+  var k = m && m.k === "音声" ? "bgm" : m && m.k === "テイク" ? "na" : "wave", fill = { wave: "#cfe9ff", bgm: "#c4f5e4", na: "#e4dafc" }[k];
+  return '<div class="ci ' + k + " snd" + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + '">' + (m && m.k !== "画像" ? waveOf(m, c.in, c.out, Math.max(4, Math.round(w)), fill, { gain: Math.pow(10, (c.vol || 0) / 20), split: r.h >= 36 }) : "") + '<span class="cl">' + nm + (c.vol ? "　" + (c.vol > 0 ? "+" : "") + c.vol + " dB" : "") + "</span>" + tm + "</div>";
 }
 function tlInner() {
   var pps = S.pps || 10, dur = progDur(), b = document.querySelector("[data-body]"), bw = b ? b.clientWidth : 900, W = Math.ceil(Math.max(dur * pps + 400, bw + 200)), y = 0, hd = "", ln = "", cl = "";
@@ -4111,7 +4243,7 @@ function projName() {
 }
 function forDisk() {
   return JSON.parse(JSON.stringify(P, function(k, v) {
-    return k === "url" || k === "loading" ? void 0 : v;
+    return k === "url" || k === "loading" || k === "wf" ? void 0 : v;
   }));
 }
 function ensureProject() {
@@ -4193,7 +4325,7 @@ function loadOpened(o) {
 }
 function queueJobs(m, force) {
   if (!HOST || !m.file || m.missing || !m.path || !HOST.project.current) return;
-  var r = { id: m.id, path: m.path, kind: m.k, duration: m.d || 0, thumb: m.k !== "音声" && (force || !m.thumb), peaks: m.k !== "画像" && !m.noAudio && (force || !m.peaks), proxy: !!m.np && (force || !m.proxyPath), proxyHeight: ps().proxy };
+  var r = { id: m.id, path: m.path, kind: m.k, duration: m.d || 0, thumb: m.k !== "音声" && (force || !m.thumb), peaks: m.k !== "画像" && !m.noAudio && (force || !m.peaks || !m.wf), proxy: !!m.np && (force || !m.proxyPath), proxyHeight: ps().proxy };
   if (!r.thumb && !r.peaks && !r.proxy) return;
   JOBS[m.id] = JOBS[m.id] || {};
   ["thumb", "peaks", "proxy"].forEach(function(k) {
@@ -4355,8 +4487,10 @@ function onJob(e) {
     m.thumb = d.thumb;
     if (d.col) m.col = d.col;
   } else if (e.kind === "peaks") {
-    if (d.peaks) m.peaks = d.peaks;
-    else if (m.k === "映像") m.noAudio = 1;
+    if (d.peaks) {
+      m.peaks = d.peaks;
+      if (d.wf) m.wf = d.wf;
+    } else if (m.k === "映像") m.noAudio = 1;
   } else if (e.kind === "proxy") {
     m.proxyPath = d.proxyPath;
     m.px = 1;
@@ -5070,18 +5204,99 @@ function waveSvg(a, fill) {
   }
   return '<svg class="wv" viewBox="0 0 ' + Math.max(1, a.length) + ' 100" preserveAspectRatio="none" aria-hidden="true" fill="' + (fill || "#a9d6f5") + '">' + b + "</svg>";
 }
-function waveOf(m, a, b, n, fill) {
-  if (m && m.peaks && m.d) {
-    var pk = m.peaks, N = pk.length, i0 = Math.floor(a / m.d * N), i1 = Math.max(i0 + 1, Math.ceil(b / m.d * N)), seg2 = pk.slice(i0, i1), out = [], step = Math.max(1, seg2.length / n);
-    for (var x = 0; x < seg2.length; x += step) {
-      var mx = 0;
-      for (var y = Math.floor(x); y < Math.min(seg2.length, Math.floor(x + step)); y++) mx = Math.max(mx, seg2[y]);
-      out.push(mx);
-    }
-    return waveSvg(out, fill);
+var WCACHE = {}, WKEYS = [];
+function waveOf(m, a, b, n, fill, opt) {
+  opt = opt || {};
+  n = Math.max(2, Math.min(2e3, Math.round(n)));
+  var g = opt.gain == null ? 1 : opt.gain, sp = !!opt.split;
+  var key = (m ? m.id : "") + "|" + (m && m.wf ? m.wf.d.length + ":" + m.wf.n : m && m.peaks ? "p" + m.peaks.length : "s") + "|" + a.toFixed(3) + "|" + b.toFixed(3) + "|" + n + "|" + g.toFixed(4) + "|" + sp + "|" + (fill || "");
+  if (WCACHE[key]) return WCACHE[key];
+  var cols;
+  if (m && m.wf && m.wf.d) cols = waveColumns(m.wf, a, b, n, g);
+  else if (m && m.peaks && m.d) cols = peakCols(m, a, b, n, g);
+  else if (m && m.file) return "";
+  else cols = fakeCols(m, a, b, n, g);
+  var out = waveSvgReal(cols, fill || "#a9d6f5", sp);
+  WCACHE[key] = out;
+  WKEYS.push(key);
+  if (WKEYS.length > 600) {
+    delete WCACHE[WKEYS.shift()];
   }
-  if (m && m.file && !m.peaks) return "";
-  return wave(n, (m ? hashN(m.id) : 3) + Math.round(a), fill);
+  return out;
+}
+function peakCols(m, a, b, n, g) {
+  var pk = m.peaks, N = pk.length, mx = new Float32Array(n), mn = new Float32Array(n), rm2 = new Float32Array(n);
+  for (var x = 0; x < n; x++) {
+    var i0 = Math.floor((a + (b - a) * x / n) / m.d * N), i1 = Math.max(i0 + 1, Math.ceil((a + (b - a) * (x + 1) / n) / m.d * N)), v = 0;
+    for (var i = Math.max(0, i0); i < Math.min(N, i1); i++) v = Math.max(v, pk[i]);
+    mx[x] = v * g;
+    mn[x] = -v * g;
+    rm2[x] = v * 0.5 * g;
+  }
+  return { ch: 1, n, max: mx, min: mn, rms: rm2 };
+}
+function fakeCols(m, a, b, n, g) {
+  var seed = m ? hashN(m.id) : 3, mx = new Float32Array(n * 2), mn = new Float32Array(n * 2), rm2 = new Float32Array(n * 2);
+  for (var x = 0; x < n; x++) {
+    var t = a + (b - a) * (x + 0.5) / n, r = rng(seed + Math.floor(t * 20)), env = 0.35 + 0.3 * Math.sin(t * 1.7 + seed) * Math.sin(t * 0.37 + seed * 0.1), gap = Math.sin(t * 2.9 + seed) > 0.82 ? 0.08 : 1;
+    for (var c = 0; c < 2; c++) {
+      var v = Math.max(0.02, Math.min(1, (env + r() * 0.35) * gap)) * (c ? 0.9 : 1), j = x * 2 + c;
+      mx[j] = v * g;
+      mn[j] = -v * (0.9 + r() * 0.1) * g;
+      rm2[j] = v * 0.42 * g;
+    }
+  }
+  return { ch: 2, n, max: mx, min: mn, rms: rm2 };
+}
+var WDB = 54;
+function dbH(v) {
+  if (!(v > 0)) return 0;
+  var d = 20 * Math.log10(Math.min(1, v));
+  return Math.max(0, (d + WDB) / WDB);
+}
+function f1(v) {
+  return (Math.round(v * 10) / 10).toString();
+}
+function waveSvgReal(cols, fill, split) {
+  var n = cols.n, ch = cols.ch, lanes = split && ch > 1 ? ch : 1, LH = 100 / lanes, body = "", clip = "";
+  for (var L = 0; L < lanes; L++) {
+    var cy = LH * (L + 0.5), hh = LH / 2 * 0.96, top = "", bot = [], rt = "", rb = [];
+    for (var x = 0; x < n; x++) {
+      var hi, lo, rr;
+      if (lanes === ch) {
+        var j = x * ch + L;
+        hi = cols.max[j];
+        lo = cols.min[j];
+        rr = cols.rms[j];
+      } else {
+        hi = 0;
+        lo = 0;
+        rr = 0;
+        for (var c = 0; c < ch; c++) {
+          var k = x * ch + c;
+          hi = Math.max(hi, cols.max[k]);
+          lo = Math.min(lo, cols.min[k]);
+          rr += cols.rms[k] * cols.rms[k];
+        }
+        rr = Math.sqrt(rr / ch);
+      }
+      if (hi >= 0.995 || lo <= -0.995) clip += '<rect x="' + x + '" y="' + f1(cy - hh) + '" width="1" height="' + f1(hh * 0.12) + '"/><rect x="' + x + '" y="' + f1(cy + hh * 0.88) + '" width="1" height="' + f1(hh * 0.12) + '"/>';
+      hi = dbH(hi);
+      lo = -dbH(-lo);
+      rr = dbH(rr);
+      var yh = cy - Math.max(hi * hh, 0.6), yl = cy - Math.min(lo * hh, -0.6);
+      var px = x + 0.5, ry = Math.min(rr * hh, Math.max(hi, -lo) * hh);
+      top += (x ? "L" : "M") + px + " " + f1(yh);
+      bot.push(px + " " + f1(yl));
+      rt += (x ? "L" : "M") + px + " " + f1(cy - ry);
+      rb.push(px + " " + f1(cy + ry));
+    }
+    bot = "L" + bot.reverse().join("L");
+    rb = "L" + rb.reverse().join("L");
+    body += '<path d="' + top + bot + 'Z" fill-opacity=".55"/><path d="' + rt + rb + 'Z"/><line x1="0" x2="' + n + '" y1="' + f1(cy) + '" y2="' + f1(cy) + '" stroke="' + fill + '" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"/>';
+    if (L > 0) body += '<line x1="0" x2="' + n + '" y1="' + f1(LH * L) + '" y2="' + f1(LH * L) + '" stroke="rgba(0,0,0,.25)" stroke-width="1" vector-effect="non-scaling-stroke"/>';
+  }
+  return '<svg class="wv" viewBox="0 0 ' + n + ' 100" preserveAspectRatio="none" aria-hidden="true" fill="' + fill + '">' + body + (clip ? '<g fill="#ff3b30">' + clip + "</g>" : "") + "</svg>";
 }
 function film(m) {
   var c = m && m.col || ["#555", "#444"];
