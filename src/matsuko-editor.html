@@ -2342,12 +2342,12 @@ function hotEdit(el) {
   });
 }
 function titleForm(c) {
-  return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0"><label for="ttext" class="t2">文字（改行できます）</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" style="width:100%;height:auto;padding:6px 8px;resize:vertical">' + h(c.label) + "</textarea>" + fontRow(c) + '<div class="fg"><span>太さ</span>' + (fontById(c.font).weight ? '<span class="mu">このフォントは太さが決まっています</span>' : '<span class="seg">' + [[400, "細め"], [700, "標準"], [900, "極太"]].map(function(x) {
+  return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0"><label for="ttext" class="t2">文字</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" style="width:100%;height:auto;padding:6px 8px;resize:vertical">' + h(c.label) + "</textarea>" + fontRow(c) + (fontById(c.font).weight ? "" : '<div class="fg"><span>太さ</span><span class="seg">' + [[400, "細め"], [700, "標準"], [900, "極太"]].map(function(x) {
     return btn(x[1], "tSet", "weight|" + x[0], "s" + ((c.weight || 700) === x[0] ? " on" : ""));
-  }).join("") + "</span>") + '</div><div class="fg"><span>揃え</span><span class="seg">' + [["left", "左"], ["center", "中央"], ["right", "右"]].map(function(x) {
+  }).join("") + "</span></div>") + '<div class="fg"><span>揃え</span><span class="seg">' + [["left", "左"], ["center", "中央"], ["right", "右"]].map(function(x) {
     var cur = c.align || (c.st === "credit" || c.st === "sub" ? "center" : "left");
     return btn(x[1], "tSet", "align|" + x[0], "s" + (cur === x[0] ? " on" : ""));
-  }).join("") + "</span></div>" + numRow("行間", c, "lh") + numRow("文字の間隔", c, "ls") + '<div class="fg"><span>スタイル</span><span class="row" style="gap:8px;min-width:0">' + (c.look ? '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h((presetById(c.lookId) || { name: "カスタム" }).name) + "</span>" + btn("外す", "tLookOff", "", "s") : '<span class="mu">なし（テロップタブで選べます）</span>') + '</span></div><div class="fg"><span>開始（秒）</span><input class="inp" type="number" step="0.1" min="0" data-in="tstart" value="' + c.start.toFixed(1) + '" aria-label="開始（秒）"></div><div class="fg"><span>長さ（秒）</span><input class="inp" type="number" step="0.1" min="0.5" data-in="tdur" value="' + cLen(c).toFixed(1) + '" aria-label="長さ（秒）"></div><div class="row" style="gap:8px">' + btn("再生ヘッドへ移動", "tToHead", "", "s") + btn("削除", "delSel", "", "s") + "</div></div>";
+  }).join("") + "</span></div>" + numRow("行間", c, "lh") + numRow("文字の間隔", c, "ls") + '<div class="fg"><span>スタイル</span><span class="row" style="gap:8px;min-width:0">' + (c.look ? '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h((presetById(c.lookId) || { name: "カスタム" }).name) + "</span>" + btn("外す", "tLookOff", "", "s") : '<span class="mu">なし</span>') + '</span></div><div class="fg"><span>開始（秒）</span><input class="inp" type="number" step="0.1" min="0" data-in="tstart" value="' + c.start.toFixed(1) + '" aria-label="開始（秒）"></div><div class="fg"><span>長さ（秒）</span><input class="inp" type="number" step="0.1" min="0.5" data-in="tdur" value="' + cLen(c).toFixed(1) + '" aria-label="長さ（秒）"></div><div class="row" style="gap:8px">' + btn("再生ヘッドへ移動", "tToHead", "", "s") + btn("削除", "delSel", "", "s") + "</div></div>";
 }
 function fontRow(c) {
   var cur = c.font || "gothic", sys = systemFonts(), st = systemFontsState(), desk = !!HOST;
@@ -2364,14 +2364,12 @@ function fontRow(c) {
     return opt(SYS_PREFIX + f.family, f.name);
   }).join("") + "</optgroup>";
   var r = '<div class="fg"><span>フォント</span><select class="inp" data-in="tfont" aria-label="フォント">' + o + "</select></div>";
-  if (desk) {
-    if (st !== "ok") r += '<div class="mu" style="font-size:11px">PC のフォントを読み込んでいます…</div>';
-  } else if (st === "error" || !canQueryLocalFonts()) r += '<div class="fg"><span>名前で指定</span><input class="inp" data-in="tfontname" placeholder="例：メイリオ" aria-label="PC のフォントの名前" value="' + (isSystemFont(cur) ? h(cur.slice(SYS_PREFIX.length)) : "") + '"></div>' + (st === "error" ? '<div class="mu" style="font-size:11px">PC のフォントの一覧を読めませんでした。名前を入れると使えます。</div>' : "");
+  if (!desk && (st === "error" || !canQueryLocalFonts())) r += '<div class="fg"><span>名前で指定</span><input class="inp" data-in="tfontname" placeholder="例：メイリオ" aria-label="PC のフォントの名前" value="' + (isSystemFont(cur) ? h(cur.slice(SYS_PREFIX.length)) : "") + '"></div>';
   return r;
 }
 function styleGallery() {
   var t = selTitle(), cur = t && t.lookId;
-  return '<div class="mu" style="line-height:1.6;margin-bottom:10px">' + (t ? "選んでいるテロップのスタイルを変えます。" : "押すと、そのスタイルのテロップを再生ヘッドの位置に追加します（T キーでも追加できます）。") + '画面の上・字幕・クレジットなどの種類は、インスペクタで変えられます。</div><div class="tsg" role="list">' + TITLE_PRESETS.map(function(p) {
+  return '<div class="tsg" role="list">' + TITLE_PRESETS.map(function(p) {
     return '<button class="tsl' + (cur === p.id ? " on" : "") + '" role="listitem" title="' + h(p.name) + '" aria-label="' + h(p.name) + '"' + (cur === p.id ? ' aria-pressed="true"' : "") + A("tLook", p.id) + '><span class="tsb"><img src="' + presetThumb(p) + '" alt=""></span><span class="tsn">' + h(p.name) + "</span></button>";
   }).join("") + "</div>";
 }
