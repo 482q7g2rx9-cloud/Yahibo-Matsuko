@@ -12,7 +12,7 @@
   --tx:#ebebeb;--tx2:#c8c8c8;--mu:#a2a2a2;--wt:#ffffff;--inv:#1b1b1b;
   --ac:#378ef0;--ach:#4b9cf5;
   --ok:#33ab84;--wn:#f29423;--er:#ec5b62;
-  --chip:#3a3a3a;--page:#121212;--lane:#202020;--shadow:0 4px 16px rgba(0,0,0,.5);
+  --chip:#3a3a3a;--page:#121212;--lane:#202020;--lkh:rgba(255,255,255,.07);--shadow:0 4px 16px rgba(0,0,0,.5);
   --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23c8c8c8' stroke-width='1.6'/%3E%3C/svg%3E");
   --mix:#000;--lbm:#ffffff;
   --sel:color-mix(in srgb,var(--ac) 24%,var(--bg1));--selh:color-mix(in srgb,var(--ac) 32%,var(--bg1));
@@ -23,7 +23,7 @@
   --bd:#b3b3b3;--bdh:#8e8e8e;--tr:#c4c4c4;--bd2:#8e8e8e;
   --tx:#2c2c2c;--tx2:#4b4b4b;--mu:#6e6e6e;--wt:#1a1a1a;--inv:#ffffff;
   --ac:#1473e6;--ach:#0d66d0;--ok:#1f7f5f;--wn:#b45a08;--er:#c9252d;
-  --chip:#e1e1e1;--page:#dcdcdc;--lane:#1e1e1e;--shadow:0 4px 16px rgba(0,0,0,.15);
+  --chip:#e1e1e1;--page:#dcdcdc;--lane:#e6e6e6;--lkh:rgba(0,0,0,.06);--shadow:0 4px 16px rgba(0,0,0,.15);
   --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%234b4b4b' stroke-width='1.6'/%3E%3C/svg%3E");
   --lbm:#000000}}
 :root[data-theme="light"]{color-scheme:light;
@@ -31,7 +31,7 @@
   --bd:#b3b3b3;--bdh:#8e8e8e;--tr:#c4c4c4;--bd2:#8e8e8e;
   --tx:#2c2c2c;--tx2:#4b4b4b;--mu:#6e6e6e;--wt:#1a1a1a;--inv:#ffffff;
   --ac:#1473e6;--ach:#0d66d0;--ok:#1f7f5f;--wn:#b45a08;--er:#c9252d;
-  --chip:#e1e1e1;--page:#dcdcdc;--lane:#1e1e1e;--shadow:0 4px 16px rgba(0,0,0,.15);
+  --chip:#e1e1e1;--page:#dcdcdc;--lane:#e6e6e6;--lkh:rgba(0,0,0,.06);--shadow:0 4px 16px rgba(0,0,0,.15);
   --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%234b4b4b' stroke-width='1.6'/%3E%3C/svg%3E");
   --lbm:#000000}
 :root[data-theme="dark"]{color-scheme:dark;
@@ -39,7 +39,7 @@
   --bd:#5a5a5a;--bdh:#7a7a7a;--tr:#5c5c5c;--bd2:#787878;
   --tx:#ebebeb;--tx2:#c8c8c8;--mu:#a2a2a2;--wt:#ffffff;--inv:#1b1b1b;
   --ac:#378ef0;--ach:#4b9cf5;--ok:#33ab84;--wn:#f29423;--er:#ec5b62;
-  --chip:#3a3a3a;--page:#121212;--lane:#202020;--shadow:0 4px 16px rgba(0,0,0,.5);
+  --chip:#3a3a3a;--page:#121212;--lane:#202020;--lkh:rgba(255,255,255,.07);--shadow:0 4px 16px rgba(0,0,0,.5);
   --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23c8c8c8' stroke-width='1.6'/%3E%3C/svg%3E");
   --lbm:#ffffff}
 /* アクセント（Spectrum の色相）。選択色・文字色は color-mix で自動的に作る */
@@ -291,7 +291,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--ac);width:14px;height:
 .tl2 .body{position:relative;overflow:auto}
 .tl2 .tlc{position:relative}
 .tl2 .lane{position:absolute;left:0}
-.tl2 .lane.lk{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.07) 0 6px,transparent 6px 12px)}
+.tl2 .lane.lk{background-image:repeating-linear-gradient(135deg,var(--lkh) 0 6px,transparent 6px 12px)}
 .tl2 .lane.off{opacity:.55}
 .tl2 .ci{box-sizing:border-box;touch-action:none}
 .tl2 .ci.snd{cursor:grab;padding:0}
