@@ -181,7 +181,7 @@ R.edit=function(){
         (rngOn?'<span class="t-ac" style="margin-left:6px">書き出し範囲 '+tc(P.pin||0)+' – '+tc(P.pout!=null?P.pout:progDur())+'</span>'+btn('範囲を消去','pclear','','s'):'')+
         '</div><div class="tl tl2" data-tlwrap>'+tlInner()+'</div>'+
       '<div class="tlfoot"><button aria-label="縮小" title="縮小（'+keyOf('zout')+'）"'+A('zout')+'>−</button><input type="range" min="0" max="100" value="'+zoomVal()+'" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（'+keyOf('zin')+'）"'+A('zin')+'>＋</button></div></div></div></div>'+
-  /* インスペクタ：幅は固定（前にドラッグで広げられた最大の幅：画面の幅の 36%、最大 560px）。見出しの右のボタンで閉じて、細い帯にできる */
+  /* インスペクタ：幅は固定（前にドラッグで広げられた最大の幅の 85%）。見出しの右のボタンで閉じて、細い帯にできる */
   (insClosed()?'<div class="pn r insc"><button class="ib" aria-label="インスペクタを開く" title="インスペクタを開く"'+A('insToggle')+'>'+ic('chevL',16)+'</button><span class="vt">インスペクタ</span></div>':
   '<div class="pn r" style="width:'+insWidth()+'px">'+ph('インスペクタ','<span class="x">'+h(ins.name)+'</span><button class="ib" aria-label="インスペクタを閉じる" title="インスペクタを閉じる"'+A('insToggle')+'>'+ic('chevR',16)+'</button>')+'<div class="scroll">'+ins.html+
     (P.sample?'<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>':'')+'</div></div>');
@@ -203,5 +203,5 @@ export function loadAview(){try{var o=JSON.parse(localStorage.getItem('matsuko.a
 /* インスペクタを閉じているか（このブラウザに覚える） */
 export function insClosed(){try{return localStorage.getItem('matsuko.inspector')==='closed';}catch(e){return !!S.insClosed;}}
 export function toggleInspector(){var c=!insClosed();S.insClosed=c;try{localStorage.setItem('matsuko.inspector',c?'closed':'open');}catch(e){}draw();}
-/* インスペクタの幅：画面の幅の 36%（280〜560px）。前に端をドラッグして広げられた最大の幅と同じ */
-export function insWidth(){var app=document.getElementById('app'),aw=app?app.clientWidth:1180;return Math.round(Math.max(280,Math.min(560,aw*0.36)));}
+/* インスペクタの幅：前に端をドラッグして広げられた最大の幅（画面の幅の 36%、280〜560px）の 85% */
+export function insWidth(){var app=document.getElementById('app'),aw=app?app.clientWidth:1180;return Math.round(Math.max(280,Math.min(560,aw*0.36))*0.85);}
