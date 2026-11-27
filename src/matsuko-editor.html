@@ -436,6 +436,11 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .tsl.on .tsb{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
 .tsl.on .tsn{color:var(--ac)}
 
+/* トランジション：つなぎ目をまたぐ帯 */
+.tl2 .trx{position:absolute;z-index:4;pointer-events:none;box-sizing:border-box;border:1px solid rgba(255,255,255,.85);border-radius:3px;background:linear-gradient(90deg,rgba(30,30,30,.75),rgba(120,120,120,.75));color:#fff;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
+.tl2 .trx.on{border-color:var(--wt);box-shadow:0 0 0 1px var(--wt)}
+.tl2 .trx span{padding:0 4px;overflow:hidden;text-overflow:ellipsis}
+
 </style>
 <div id="app">
 <header id="top"></header>
@@ -454,7 +459,7 @@ var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var D;
-function init$r() {
+function init$s() {
   D = {
     title: "地元商店街 密着ドキュメント（8分）",
     people: [["佐", "var(--ac)", "#0b1220"], ["田", "#ffb454", "#1b1204"], ["山", "var(--ok)", "#0b1a10"]],
@@ -856,7 +861,7 @@ var hasFx = hasFx$1;
 function setP(v) {
   P = v;
 }
-function init$q() {
+function init$r() {
   P = sampleProject();
   uid = uid$1;
 }
@@ -892,7 +897,7 @@ function persist() {
   } catch (e) {
   }
 }
-function init$p() {
+function init$q() {
   S = {
     page: "edit",
     theme: "system",
@@ -915,7 +920,7 @@ function init$p() {
     tlx: 0,
     tly: 0,
     tool: "select",
-    open: { clip: 1, motion: 1, audio: 1, video: 1, comp: 1, track: 1, color: 1 },
+    open: { clip: 1, motion: 1, audio: 1, video: 1, comp: 1, track: 1, color: 1, trans: 1 },
     fx: "オブジェクトトラッキング",
     fxClosed: {},
     ba: "after",
@@ -1034,9 +1039,9 @@ function drawLookText(cx, text, x, y, fs, look) {
   cx.fillText(text, x, y);
   cx.restore();
 }
-const thumbs = {};
+const thumbs$1 = {};
 function presetThumb(p) {
-  if (thumbs[p.id]) return thumbs[p.id];
+  if (thumbs$1[p.id]) return thumbs$1[p.id];
   const c = document.createElement("canvas");
   c.width = 256;
   c.height = 160;
@@ -1047,10 +1052,10 @@ function presetThumb(p) {
   cx.textAlign = "center";
   cx.textBaseline = "middle";
   drawLookText(cx, "あア", 128, 82, fs, p.look);
-  return thumbs[p.id] = c.toDataURL("image/png");
+  return thumbs$1[p.id] = c.toDataURL("image/png");
 }
 function clearThumbs() {
-  for (const k of Object.keys(thumbs)) delete thumbs[k];
+  for (const k of Object.keys(thumbs$1)) delete thumbs$1[k];
 }
 const TITLE_FONTS = [
   { id: "gothic", name: "ゴシック（Noto Sans JP）", family: '"Noto Sans JP","Noto Sans JP Variable"' },
@@ -1132,6 +1137,180 @@ function loadFont(font, weight, done) {
   }
   return requested[key];
 }
+const TRANSITIONS = [
+  { id: "fade", name: "クロスディゾルブ", ff: "fade" },
+  { id: "fadeblack", name: "黒を挟む", ff: "fadeblack" },
+  { id: "fadewhite", name: "白を挟む", ff: "fadewhite" },
+  { id: "wipeleft", name: "ワイプ（左へ）", ff: "wipeleft" },
+  { id: "wiperight", name: "ワイプ（右へ）", ff: "wiperight" },
+  { id: "wipeup", name: "ワイプ（上へ）", ff: "wipeup" },
+  { id: "slideleft", name: "スライド（左へ）", ff: "slideleft" },
+  { id: "slideright", name: "スライド（右へ）", ff: "slideright" },
+  { id: "circleopen", name: "円で開く", ff: "circleopen" },
+  { id: "circleclose", name: "円で閉じる", ff: "circleclose" },
+  { id: "zoomin", name: "ズームイン", ff: "zoomin" },
+  { id: "pixelize", name: "モザイク", ff: "pixelize" }
+];
+const TRANSITION_DEFAULT_D = 1;
+function transitionById(id) {
+  return TRANSITIONS.find((t) => t.id === id);
+}
+const smooth = (e0, e1, x) => {
+  const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
+};
+let pixCanvas = null;
+let tmpCanvas = null;
+function tmp(W, H) {
+  if (!tmpCanvas) tmpCanvas = document.createElement("canvas");
+  if (tmpCanvas.width !== W || tmpCanvas.height !== H) {
+    tmpCanvas.width = W;
+    tmpCanvas.height = H;
+  }
+  return tmpCanvas;
+}
+function mixTransition(cx, id, a, b, p, W, H) {
+  p = Math.max(0, Math.min(1, p));
+  cx.save();
+  const full = (img, alpha = 1) => {
+    cx.globalAlpha = alpha;
+    cx.drawImage(img, 0, 0, W, H);
+    cx.globalAlpha = 1;
+  };
+  const clipRect = (x, y, w, h2, img) => {
+    cx.save();
+    cx.beginPath();
+    cx.rect(x, y, w, h2);
+    cx.clip();
+    cx.drawImage(img, 0, 0, W, H);
+    cx.restore();
+  };
+  switch (id) {
+    case "fadeblack":
+    case "fadewhite": {
+      const pr = 1 - p, ph2 = 0.2;
+      const wA = smooth(1 - ph2, 1, pr) * pr, wB = (1 - smooth(ph2, 1, pr)) * (1 - pr);
+      cx.fillStyle = id === "fadeblack" ? "#000" : "#fff";
+      cx.fillRect(0, 0, W, H);
+      if (wA > 0 && wB < 1) full(a, Math.min(1, wA / (1 - wB)));
+      if (wB > 0) full(b, wB);
+      break;
+    }
+    case "wipeleft":
+      full(a);
+      clipRect(W * (1 - p), 0, W * p, H, b);
+      break;
+    case "wiperight":
+      full(a);
+      clipRect(0, 0, W * p, H, b);
+      break;
+    case "wipeup":
+      full(a);
+      clipRect(0, H * (1 - p), W, H * p, b);
+      break;
+    case "slideleft":
+      cx.drawImage(a, -W * p, 0, W, H);
+      cx.drawImage(b, W * (1 - p), 0, W, H);
+      break;
+    case "slideright":
+      cx.drawImage(a, W * p, 0, W, H);
+      cx.drawImage(b, -W * (1 - p), 0, W, H);
+      break;
+    case "circleopen":
+    case "circleclose": {
+      const pr = 1 - p, c = (pr - 0.5) * 3, z = Math.hypot(W / 2, H / 2), open = id === "circleopen";
+      full(a);
+      const t = tmp(W, H);
+      const tc2 = t.getContext("2d");
+      if (tc2) {
+        tc2.globalCompositeOperation = "source-over";
+        tc2.clearRect(0, 0, W, H);
+        tc2.drawImage(b, 0, 0, W, H);
+        const g = tc2.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, z);
+        for (let i = 0; i <= 20; i++) {
+          const r = i / 20, wB = open ? 1 - smooth(0, 1, r + c) : smooth(0, 1, r - c);
+          g.addColorStop(r, "rgba(0,0,0," + wB.toFixed(3) + ")");
+        }
+        tc2.globalCompositeOperation = "destination-in";
+        tc2.fillStyle = g;
+        tc2.fillRect(0, 0, W, H);
+        tc2.globalCompositeOperation = "source-over";
+        cx.drawImage(t, 0, 0, W, H);
+      }
+      break;
+    }
+    case "zoomin": {
+      const pr = 1 - p, zf = Math.max(4e-3, smooth(0.5, 1, pr));
+      const sw = W * zf, sh = H * zf;
+      cx.drawImage(a, (W - sw) / 2, (H - sh) / 2, sw, sh, 0, 0, W, H);
+      full(b, 1 - smooth(0, 0.5, pr));
+      break;
+    }
+    case "pixelize": {
+      const d = Math.ceil(Math.min(p, 1 - p) * 50) / 50, sq = 2 * d * Math.min(W, H) / 20;
+      const t = tmp(W, H), tc2 = t.getContext("2d");
+      if (!tc2) break;
+      tc2.globalCompositeOperation = "source-over";
+      tc2.globalAlpha = 1;
+      tc2.drawImage(a, 0, 0, W, H);
+      tc2.globalAlpha = p;
+      tc2.drawImage(b, 0, 0, W, H);
+      tc2.globalAlpha = 1;
+      if (sq < 1.5) {
+        cx.drawImage(t, 0, 0, W, H);
+        break;
+      }
+      const sw = Math.max(1, Math.round(W / sq)), sh = Math.max(1, Math.round(H / sq));
+      if (!pixCanvas) pixCanvas = document.createElement("canvas");
+      pixCanvas.width = sw;
+      pixCanvas.height = sh;
+      const pc = pixCanvas.getContext("2d");
+      if (pc) {
+        pc.drawImage(t, 0, 0, sw, sh);
+        cx.imageSmoothingEnabled = false;
+        cx.drawImage(pixCanvas, 0, 0, sw, sh, 0, 0, W, H);
+        cx.imageSmoothingEnabled = true;
+      }
+      break;
+    }
+    default:
+      full(a);
+      full(b, p);
+  }
+  cx.restore();
+}
+const thumbs = {};
+const THUMB_P = { fadeblack: 0.6, fadewhite: 0.6, circleopen: 0.45, circleclose: 0.55, zoomin: 0.3, pixelize: 0.4 };
+function card(label, bg, fg, W, H) {
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const x = c.getContext("2d");
+  if (x) {
+    const g = x.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, bg);
+    g.addColorStop(1, fg);
+    x.fillStyle = g;
+    x.fillRect(0, 0, W, H);
+    x.fillStyle = "rgba(255,255,255,.92)";
+    x.font = "700 " + Math.round(H * 0.5) + "px sans-serif";
+    x.textAlign = "center";
+    x.textBaseline = "middle";
+    x.fillText(label, W / 2, H / 2 + 2);
+  }
+  return c;
+}
+function transitionThumb(id) {
+  if (thumbs[id]) return thumbs[id];
+  const W = 256, H = 144;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const cx = c.getContext("2d");
+  if (!cx) return "";
+  mixTransition(cx, id, card("A", "#2f6fd1", "#1b3f7a", W, H), card("B", "#f08a24", "#a8460e", W, H), THUMB_P[id] || 0.4, W, H);
+  return thumbs[id] = c.toDataURL("image/png");
+}
 var IDB;
 var saveTimer;
 function saveP() {
@@ -1210,7 +1389,7 @@ function setHIST(v) {
 function setREDO(v) {
   REDO = v;
 }
-function init$o() {
+function init$p() {
   IDB = {
     db: null,
     open: function() {
@@ -1592,7 +1771,7 @@ function rec() {
 function setREC(v) {
   REC = v;
 }
-function init$n() {
+function init$o() {
   SRC = { el: null, id: null, playing: false, raf: 0 };
   SIM = null;
   FXP = null;
@@ -1917,7 +2096,7 @@ function openPicker() {
   i.value = "";
   i.click();
 }
-function init$m() {
+function init$n() {
   IMP = { total: 0, done: 0, cur: "" };
 }
 const SILENCE_PAD = 0.1;
@@ -1954,6 +2133,106 @@ function keepSegments(marks, a, b) {
 function numberIn(s) {
   const m = String(s).match(/[\d.]+/);
   return m ? parseFloat(m[0]) : 0;
+}
+function prevOf(b) {
+  return P.clips.filter(function(c) {
+    return c !== b && c.tr === b.tr && c.type === "media" && Math.abs(cEnd(c) - b.start) < 1e-3;
+  })[0];
+}
+function isCutB(b) {
+  var tr = b && T(b.tr), m = b && M(b.m);
+  return !!(b && b.type === "media" && tr && tr.kind === "v" && m && (m.k === "映像" || m.k === "画像") && prevOf(b));
+}
+function trTarget() {
+  var c = primary();
+  if (c && isCutB(c)) return c;
+  var t = S.t.edit, best = null;
+  P.clips.forEach(function(b) {
+    if (isCutB(b) && (!best || Math.abs(b.start - t) < Math.abs(best.start - t))) best = b;
+  });
+  return best;
+}
+function transGallery() {
+  return '<div class="tsg" role="list">' + TRANSITIONS.map(function(x) {
+    return '<button class="tsl" role="listitem" data-trn="' + x.id + '" title="' + h(x.name) + '" aria-label="' + h(x.name) + '"' + A("trApply", x.id) + '><span class="tsb"><img src="' + transitionThumb(x.id) + '" alt=""></span><span class="tsn">' + h(x.name) + "</span></button>";
+  }).join("") + "</div>";
+}
+function applyTransition(id) {
+  var b = trTarget(), def = transitionById(id);
+  if (!def) return;
+  if (!b) return toast("つなぎ目がありません");
+  mark();
+  b.xin = { k: id, d: b.xin && b.xin.d || TRANSITION_DEFAULT_D };
+  changed();
+  toast("「" + def.name + "」を付けました");
+}
+var PV = null;
+function stopPreview() {
+  if (!PV) return;
+  cancelAnimationFrame(PV.raf);
+  E.prevTr = null;
+  S.t.edit = PV.saved;
+  if (E.mon && PV.mon != null) E.mon.gain.value = PV.mon;
+  PV = null;
+  sync(S.t.edit, false);
+  heads();
+  redrawProg();
+}
+function startPreview(id) {
+  stopPreview();
+  var b = trTarget();
+  if (!b || !transitionById(id)) return;
+  if (E.playing) progStop();
+  PV = { id, saved: S.t.edit, raf: 0, mon: null };
+  E.prevTr = { bid: b.id, k: id, d: b.xin && b.xin.d || TRANSITION_DEFAULT_D };
+  var q = trPairs().filter(function(x) {
+    return x.b === b;
+  })[0];
+  if (!q) return stopPreview();
+  if (E.mon) {
+    PV.mon = E.mon.gain.value;
+    E.mon.gain.value = 0;
+  }
+  var L0 = Math.max(0, q.w0 - 0.6), L1 = q.w1 + 0.6, len = L1 - L0, me = PV;
+  sync(L0, false);
+  var w0 = performance.now();
+  (function ready2() {
+    if (PV !== me) return;
+    var wait = activeVideos(L0).some(function(e) {
+      return e.readyState < 2 || e.seeking;
+    });
+    if (wait && performance.now() - w0 < 1200) {
+      me.raf = requestAnimationFrame(ready2);
+      return;
+    }
+    var t0 = performance.now(), last2 = -1;
+    (function loop() {
+      if (PV !== me) return;
+      var k = (performance.now() - t0) / 1e3, t = L0 + k % len, wrap = Math.floor(k / len) !== last2;
+      last2 = Math.floor(k / len);
+      S.t.edit = t;
+      sync(t, !wrap);
+      heads();
+      redrawProg();
+      me.raf = requestAnimationFrame(loop);
+    })();
+  })();
+}
+function init$m() {
+  PV = null;
+  document.addEventListener("mouseover", function(e) {
+    var el = e.target.closest && e.target.closest("[data-trn]");
+    if (!el || e.relatedTarget && el.contains(e.relatedTarget)) return;
+    startPreview(el.dataset.trn);
+  });
+  document.addEventListener("mouseout", function(e) {
+    var el = e.target.closest && e.target.closest("[data-trn]");
+    if (!el || e.relatedTarget && el.contains(e.relatedTarget)) return;
+    stopPreview();
+  });
+  addEventListener("pointerdown", function(e) {
+    if (PV && !(e.target.closest && e.target.closest("[data-trn]"))) stopPreview();
+  }, true);
 }
 var VM;
 var AM;
@@ -2402,6 +2681,14 @@ function tlInner() {
     })[0];
     if (r) cl += clipHtml(c, r, pps);
   });
+  trPairs().forEach(function(q) {
+    var r = ROWS.filter(function(x) {
+      return x.id === q.tr;
+    })[0], d = transitionById(q.k);
+    if (!r || !d) return;
+    var on = S.sel.indexOf(q.b.id) >= 0;
+    cl += '<div class="trx' + (on ? " on" : "") + '" style="left:' + (q.w0 * pps).toFixed(1) + "px;width:" + Math.max(6, q.d * pps).toFixed(1) + "px;top:" + (r.y + Math.round(r.h * 0.3)) + "px;height:" + Math.max(12, Math.round(r.h * 0.4)) + 'px" title="' + h(d.name) + '"><span>' + h(d.name) + "</span></div>";
+  });
   var step = tickStep(pps), lab = "";
   for (var t = 0; t * pps < W; t += step) lab += '<div class="rl" style="left:' + (t * pps).toFixed(1) + 'px">' + tc(t) + "</div>";
   var rng2 = P.pin != null || P.pout != null ? '<div class="rng" style="left:' + (P.pin || 0) * pps + "px;width:" + ((P.pout != null ? P.pout : dur) - (P.pin || 0)) * pps + 'px" title="書き出し範囲"></div>' : "", ph0 = S.t.edit * pps;
@@ -2437,6 +2724,7 @@ function drawTL() {
 var PROPS;
 var TITLE_PX = { "小": 45, "中": 59, "大": 81 };
 function propVal(c, key) {
+  if (key === "xd") return c.xin && c.xin.d || 1;
   if (key === "fsz" && c.fsz == null) return TITLE_PX[c.sz || "中"] || 59;
   return c[key] == null ? PROPS[key].def : c[key];
 }
@@ -2460,6 +2748,13 @@ function setProp(cid, key, v) {
   if (key === "fin" || key === "fout") v = Math.min(v, Math.max(0, cLen(c) - (key === "fin" ? fades(c)[1] : fades(c)[0])));
   v = Math.round(Math.max(p.min, Math.min(p.max, v)) / p.step) * p.step;
   v = +v.toFixed(3);
+  if (key === "xd") {
+    if (c.xin) c.xin.d = v;
+    drawTL();
+    redrawProg();
+    saveP();
+    return;
+  }
   c[key] = v;
   [].forEach.call(document.querySelectorAll('[data-k="' + key + '"][data-cid="' + cid + '"]'), function(x) {
     if (x.tagName === "INPUT" && x.type === "range") {
@@ -2571,6 +2866,12 @@ function inspector() {
   var info = kv("素材", h(m ? m.n : c.label || "—")) + kv("トラック", c.tr + (a && v ? " / " + a.tr : "")) + kv("開始", tc(c.start)) + (c.type === "media" ? kv("イン", tc(c.in)) + kv("アウト", tc(c.out)) : "") + kv("長さ", mmss(cLen(c))) + '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">' + btn("再生ヘッドで分割", "split", "", "s") + btn("削除", "delSel", "", "s") + btn("リップル削除", "rdel", "", "s") + (c.link || pair ? btn("リンク解除", "lnk", "", "s") : "") + "</div>";
   var h2 = fsec("clip", "クリップ", null, info);
   if (v && v.type === "media") h2 += fsec("motion", "モーション・不透明度", null, motionForm(v), 1);
+  var tq = v && trPairs().filter(function(q) {
+    return q.b === v;
+  })[0];
+  if (tq) h2 += fsec("trans", "トランジション", null, '<div class="fg"><span>種類</span><select class="inp" data-in="trk" aria-label="トランジションの種類">' + TRANSITIONS.map(function(x) {
+    return '<option value="' + x.id + '"' + (x.id === tq.k ? " selected" : "") + ">" + h(x.name) + "</option>";
+  }).join("") + "</select></div>" + numRow("長さ", v, "xd") + '<div class="row" style="justify-content:flex-end;padding-top:8px">' + btn("外す", "trDel", v.id, "s") + "</div>");
   if (a) h2 += fsec("audio", "音量", null, numRow("音量", a, "vol") + numRow("フェードイン", a, "fin") + numRow("フェードアウト", a, "fout"));
   if (m) h2 += '<div style="padding:10px 16px;border-bottom:1px solid var(--dv);line-height:1.6"><div style="font-weight:500">リンク中の台本行</div><div class="mu">' + h(m.line && m.line !== "—" ? m.line : "—") + "</div></div>";
   return { name: m ? m.n : c.label || "", html: h2 };
@@ -2622,11 +2923,12 @@ function init$j() {
     op: { min: 0, max: 100, step: 1, unit: "%", def: 100, dec: 1 },
     vol: { min: -60, max: 15, step: 0.1, unit: "dB", def: 0, dec: 1 },
     fin: { min: 0, max: 600, step: 0.05, unit: "s", def: 0, dec: 2 },
+    xd: { min: 0.1, max: 10, step: 0.05, unit: "s", def: 1, dec: 2 },
     fout: { min: 0, max: 600, step: 0.05, unit: "s", def: 0, dec: 2 }
   };
   R.edit = function() {
     var left;
-    if (S.etab !== "text") {
+    if (S.etab !== "text" && S.etab !== "trans") {
       var L = P.media.filter(function(m) {
         return m.k === "映像" || m.k === "音声" || m.k === "画像" || m.k === "テイク";
       });
@@ -2636,9 +2938,10 @@ function init$j() {
         var r = D.rights[m.r] || ["—", ""], can = m.url && !m.loading || m.sample && m.k !== "音声" && m.k !== "テイク";
         return '<div style="position:relative"' + (can ? ' data-am="' + m.id + '"' : "") + '><div class="tb" style="cursor:' + (can ? "grab" : "default") + ";background:" + (m.thumb ? "#000 url(" + m.thumb + ") center / cover" : m.k === "音声" ? "#2f6b45" : m.k === "テイク" ? "#5a4a8a" : (m.col || ["#555"])[0]) + '"><span>' + m.k + "</span><span>" + (m.k === "画像" ? "" : mmss(m.d)) + "</span></div>" + (can ? '<button class="b s" aria-label="「' + h(m.n) + '」をタイムラインに追加" title="タイムラインに追加"' + A("addtl", m.id) + ' style="position:absolute;right:4px;top:4px;width:24px;height:24px;padding:0;border-radius:50%">' + ic("plus", 14) + "</button>" : "") + '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (m.k === "音声" ? h(m.c) + " " : "") + h(m.n) + '</div><div class="' + (m.r === "wn" ? "t-wn" : "t-ok") + '">' + r[0] + "</div></div>";
       }).join("") + "</div></div>";
-    } else left = '<div class="scroll" style="padding:14px">' + styleGallery() + "</div>";
+    } else if (S.etab === "trans") left = '<div class="scroll" style="padding:14px">' + transGallery() + "</div>";
+    else left = '<div class="scroll" style="padding:14px">' + styleGallery() + "</div>";
     var tools = [["select", "選択", keyOf("tSel")], ["split", "分割", keyOf("tSplit")], ["trash", "削除", ""], ["hand", "ハンド", keyOf("tHand")], ["text", "文字", ""]], ins = inspector(), rngOn = P.pin != null || P.pout != null;
-    return '<div class="pn l" style="width:' + pw("editL") + 'px">' + splitter("editL", "l") + ph("素材") + tabs([["assets", "アセット"], ["text", "テロップ"]], S.etab === "text" ? "text" : "assets", "etab", "素材の種類") + left + '</div><div class="pc" style="background:var(--bg0)"><div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">' + ph("プレビュー", '<span class="x">全長 ' + mmss(progDur()) + "</span>") + '<div class="mon" style="flex:1;min-height:0"><canvas data-prog ' + canvasAttrs() + ' style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas></div><div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">' + tc(S.t.edit) + '</span><span class="mid">' + ibtn("inPt", "イン点を設定（I キー）", "pin") + ibtn("outPt", "アウト点を設定（O キー）", "pout") + '<span class="vsep"></span>' + ibtn("prevCut", "前の編集点へ（↑）", "prev") + ibtn("back", "1フレーム戻る（←）", "fb") + playBtn(E.playing) + ibtn("fwd", "1フレーム進む（→）", "ff") + ibtn("nextCut", "次の編集点へ（↓）", "next") + '<span class="vsep"></span>' + ibtn("split", "再生ヘッドで分割（S キー）", "split") + '</span><span class="end row" style="justify-content:flex-end;gap:6px"><button class="b s" style="height:24px;padding:0 8px;border:0;background:none;color:var(--mu)" title="プレビューの画質"' + A("psOpen") + ">" + pqLabel() + "</button>" + ibtn("full", "全画面", "todo") + '</span></div></div><div style="flex:1;min-height:0;display:flex"><div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px;background:var(--bg1);border-right:1px solid var(--ln)">' + tools.map(function(t) {
+    return '<div class="pn l" style="width:' + pw("editL") + 'px">' + splitter("editL", "l") + ph("素材") + tabs([["assets", "アセット"], ["text", "テロップ"], ["trans", "トランジション"]], S.etab === "text" || S.etab === "trans" ? S.etab : "assets", "etab", "素材の種類") + left + '</div><div class="pc" style="background:var(--bg0)"><div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">' + ph("プレビュー", '<span class="x">全長 ' + mmss(progDur()) + "</span>") + '<div class="mon" style="flex:1;min-height:0"><canvas data-prog ' + canvasAttrs() + ' style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas></div><div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">' + tc(S.t.edit) + '</span><span class="mid">' + ibtn("inPt", "イン点を設定（I キー）", "pin") + ibtn("outPt", "アウト点を設定（O キー）", "pout") + '<span class="vsep"></span>' + ibtn("prevCut", "前の編集点へ（↑）", "prev") + ibtn("back", "1フレーム戻る（←）", "fb") + playBtn(E.playing) + ibtn("fwd", "1フレーム進む（→）", "ff") + ibtn("nextCut", "次の編集点へ（↓）", "next") + '<span class="vsep"></span>' + ibtn("split", "再生ヘッドで分割（S キー）", "split") + '</span><span class="end row" style="justify-content:flex-end;gap:6px"><button class="b s" style="height:24px;padding:0 8px;border:0;background:none;color:var(--mu)" title="プレビューの画質"' + A("psOpen") + ">" + pqLabel() + "</button>" + ibtn("full", "全画面", "todo") + '</span></div></div><div style="flex:1;min-height:0;display:flex"><div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px;background:var(--bg1);border-right:1px solid var(--ln)">' + tools.map(function(t) {
       var on = S.tool === t[0];
       return '<button aria-label="' + t[1] + '" title="' + t[1] + (t[2] ? "（" + t[2] + " キー）" : "") + '" aria-pressed="' + on + '"' + A("tool", t[0]) + ' style="width:38px;height:44px;padding:0;border:0;border-radius:4px;background:' + (on ? "var(--bg4)" : "transparent") + ";color:" + (on ? "var(--ac)" : "var(--tx2)") + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">' + ic(t[0], 16) + '<span style="font-size:10px;color:var(--tx2)">' + t[1] + "</span></button>";
     }).join("") + '</div><div style="flex:1;min-width:0;display:flex;flex-direction:column"><div class="row tlbar"><button class="b s' + (S.snap ? " on" : "") + '" aria-pressed="' + S.snap + '"' + A("snapT") + ' title="スナップ（N キー）">スナップ</button>' + btn("＋ トラック", "addTrk", "", "s", "トラックを追加") + (rngOn ? '<span class="t-ac" style="margin-left:6px">書き出し範囲 ' + tc(P.pin || 0) + " – " + tc(P.pout != null ? P.pout : progDur()) + "</span>" + btn("範囲を消去", "pclear", "", "s") : "") + '</div><div class="tl tl2" data-tlwrap>' + tlInner() + '</div><div class="tlfoot"><button aria-label="縮小" title="縮小（' + keyOf("zout") + '）"' + A("zout") + '>−</button><input type="range" min="0" max="100" value="' + zoomVal() + '" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（' + keyOf("zin") + '）"' + A("zin") + '>＋</button></div></div></div></div><div class="pn r" style="width:' + pw("editR") + 'px">' + splitter("editR", "r") + ph("インスペクタ", '<span class="x">' + h(ins.name) + "</span>") + '<div class="scroll">' + ins.html + (P.sample ? '<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>' : "") + "</div></div>";
@@ -3809,6 +4112,16 @@ function init$e() {
         changed();
       }
     },
+    trApply: function(v) {
+      applyTransition(v);
+    },
+    trDel: function(v) {
+      var c = C(v);
+      if (!c || !c.xin) return;
+      mark();
+      delete c.xin;
+      changed();
+    },
     tSet: function(v) {
       var i = v.indexOf("|"), k = v.slice(0, i), x = v.slice(i + 1), L = S.sel.map(C).filter(function(c) {
         return c && c.type === "title" && !locked(c);
@@ -4806,6 +5119,34 @@ function audible(tr) {
   });
   return !so || !!tr.solo;
 }
+function trPairs() {
+  var out = [], pv = E.prevTr;
+  P.clips.forEach(function(b) {
+    if (b.type !== "media") return;
+    var x = pv && pv.bid === b.id ? pv : b.xin;
+    if (!x || !transitionById(x.k)) return;
+    var tr = T(b.tr);
+    if (!tr || tr.kind !== "v") return;
+    var a = P.clips.filter(function(c) {
+      return c !== b && c.tr === b.tr && c.type === "media" && Math.abs(cEnd(c) - b.start) < 1e-3;
+    })[0];
+    if (!a) return;
+    var d = Math.max(0.05, Math.min(x.d || TRANSITION_DEFAULT_D, cLen(a), cLen(b)));
+    out.push({ a, b, k: x.k, d, w0: b.start - d / 2, w1: b.start + d / 2, tr: b.tr });
+  });
+  return out;
+}
+function pairAt(t, trid) {
+  var L = trPairs();
+  for (var i = 0; i < L.length; i++) {
+    var q = L[i];
+    if ((!trid || q.tr === trid) && t >= q.w0 - 1e-9 && t < q.w1) return q;
+  }
+  return null;
+}
+function srcClamp(m, lt) {
+  return Math.max(0, Math.min((m.d || 1e9) - 0.04, lt));
+}
 function sync(t, play) {
   var want = {}, near = [];
   P.clips.forEach(function(c) {
@@ -4822,6 +5163,17 @@ function sync(t, play) {
     return x.d - y.d;
   }).slice(0, 4).forEach(function(w) {
     want[w.c.id] = w;
+  });
+  trPairs().forEach(function(q) {
+    if (t < q.w0 - 1e-9 || t >= q.w1) return;
+    var tr = T(q.tr);
+    if (!tr || tr.hide) return;
+    [q.a, q.b].forEach(function(c) {
+      var m = M(c.m);
+      if (!m || !m.url || m.loading || m.k !== "映像") return;
+      var raw = c.in + (t - c.start), lt = srcClamp(m, raw);
+      want[c.id] = { c, m, a: false, lt, pre: Math.abs(lt - raw) > 1e-3 ? 1 : 0 };
+    });
   });
   Object.keys(want).forEach(function(id) {
     var w = want[id], e = elFor(w.c, w.m, w.a);
@@ -4881,22 +5233,46 @@ function drawFrame(cx, W, H, t) {
   cx.fillRect(0, 0, W, H);
   vTracks().slice().reverse().forEach(function(tr) {
     if (tr.hide) return;
+    var q = pairAt(t, tr.id);
+    if (q) drawPair(cx, W, H, q, t);
     P.clips.forEach(function(c) {
       if (c.tr !== tr.id || t < c.start - 1e-9 || t >= cEnd(c)) return;
+      if (q && (c === q.a || c === q.b)) return;
       if (c.type === "title") drawTitleClip(cx, W, H, c, t);
       else if (c.type === "adj") adjust(cx, W, H);
       else drawClip(cx, W, H, c);
     });
   });
 }
+var LAYER = {};
+function layer(k, W, H) {
+  var c = LAYER[k];
+  if (!c) {
+    c = LAYER[k] = document.createElement("canvas");
+  }
+  if (c.width !== W || c.height !== H) {
+    c.width = W;
+    c.height = H;
+  }
+  var x = c.getContext("2d");
+  x.fillStyle = "#000";
+  x.fillRect(0, 0, W, H);
+  return c;
+}
+function drawPair(cx, W, H, q, t) {
+  var la = layer("a", W, H), lb = layer("b", W, H);
+  drawClip(la.getContext("2d"), W, H, q.a);
+  drawClip(lb.getContext("2d"), W, H, q.b);
+  mixTransition(cx, q.k, la, lb, (t - q.w0) / q.d, W, H);
+}
 function adjust(cx, W, H) {
   try {
-    var tmp = adjust.c || (adjust.c = document.createElement("canvas"));
-    tmp.width = W;
-    tmp.height = H;
-    tmp.getContext("2d").drawImage(cx.canvas, 0, 0);
+    var tmp2 = adjust.c || (adjust.c = document.createElement("canvas"));
+    tmp2.width = W;
+    tmp2.height = H;
+    tmp2.getContext("2d").drawImage(cx.canvas, 0, 0);
     cx.filter = "saturate(1.08) contrast(1.04)";
-    cx.drawImage(tmp, 0, 0);
+    cx.drawImage(tmp2, 0, 0);
     cx.filter = "none";
   } catch (e) {
   }
@@ -5183,7 +5559,7 @@ function progStop() {
   syncPlayBtn();
 }
 function init$a() {
-  E = { ctx: null, master: null, mon: null, els: {}, imgs: {}, last: {}, thumbs: {}, idle: { frames: 0, ph: 0, fb: 0 }, playing: false, raf: 0, base: 0, t0: 0, stats: { frames: 0, vframes: 0, blank: 0, stale: 0, late: 0, maxGap: 0, slow: 0, last: 0, at: [] } };
+  E = { prevTr: null, ctx: null, master: null, mon: null, els: {}, imgs: {}, last: {}, thumbs: {}, idle: { frames: 0, ph: 0, fb: 0 }, playing: false, raf: 0, base: 0, t0: 0, stats: { frames: 0, vframes: 0, blank: 0, stale: 0, late: 0, maxGap: 0, slow: 0, last: 0, at: [] } };
   PLAYERR = {};
   TST = { name: "店名テロップ", q: "質問テロップ", sub: "字幕", credit: "クレジット" };
 }
@@ -6572,6 +6948,13 @@ function init$1() {
         if (fontById(tf.font).weight) delete tf.weight;
         changed();
       }
+    } else if (k === "trk") {
+      var tc2 = selClipXin();
+      if (tc2) {
+        mark();
+        tc2.xin.k = e.target.value;
+        changed();
+      }
     } else if (k === "tfontname") {
       var tn = selTitle(), fn = e.target.value.replace(/["\\]/g, "").trim();
       if (tn && fn) {
@@ -6688,10 +7071,16 @@ function wantSysFonts(e) {
 }
 document.addEventListener("pointerdown", wantSysFonts, true);
 document.addEventListener("keydown", wantSysFonts, true);
+function selClipXin() {
+  var c = S.sel.map(C).filter(function(x) {
+    return x && x.xin && T(x.tr) && T(x.tr).kind === "v";
+  })[0];
+  return c || null;
+}
 function init() {
   window.__matsuko = { E, P: function() {
     return P;
-  }, setP, changed };
+  }, setP, changed, setProg };
   if (HOST) {
     refreshRecent();
     HOST.project.openLast().then(function(o) {
@@ -6738,15 +7127,15 @@ function init() {
   });
 }
 init$7();
+init$s();
 init$r();
 init$q();
-init$p();
 init$9();
-init$o();
-init$m();
+init$p();
+init$n();
 init$b();
 init$a();
-init$n();
+init$o();
 init$i();
 init$l();
 init$k();
@@ -6764,5 +7153,6 @@ init$e();
 init$2();
 init$1();
 init$f();
+init$m();
 init();
 </script>

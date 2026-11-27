@@ -10,7 +10,9 @@ import { C, M, P, T, cEnd, cLen, fades, gainFrac, hasFx, progDur } from '../proj
 import { S } from '../state';
 import { A, TRI, btn, diamond, filmStyle, fsec, h, ibtn, ic, kv, mmss, ph, playBtn, sel, tabs, tc, waveOf } from '../util';
 import { mark, saveP } from '../store';
-import { E, TST, audible, redrawProg, sync } from '../engine';
+import { E, TST, audible, redrawProg, sync, trPairs } from '../engine';
+import { TRANSITIONS, transitionById } from '../transitions';
+import { transGallery } from '../transPreview';
 import { fitZoom, primary, zoomVal } from '../editOps';
 import { num } from '../exporter';
 import { R } from './media';
@@ -48,6 +50,9 @@ export function tlInner(){var pps=S.pps||10,dur=progDur(),b=document.querySelect
       (tr.kind==='v'?tbtn('thide',tr.id,tr.hide,tr.hide?'表示する':'隠す',EYE,'eye'):tbtn('tmute',tr.id,tr.mute,'ミュート','M','m')+tbtn('tsolo',tr.id,tr.solo,'ソロ','S','s'))+tbtn('tlock',tr.id,tr.lock,tr.lock?'ロックを解除':'ロック',LOCK,'l')+'</div>';
     ln+='<div class="lane'+(tr.lock?' lk':'')+(off?' off':'')+'" data-lane="'+tr.id+'" style="top:'+y+'px;height:'+tr.h+'px;width:'+W+'px"></div>';y+=tr.h+4;});
   var H=y;P.clips.forEach(function(c){var r=ROWS.filter(function(x){return x.id===c.tr;})[0];if(r)cl+=clipHtml(c,r,pps);});
+  /* トランジション：つなぎ目をまたぐ帯 */
+  trPairs().forEach(function(q){var r=ROWS.filter(function(x){return x.id===q.tr;})[0],d=transitionById(q.k);if(!r||!d)return;var on=S.sel.indexOf(q.b.id)>=0;
+    cl+='<div class="trx'+(on?' on':'')+'" style="left:'+(q.w0*pps).toFixed(1)+'px;width:'+Math.max(6,q.d*pps).toFixed(1)+'px;top:'+(r.y+Math.round(r.h*.3))+'px;height:'+Math.max(12,Math.round(r.h*.4))+'px" title="'+h(d.name)+'"><span>'+h(d.name)+'</span></div>';});
   var step=tickStep(pps),lab='';for(var t=0;t*pps<W;t+=step)lab+='<div class="rl" style="left:'+(t*pps).toFixed(1)+'px">'+tc(t)+'</div>';
   var rng=P.pin!=null||P.pout!=null?'<div class="rng" style="left:'+((P.pin||0)*pps)+'px;width:'+(((P.pout!=null?P.pout:dur)-(P.pin||0))*pps)+'px" title="書き出し範囲"></div>':'',ph0=S.t.edit*pps;
   return '<div class="corner" data-time="edit">'+tc(S.t.edit)+'</div>'+
@@ -64,7 +69,7 @@ export function drawTL(){var w=document.querySelector('[data-tlwrap]');if(!w)ret
 export var PROPS;
 /* テロップの文字サイズ（1080p の画面での px）。まだ決めていなければ、前の「小・中・大」から */
 export var TITLE_PX={'小':45,'中':59,'大':81};
-export function propVal(c,key){if(key==='fsz'&&c.fsz==null)return TITLE_PX[c.sz||'中']||59;return c[key]==null?PROPS[key].def:c[key];}
+export function propVal(c,key){if(key==='xd')return c.xin&&c.xin.d||1;if(key==='fsz'&&c.fsz==null)return TITLE_PX[c.sz||'中']||59;return c[key]==null?PROPS[key].def:c[key];}
 export function propPct(key,v){var p=PROPS[key];return Math.max(0,Math.min(100,(v-p.min)/(p.max-p.min)*100));}
 export function propTxt(key,v){return (+v).toFixed(PROPS[key].dec);}
 export function numRow(label,c,key){var p=PROPS[key],v=propVal(c,key),id=c.id;
@@ -75,7 +80,7 @@ export function numRow(label,c,key){var p=PROPS[key],v=propVal(c,key),id=c.id;
 export function motionForm(c){return numRow('位置 X',c,'x')+numRow('位置 Y',c,'y')+numRow('拡大率',c,'scale')+numRow('回転',c,'rot')+numRow('不透明度',c,'op')+
   '<div class="row" style="justify-content:flex-end;padding-top:8px">'+btn('元に戻す','mreset',c.id,'s')+'</div>';}
 /* 値を変えて、同じ値を表示している部品（スライダー・数値）をそろえる */
-export function setProp(cid,key,v){var c=C(cid),p=PROPS[key];if(!c||!p||isNaN(v))return;if(key==='fin'||key==='fout')v=Math.min(v,Math.max(0,cLen(c)-(key==='fin'?fades(c)[1]:fades(c)[0])));v=Math.round(Math.max(p.min,Math.min(p.max,v))/p.step)*p.step;v=+v.toFixed(3);c[key]=v;
+export function setProp(cid,key,v){var c=C(cid),p=PROPS[key];if(!c||!p||isNaN(v))return;if(key==='fin'||key==='fout')v=Math.min(v,Math.max(0,cLen(c)-(key==='fin'?fades(c)[1]:fades(c)[0])));v=Math.round(Math.max(p.min,Math.min(p.max,v))/p.step)*p.step;v=+v.toFixed(3);if(key==='xd'){if(c.xin)c.xin.d=v;drawTL();redrawProg();saveP();return;}c[key]=v;
   [].forEach.call(document.querySelectorAll('[data-k="'+key+'"][data-cid="'+cid+'"]'),function(x){if(x.tagName==='INPUT'&&x.type==='range'){x.value=v;x.style.setProperty('--p',propPct(key,v)+'%');}else if(x.hasAttribute('data-hot')){x.firstChild.nodeValue=propTxt(key,v);x.setAttribute('aria-valuenow',v);}});
   redrawProg();saveP();if(key==='vol'||key==='fin'||key==='fout'){sync(S.t.edit,E.playing);drawTL();}}
 /* 数値をクリックしたときの入力欄 */
@@ -121,6 +126,8 @@ export function inspector(){var L=S.sel.map(C).filter(Boolean),c=primary();
     '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">'+btn('再生ヘッドで分割','split','','s')+btn('削除','delSel','','s')+btn('リップル削除','rdel','','s')+(c.link||pair?btn('リンク解除','lnk','','s'):'')+'</div>';
   var h2=fsec('clip','クリップ',null,info);
   if(v&&v.type==='media')h2+=fsec('motion','モーション・不透明度',null,motionForm(v),1);
+  var tq=v&&trPairs().filter(function(q){return q.b===v;})[0];
+  if(tq)h2+=fsec('trans','トランジション',null,'<div class="fg"><span>種類</span><select class="inp" data-in="trk" aria-label="トランジションの種類">'+TRANSITIONS.map(function(x){return '<option value="'+x.id+'"'+(x.id===tq.k?' selected':'')+'>'+h(x.name)+'</option>';}).join('')+'</select></div>'+numRow('長さ',v,'xd')+'<div class="row" style="justify-content:flex-end;padding-top:8px">'+btn('外す','trDel',v.id,'s')+'</div>');
   if(a)h2+=fsec('audio','音量',null,numRow('音量',a,'vol')+numRow('フェードイン',a,'fin')+numRow('フェードアウト',a,'fout'));
   if(m)h2+='<div style="padding:10px 16px;border-bottom:1px solid var(--dv);line-height:1.6"><div style="font-weight:500">リンク中の台本行</div><div class="mu">'+h(m.line&&m.line!=='—'?m.line:'—')+'</div></div>';
   return {name:m?m.n:c.label||'',html:h2};}
@@ -143,18 +150,19 @@ EYE='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hi
 LOCK='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0110 0v3h1v11H6V10zm2 0h6V7a3 3 0 00-6 0z"/></svg>';
 PROPS={fsz:{min:12,max:300,step:1,unit:'px',def:59,dec:0},lh:{min:80,max:300,step:5,unit:'%',def:135,dec:0},ls:{min:-20,max:100,step:1,unit:'px',def:0,dec:0},x:{min:-100,max:100,step:1,unit:'%',def:0,dec:1},y:{min:-100,max:100,step:1,unit:'%',def:0,dec:1},scale:{min:10,max:400,step:1,unit:'%',def:100,dec:1},
   rot:{min:-180,max:180,step:1,unit:'°',def:0,dec:1},op:{min:0,max:100,step:1,unit:'%',def:100,dec:1},vol:{min:-60,max:15,step:0.1,unit:'dB',def:0,dec:1},
-  fin:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2},fout:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2}};
+  fin:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2},xd:{min:0.1,max:10,step:0.05,unit:'s',def:1,dec:2},fout:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2}};
 R.edit=function(){
   var left;
-  if(S.etab!=='text'){var L=P.media.filter(function(m){return m.k==='映像'||m.k==='音声'||m.k==='画像'||m.k==='テイク';});
+  if(S.etab!=='text'&&S.etab!=='trans'){var L=P.media.filter(function(m){return m.k==='映像'||m.k==='音声'||m.k==='画像'||m.k==='テイク';});
     left='<div class="row" style="padding:12px 16px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="'+h(S.eq||'')+'" style="height:28px">'+btn('＋ 読込','imp')+'</div><div class="scroll"><div class="asg">'+
     L.filter(function(m){return !S.eq||m.n.indexOf(S.eq)>=0;}).map(function(m){var r=D.rights[m.r]||['—',''],can=(m.url&&!m.loading)||(m.sample&&m.k!=='音声'&&m.k!=='テイク');
       return '<div style="position:relative"'+(can?' data-am="'+m.id+'"':'')+'><div class="tb" style="cursor:'+(can?'grab':'default')+';background:'+(m.thumb?'#000 url('+m.thumb+') center / cover':m.k==='音声'?'#2f6b45':m.k==='テイク'?'#5a4a8a':(m.col||['#555'])[0])+'"><span>'+m.k+'</span><span>'+(m.k==='画像'?'':mmss(m.d))+'</span></div>'+
       (can?'<button class="b s" aria-label="「'+h(m.n)+'」をタイムラインに追加" title="タイムラインに追加"'+A('addtl',m.id)+' style="position:absolute;right:4px;top:4px;width:24px;height:24px;padding:0;border-radius:50%">'+ic('plus',14)+'</button>':'')+
       '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(m.k==='音声'?h(m.c)+' ':'')+h(m.n)+'</div><div class="'+(m.r==='wn'?'t-wn':'t-ok')+'">'+r[0]+'</div></div>';}).join('')+'</div>'+'</div>';}
+  else if(S.etab==='trans')left='<div class="scroll" style="padding:14px">'+transGallery()+'</div>';
   else left='<div class="scroll" style="padding:14px">'+styleGallery()+'</div>';
   var tools=[['select','選択',keyOf('tSel')],['split','分割',keyOf('tSplit')],['trash','削除',''],['hand','ハンド',keyOf('tHand')],['text','文字','']],ins=inspector(),rngOn=P.pin!=null||P.pout!=null;
-  return '<div class="pn l" style="width:'+pw('editL')+'px">'+splitter('editL','l')+''+ph('素材')+tabs([['assets','アセット'],['text','テロップ']],S.etab==='text'?'text':'assets','etab','素材の種類')+left+'</div>'+
+  return '<div class="pn l" style="width:'+pw('editL')+'px">'+splitter('editL','l')+''+ph('素材')+tabs([['assets','アセット'],['text','テロップ'],['trans','トランジション']],S.etab==='text'||S.etab==='trans'?S.etab:'assets','etab','素材の種類')+left+'</div>'+
   '<div class="pc" style="background:var(--bg0)">'+
     '<div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">'+ph('プレビュー','<span class="x">全長 '+mmss(progDur())+'</span>')+'<div class="mon" style="flex:1;min-height:0"><canvas data-prog '+canvasAttrs()+' style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas></div>'+
       '<div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">'+tc(S.t.edit)+'</span><span class="mid">'+ibtn('inPt','イン点を設定（I キー）','pin')+ibtn('outPt','アウト点を設定（O キー）','pout')+'<span class="vsep"></span>'+ibtn('prevCut','前の編集点へ（↑）','prev')+ibtn('back','1フレーム戻る（←）','fb')+playBtn(E.playing)+ibtn('fwd','1フレーム進む（→）','ff')+ibtn('nextCut','次の編集点へ（↓）','next')+'<span class="vsep"></span>'+ibtn('split','再生ヘッドで分割（S キー）','split')+'</span><span class="end row" style="justify-content:flex-end;gap:6px"><button class="b s" style="height:24px;padding:0 8px;border:0;background:none;color:var(--mu)" title="プレビューの画質"'+A('psOpen')+'>'+pqLabel()+'</button>'+ibtn('full','全画面','todo')+'</span></div></div>'+

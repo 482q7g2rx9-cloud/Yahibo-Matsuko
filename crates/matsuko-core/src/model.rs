@@ -115,6 +115,14 @@ pub enum ClipType {
     Adj,
 }
 
+/// トランジション：つなぎ目の後ろのクリップに持たせる（種類と、つなぎ目を中心にした長さ（秒））
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Transition {
+    pub k: String,
+    pub d: f64,
+}
+
 /// クリップ
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -157,6 +165,9 @@ pub struct Clip {
     pub fin: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fout: Option<f64>,
+    /// このクリップの頭（前のクリップとのつなぎ目）のトランジション
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xin: Option<Transition>,
     /// テロップ：文字、種類（name / q / sub / credit）、大きさ（小 / 中 / 大）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,

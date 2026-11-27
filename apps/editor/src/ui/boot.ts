@@ -5,7 +5,7 @@ import { C, M, P, migrate, setP } from './project';
 import { S } from './state';
 import { IDB } from './store';
 import { HOST, loadOpened, refreshRecent } from './desktop';
-import { E, clampProg } from './engine';
+import { E, clampProg, setProg } from './engine';
 import { changed } from './store';
 import { draw } from './render';
 import { toast } from './menus';
@@ -14,7 +14,7 @@ import { toast } from './menus';
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
 /* テスト用：再生エンジンと、プロジェクトを差し替える関数（tests/playback.mjs が使う） */
-window.__matsuko={E:E,P:function(){return P;},setP:setP,changed:changed};
+window.__matsuko={E:E,P:function(){return P;},setP:setP,changed:changed,setProg:setProg};
 if(HOST){refreshRecent();HOST.project.openLast().then(function(o){if(o)loadOpened(o);}).catch(function(e){toast('前回のプロジェクトを開けませんでした：'+e);});}
 else IDB.open().then(function(ok){if(!ok)return;return IDB.get('kv','project').then(function(o){if(!o||!o.media)return;
   return Promise.all(o.media.map(function(m){if(!m.file)return null;return IDB.get('files',m.id).then(function(b){if(b)m.url=URL.createObjectURL(b);});})).then(function(){

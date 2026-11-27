@@ -1,7 +1,8 @@
 // @ts-nocheck
 import { drawLookText, loadFont, titleFont } from './titleStyles';
+import { TRANSITION_DEFAULT_D, mixTransition, transitionById } from './transitions';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
-import { C, M, P, T, cEnd, fadeAt, progDur, vTracks } from './project';
+import { C, M, P, T, cEnd, cLen, fadeAt, progDur, vTracks } from './project';
 import { S } from './state';
 import { tc } from './util';
 import { HOST } from './desktop';
@@ -37,6 +38,16 @@ export function dropEl(id){delete E.last[id];var e=E.els[id];if(!e)return;try{e.
 export function dbLin(db){return Math.pow(10,(db||0)/20);}
 export function audible(tr){if(tr.mute)return false;var so=P.tracks.some(function(t){return t.kind==='a'&&t.solo;});return !so||!!tr.solo;}
 /* 時刻 t に映る・鳴るクリップの素材を、その位置に合わせる。少し先のクリップは準備しておく */
+/* トランジション：つなぎ目の後ろのクリップ b の xin（種類と長さ）と、その直前に同じトラックで終わるクリップ a の組。
+   つなぎ目を中心に d 秒（2 つのクリップの短いほうの長さまで）。E.prevTr はテロップタブのトランジションにマウスを乗せたときの試し表示 */
+export function trPairs(){var out=[],pv=E.prevTr;
+  P.clips.forEach(function(b){if(b.type!=='media')return;var x=pv&&pv.bid===b.id?pv:b.xin;if(!x||!transitionById(x.k))return;var tr=T(b.tr);if(!tr||tr.kind!=='v')return;
+    var a=P.clips.filter(function(c){return c!==b&&c.tr===b.tr&&c.type==='media'&&Math.abs(cEnd(c)-b.start)<1e-3;})[0];if(!a)return;
+    var d=Math.max(0.05,Math.min(x.d||TRANSITION_DEFAULT_D,cLen(a),cLen(b)));out.push({a:a,b:b,k:x.k,d:d,w0:b.start-d/2,w1:b.start+d/2,tr:b.tr});});
+  return out;}
+export function pairAt(t,trid){var L=trPairs();for(var i=0;i<L.length;i++){var q=L[i];if((!trid||q.tr===trid)&&t>=q.w0-1e-9&&t<q.w1)return q;}return null;}
+/* 素材の中の位置（素材の長さの中に収める） */
+function srcClamp(m,lt){return Math.max(0,Math.min((m.d||1e9)-0.04,lt));}
 export function sync(t,play){var want={},near=[];
   P.clips.forEach(function(c){if(c.type!=='media')return;var m=M(c.m),tr=T(c.tr);if(!m||!m.url||m.loading||m.k==='画像'||!tr)return;
     var s=c.start,e=cEnd(c),a=tr.kind==='a';if(a?!audible(tr):(m.k!=='映像'||tr.hide))return;
@@ -44,6 +55,11 @@ export function sync(t,play){var want={},near=[];
     /* 止まっているとき（トラックバーを動かしているとき）は、前後の映像のクリップも用意しておく（入ったときにすぐ絵が出るように） */
     else if(!play&&!a&&(s>t&&s-t<20||e<=t&&t-e<20))near.push({c:c,m:m,a:a,lt:s>t?c.in:Math.max(c.in,c.in+(e-s)-0.05),pre:1,d:s>t?s-t:t-e});});
   near.sort(function(x,y){return x.d-y.d;}).slice(0,4).forEach(function(w){want[w.c.id]=w;});
+  /* トランジションの間は、前のクリップは終わりより後ろまで、後ろのクリップは頭より前から映す */
+  trPairs().forEach(function(q){if(t<q.w0-1e-9||t>=q.w1)return;var tr=T(q.tr);if(!tr||tr.hide)return;
+    [q.a,q.b].forEach(function(c){var m=M(c.m);if(!m||!m.url||m.loading||m.k!=='映像')return;var raw=c.in+(t-c.start),lt=srcClamp(m,raw);
+      /* 素材の外（頭より前・終わりより後ろ）は、端の絵で止めておく */
+      want[c.id]={c:c,m:m,a:false,lt:lt,pre:Math.abs(lt-raw)>1e-3?1:0};});});
   Object.keys(want).forEach(function(id){var w=want[id],e=elFor(w.c,w.m,w.a);
     /* 音量（dB）とフェード。再生中は少しなめらかに変える */
     if(w.a){var lin=dbLin(w.c.vol)*(w.pre?0:fadeAt(w.c,t-w.c.start));if(e._g){var gg=e._g.gain;if(play&&E.ctx){try{gg.setTargetAtTime(lin,E.ctx.currentTime,0.015);}catch(x){gg.value=lin;}}else{if(gg.cancelScheduledValues&&E.ctx)gg.cancelScheduledValues(E.ctx.currentTime);gg.value=lin;}e.volume=1;}else e.volume=Math.min(1,lin);}
@@ -56,9 +72,15 @@ export function sync(t,play){var want={},near=[];
    stale 止まった映像を描いた回数、maxGap・slow 描く間隔の最大（ミリ秒）と 50 ミリ秒を超えた回数 */
 /* 1フレームを描く：V1 から上へ重ねる。見本の素材は色の画面に名前を出す */
 export function drawFrame(cx,W,H,t){cx.fillStyle='#000';cx.fillRect(0,0,W,H);
-  vTracks().slice().reverse().forEach(function(tr){if(tr.hide)return;P.clips.forEach(function(c){if(c.tr!==tr.id||t<c.start-1e-9||t>=cEnd(c))return;
+  vTracks().slice().reverse().forEach(function(tr){if(tr.hide)return;var q=pairAt(t,tr.id);if(q)drawPair(cx,W,H,q,t);
+    P.clips.forEach(function(c){if(c.tr!==tr.id||t<c.start-1e-9||t>=cEnd(c))return;if(q&&(c===q.a||c===q.b))return;
     if(c.type==='title')drawTitleClip(cx,W,H,c,t);
     else if(c.type==='adj')adjust(cx,W,H);else drawClip(cx,W,H,c);});});}
+/* トランジションの 1 フレーム：前と後ろのクリップを、それぞれ黒の上に描いてから切り替える（書き出しの xfade と同じ） */
+var LAYER={};
+function layer(k,W,H){var c=LAYER[k];if(!c){c=LAYER[k]=document.createElement('canvas');}if(c.width!==W||c.height!==H){c.width=W;c.height=H;}var x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,W,H);return c;}
+export function drawPair(cx,W,H,q,t){var la=layer('a',W,H),lb=layer('b',W,H);drawClip(la.getContext('2d'),W,H,q.a);drawClip(lb.getContext('2d'),W,H,q.b);
+  mixTransition(cx,q.k,la,lb,(t-q.w0)/q.d,W,H);}
 export function adjust(cx,W,H){try{var tmp=adjust.c||(adjust.c=document.createElement('canvas'));tmp.width=W;tmp.height=H;tmp.getContext('2d').drawImage(cx.canvas,0,0);cx.filter='saturate(1.08) contrast(1.04)';cx.drawImage(tmp,0,0);cx.filter='none';}catch(e){}}
 export function drawClip(cx,W,H,c){var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='映像'&&m.k!=='画像')return;
   if(m.url&&!m.loading){if(m.k==='画像'){src=imgFor(m);if(src.complete){w=src.naturalWidth;hh=src.naturalHeight;}}else{src=E.els[c.id]||elFor(c,m,false);if(src.readyState>=2){w=src.videoWidth;hh=src.videoHeight;}if(E.playing){var st=E.stats,lt=c.in+(S.t.edit-c.start);st.vframes++;if(!w){st.blank++;if(st.at.length<40)st.at.push('blank@'+S.t.edit.toFixed(2));}else if(src.paused||src.seeking)st.stale++;else if(Math.abs(src.currentTime-lt)>0.15){st.late++;if(st.at.length<40)st.at.push('late@'+S.t.edit.toFixed(2)+'('+(src.currentTime-lt).toFixed(2)+')');}}}}
@@ -125,7 +147,7 @@ export function progStop(){E.playing=false;cancelAnimationFrame(E.raf);sync(S.t.
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
-E={ctx:null,master:null,mon:null,els:{},imgs:{},last:{},thumbs:{},idle:{frames:0,ph:0,fb:0},playing:false,raf:0,base:0,t0:0,stats:{frames:0,vframes:0,blank:0,stale:0,late:0,maxGap:0,slow:0,last:0,at:[]}};
+E={prevTr:null,ctx:null,master:null,mon:null,els:{},imgs:{},last:{},thumbs:{},idle:{frames:0,ph:0,fb:0},playing:false,raf:0,base:0,t0:0,stats:{frames:0,vframes:0,blank:0,stale:0,late:0,maxGap:0,slow:0,last:0,at:[]}};
 PLAYERR={};
 TST={name:'店名テロップ',q:'質問テロップ',sub:'字幕',credit:'クレジット'};
 }

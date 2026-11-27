@@ -241,13 +241,23 @@ pub fn plan(
             }
         }
     }
+    // トランジションの始めと終わりも境目にする（その間は、前と後ろのクリップを xfade で切り替える）
+    let prs = pairs(p, &vtracks);
+    for q in &prs {
+        for t in [q.w0, q.w1] {
+            let f = fps.frame(t);
+            if f > f0 && f < f1 {
+                cuts.push(f);
+            }
+        }
+    }
     cuts.sort_unstable();
     cuts.dedup();
     let mut list_text = String::new();
     for (i, w) in cuts.windows(2).enumerate() {
         let (a, b) = (w[0], w[1]);
         let output = work.join(format!("seg{:05}.mp4", i + 1));
-        let args = segment_args(p, titles, st, a, b, &vtracks, &output, encoder);
+        let args = segment_args(p, titles, st, a, b, &vtracks, &prs, &output, encoder);
         list_text.push_str(&format!(
             "file '{}'\n",
             output.file_name().unwrap().to_string_lossy()
@@ -299,6 +309,7 @@ fn segment_args(
     a: u64,
     b: u64,
     vtracks: &[&str],
+    prs: &[Pair],
     output: &Path,
     encoder: &str,
 ) -> Vec<String> {
@@ -316,10 +327,64 @@ fn segment_args(
     let mut n = 1; // 次の入力の番号
     let mut k = 0; // 重ねた数
     for tid in vtracks {
+        // このトラックのトランジション（区間の真ん中がその間にあるもの）
+        let pr = prs
+            .iter()
+            .find(|q| q.b.tr == *tid && q.w0 <= mid && mid < q.w1);
+        if let Some(q) = pr {
+            k += 1;
+            let next = format!("b{k}");
+            let mut lay = Vec::new();
+            for (j, c) in [q.a, q.b].iter().enumerate() {
+                let src = c.src_in + (q.w0 - c.start);
+                let Some((f, dx, dy, pre)) = clip_input(p, c, src, q.d + 1.0, n, st, &mut args)
+                else {
+                    continue;
+                };
+                n += 1;
+                // 黒い画面の上に置いてから切り替える（プレビューと同じ）
+                args.extend(["-f", "lavfi", "-i"].map(s));
+                args.push(format!(
+                    "color=c=black:s={w}x{h}:r={}:d={}",
+                    fps.arg(),
+                    f3(q.d + 1.0)
+                ));
+                graph.push(format!(
+                    "{f},tpad=start_mode=clone:start_duration={}:stop_mode=clone:stop_duration={}[x{k}c{j}]",
+                    f3(pre),
+                    f3(q.d + 1.0)
+                ));
+                graph.push(format!(
+                    "[{n}:v]setsar=1,format=yuv420p[x{k}k{j}];[x{k}k{j}][x{k}c{j}]overlay=x=(main_w-overlay_w)/2+({}):y=(main_h-overlay_h)/2+({}):format=auto:eof_action=repeat,format=yuv420p[x{k}l{j}]",
+                    f3(dx),
+                    f3(dy)
+                ));
+                n += 1;
+                lay.push(format!("x{k}l{j}"));
+            }
+            if lay.len() == 2 {
+                graph.push(format!(
+                    "[{}][{}]xfade=transition={}:duration={}:offset=0,trim=start={}:duration={},setpts=PTS-STARTPTS[x{k}]",
+                    lay[0],
+                    lay[1],
+                    q.k,
+                    f3(q.d),
+                    f3((ta - q.w0).max(0.0)),
+                    f3(len + 1.0)
+                ));
+                graph.push(format!(
+                    "[{cur}][x{k}]overlay=x=0:y=0:format=auto:eof_action=repeat[{next}]"
+                ));
+                cur = next;
+            } else {
+                k -= 1;
+            }
+        }
         for c in p
             .clips
             .iter()
             .filter(|c| c.tr == *tid && c.start <= mid && mid < c.end())
+            .filter(|c| pr.map_or(true, |q| c.id != q.a.id && c.id != q.b.id))
         {
             k += 1;
             let next = format!("b{k}");
@@ -357,62 +422,14 @@ fn segment_args(
                     n += 1;
                 }
                 ClipType::Media => {
-                    let Some(m) = c.m.as_deref().and_then(|id| p.media(id)) else {
+                    let src_at = c.src_in + (ta - c.start).max(0.0);
+                    let Some((f, dx, dy, _)) =
+                        clip_input(p, c, src_at, len + 1.0, n, st, &mut args)
+                    else {
                         k -= 1;
                         continue;
                     };
-                    if m.k != "映像" && m.k != "画像" {
-                        k -= 1;
-                        continue;
-                    }
-                    let src_at = c.src_in + (ta - c.start).max(0.0);
-                    if has_file(m) && m.k == "画像" {
-                        args.extend(["-loop", "1", "-framerate"].map(s));
-                        args.push(fps.arg());
-                        args.push("-t".into());
-                        args.push(f3(len + 1.0));
-                        args.push("-i".into());
-                        args.push(m.path.clone().unwrap_or_default());
-                    } else if has_file(m) {
-                        args.push("-ss".into());
-                        args.push(f3(src_at));
-                        args.push("-t".into());
-                        args.push(f3(len + 1.0));
-                        args.push("-i".into());
-                        args.push(m.path.clone().unwrap_or_default());
-                    } else {
-                        // ファイルのない見本の素材：色の画面
-                        args.extend(["-f", "lavfi", "-i"].map(s));
-                        args.push(format!(
-                            "color=c={}:s={w}x{h}:r={}",
-                            color(m.col.first()),
-                            fps.arg()
-                        ));
-                    }
-                    let sc = c.scale.unwrap_or(100.0) / 100.0;
-                    let rot = c.rot.unwrap_or(0.0);
-                    let op = (c.op.unwrap_or(100.0) / 100.0).clamp(0.0, 1.0);
-                    let (bw, bh) = (
-                        ((w as f64) * sc).round().max(2.0) as u32,
-                        ((h as f64) * sc).round().max(2.0) as u32,
-                    );
-                    let mut f = format!(
-                        "[{n}:v]setpts=PTS-STARTPTS,fps={},scale=w={bw}:h={bh}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1",
-                        fps.arg()
-                    );
-                    if rot != 0.0 || op < 1.0 {
-                        f.push_str(",format=rgba");
-                        if rot != 0.0 {
-                            let r = format!("{:.6}", rot.to_radians());
-                            f.push_str(&format!(",rotate=a={r}:ow=rotw({r}):oh=roth({r}):c=none"));
-                        }
-                        if op < 1.0 {
-                            f.push_str(&format!(",colorchannelmixer=aa={:.3}", op));
-                        }
-                    }
                     graph.push(format!("{f}[v{k}]"));
-                    let dx = c.x.unwrap_or(0.0) / 100.0 * w as f64;
-                    let dy = c.y.unwrap_or(0.0) / 100.0 * h as f64;
                     graph.push(format!(
                         "[{cur}][v{k}]overlay=x=(main_w-overlay_w)/2+({}):y=(main_h-overlay_h)/2+({}):format=auto:eof_action=repeat[{next}]",
                         f3(dx),
@@ -499,6 +516,139 @@ fn audio_step(p: &Project, st: &Settings, f0: u64, f1: u64, output: &Path) -> St
         seconds,
         output: output.to_path_buf(),
     }
+}
+
+/// プレビューと同じ切り替えができるトランジション（画面側の transitions.ts と同じ名前。FFmpeg の xfade の transition）
+pub const TRANSITIONS: [&str; 12] = [
+    "fade",
+    "fadeblack",
+    "fadewhite",
+    "wipeleft",
+    "wiperight",
+    "wipeup",
+    "slideleft",
+    "slideright",
+    "circleopen",
+    "circleclose",
+    "zoomin",
+    "pixelize",
+];
+
+/// トランジションのある、つなぎ目の前後のクリップ
+pub struct Pair<'a> {
+    pub a: &'a Clip,
+    pub b: &'a Clip,
+    pub k: &'static str,
+    /// 長さ（2 つのクリップの短いほうまで）と、タイムライン上の始めと終わり（つなぎ目を中心に）
+    pub d: f64,
+    pub w0: f64,
+    pub w1: f64,
+}
+
+fn is_picture(p: &Project, c: &Clip) -> bool {
+    c.kind == ClipType::Media
+        && c.m
+            .as_deref()
+            .and_then(|id| p.media(id))
+            .is_some_and(|m| m.k == "映像" || m.k == "画像")
+}
+
+/// 映るトラックのトランジション（画面側の trPairs と同じ決め方）
+pub fn pairs<'a>(p: &'a Project, vtracks: &[&str]) -> Vec<Pair<'a>> {
+    let mut out = Vec::new();
+    for b in &p.clips {
+        let Some(x) = &b.xin else { continue };
+        let Some(k) = TRANSITIONS.iter().find(|t| **t == x.k) else {
+            continue;
+        };
+        if !vtracks.contains(&b.tr.as_str()) || !is_picture(p, b) {
+            continue;
+        }
+        let Some(a) = p.clips.iter().find(|c| {
+            c.id != b.id && c.tr == b.tr && is_picture(p, c) && (c.end() - b.start).abs() < 1e-3
+        }) else {
+            continue;
+        };
+        let d0 = if x.d > 0.0 { x.d } else { 1.0 };
+        let d = d0.min(a.len()).min(b.len()).max(0.05);
+        out.push(Pair {
+            a,
+            b,
+            k,
+            d,
+            w0: b.start - d / 2.0,
+            w1: b.start + d / 2.0,
+        });
+    }
+    out
+}
+
+/// 映像・画像のクリップの入力を args に足し、拡大率・回転・不透明度をつけるフィルター（`[n:v]...`、出力の名前はなし）と、
+/// 置く位置のずれ（x, y）、頭に足す長さ（素材の頭より前から始めるとき）を返す
+fn clip_input(
+    p: &Project,
+    c: &Clip,
+    src: f64,
+    len: f64,
+    n: usize,
+    st: &Settings,
+    args: &mut Vec<String>,
+) -> Option<(String, f64, f64, f64)> {
+    let m = c.m.as_deref().and_then(|id| p.media(id))?;
+    if m.k != "映像" && m.k != "画像" {
+        return None;
+    }
+    let fps = st.fps;
+    let (w, h) = (st.width, st.height);
+    let mut pre = 0.0;
+    if has_file(m) && m.k == "画像" {
+        args.extend(["-loop", "1", "-framerate"].map(s));
+        args.push(fps.arg());
+        args.push("-t".into());
+        args.push(f3(len));
+        args.push("-i".into());
+        args.push(m.path.clone().unwrap_or_default());
+    } else if has_file(m) {
+        pre = (-src).max(0.0);
+        args.push("-ss".into());
+        args.push(f3(src.max(0.0)));
+        args.push("-t".into());
+        args.push(f3(len));
+        args.push("-i".into());
+        args.push(m.path.clone().unwrap_or_default());
+    } else {
+        // ファイルのない見本の素材：色の画面
+        args.extend(["-f", "lavfi", "-i"].map(s));
+        args.push(format!(
+            "color=c={}:s={w}x{h}:r={}",
+            color(m.col.first()),
+            fps.arg()
+        ));
+    }
+    let sc = c.scale.unwrap_or(100.0) / 100.0;
+    let rot = c.rot.unwrap_or(0.0);
+    let op = (c.op.unwrap_or(100.0) / 100.0).clamp(0.0, 1.0);
+    let (bw, bh) = (
+        ((w as f64) * sc).round().max(2.0) as u32,
+        ((h as f64) * sc).round().max(2.0) as u32,
+    );
+    let mut f = format!(
+        "[{n}:v]setpts=PTS-STARTPTS,fps={},scale=w={bw}:h={bh}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1",
+        fps.arg()
+    );
+    if rot != 0.0 || op < 1.0 {
+        f.push_str(",format=rgba");
+        if rot != 0.0 {
+            let r = format!("{:.6}", rot.to_radians());
+            f.push_str(&format!(",rotate=a={r}:ow=rotw({r}):oh=roth({r}):c=none"));
+        }
+        if op < 1.0 {
+            f.push_str(&format!(",colorchannelmixer=aa={:.3}", op));
+        }
+    }
+    let dx = c.x.unwrap_or(0.0) / 100.0 * w as f64;
+    let dy = c.y.unwrap_or(0.0) / 100.0 * h as f64;
+    Some((f, dx, dy, pre))
 }
 
 /// 音量とフェード（直線）。off は、取り出した音声の頭がクリップの頭から何秒後か（範囲で頭を切ったとき）
@@ -902,5 +1052,62 @@ mod tests {
         c.fin = Some(8.0);
         c.fout = Some(8.0);
         assert_eq!(c.fades(), (5.0, 5.0));
+    }
+
+    #[test]
+    fn transitions_split_the_window_and_use_xfade() {
+        let x = exe();
+        let mut b = clip("b", "V1", Some("v"), ClipType::Media, 4.0, 0.0, 4.0);
+        b.xin = Some(crate::model::Transition {
+            k: "wipeleft".into(),
+            d: 1.0,
+        });
+        let p = Project {
+            v: 2,
+            media: vec![media("v", "映像", Some(&x))],
+            tracks: tracks(),
+            clips: vec![
+                clip("a", "V1", Some("v"), ClipType::Media, 0.0, 2.0, 6.0),
+                b,
+            ],
+            ..Default::default()
+        };
+        let pl = plan(
+            &p,
+            &[],
+            &settings(0.0, 8.0),
+            Path::new("/w"),
+            Path::new("/o.mp4"),
+            "libx264",
+        )
+        .unwrap();
+        let vids: Vec<String> = pl
+            .steps
+            .iter()
+            .filter_map(|s| match s {
+                Step::Video { args, .. } => Some(args.join(" ")),
+                _ => None,
+            })
+            .collect();
+        // 0〜3.5・3.5〜4・4〜4.5・4.5〜8 の 4 つ
+        assert_eq!(vids.len(), 4, "{vids:?}");
+        assert!(!vids[0].contains("xfade"));
+        // 後ろのクリップは素材の頭より 0.5 秒前から：頭で止めた絵を足す
+        assert!(
+            vids[1].contains("xfade=transition=wipeleft:duration=1.000:offset=0,trim=start=0.000"),
+            "{}",
+            vids[1]
+        );
+        assert!(
+            vids[1].contains("tpad=start_mode=clone:start_duration=0.500"),
+            "{}",
+            vids[1]
+        );
+        assert!(vids[2].contains("trim=start=0.500"), "{}", vids[2]);
+        assert!(!vids[3].contains("xfade"));
+        // 知らない種類は無視する
+        let mut q = p.clone();
+        q.clips[1].xin.as_mut().unwrap().k = "nope".into();
+        assert!(pairs(&q, &["V1"]).is_empty());
     }
 }

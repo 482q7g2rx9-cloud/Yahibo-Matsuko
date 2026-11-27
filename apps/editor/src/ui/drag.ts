@@ -2,7 +2,7 @@
 import { SYS_PREFIX, canQueryLocalFonts, fontById, queryLocalFonts, systemFontsState } from './titleStyles';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
-import { C, M, cEnd } from './project';
+import { C, M, T, cEnd } from './project';
 import { S } from './state';
 import { HIST, changed, mark, saveP } from './store';
 import { importFiles } from './importWeb';
@@ -88,6 +88,7 @@ document.addEventListener('focusin',function(e){var k=e.target.dataset&&e.target
 document.addEventListener('change',function(e){var k=e.target.dataset&&e.target.dataset.in;if(!k)return;
   if(k==='mtype'){S.mtype=e.target.value;draw();}else if(k==='msort'){S.msort=e.target.value;draw();}else if(k==='countin')S.countin=e.target.checked;
   else if(k==='tfont'){var tf=selTitle();if(tf){mark();tf.font=e.target.value;if(fontById(tf.font).weight)delete tf.weight;changed();}}
+  else if(k==='trk'){var tc=selClipXin();if(tc){mark();tc.xin.k=e.target.value;changed();}}
   else if(k==='tfontname'){var tn=selTitle(),fn=e.target.value.replace(/["\\]/g,'').trim();if(tn&&fn){mark();tn.font=SYS_PREFIX+fn;changed();}}
   else if(k==='tst'||k==='tsz'||k==='tstart'||k==='tdur'){var ti=selTitle();if(ti){mark();if(k==='tst')ti.st=e.target.value;else if(k==='tsz')ti.sz=e.target.value;else if(k==='tstart')ti.start=Math.max(0,+e.target.value||0);else ti.out=ti.in+Math.max(0.5,+e.target.value||0.5);var sk={};sk[ti.id]=1;carve(ti.tr,ti.start,cEnd(ti),sk);changed();}}
   else if(k==='ttext'||k==='cp'){drawTL();}
@@ -121,3 +122,6 @@ function wantSysFonts(e){var t=e.target;if(HOST||!t||!t.dataset||t.dataset.in!==
   queryLocalFonts().then(function(){draw();});}
 document.addEventListener('pointerdown',wantSysFonts,true);
 document.addEventListener('keydown',wantSysFonts,true);
+
+/* インスペクタのトランジションの種類：選んでいる映像のクリップ（つなぎ目の後ろ） */
+function selClipXin(){var c=S.sel.map(C).filter(function(x){return x&&x.xin&&T(x.tr)&&T(x.tr).kind==='v';})[0];return c||null;}

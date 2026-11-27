@@ -431,3 +431,8 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .tsl:hover .tsn{color:var(--tx)}
 .tsl.on .tsb{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
 .tsl.on .tsn{color:var(--ac)}
+
+/* トランジション：つなぎ目をまたぐ帯 */
+.tl2 .trx{position:absolute;z-index:4;pointer-events:none;box-sizing:border-box;border:1px solid rgba(255,255,255,.85);border-radius:3px;background:linear-gradient(90deg,rgba(30,30,30,.75),rgba(120,120,120,.75));color:#fff;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
+.tl2 .trx.on{border-color:var(--wt);box-shadow:0 0 0 1px var(--wt)}
+.tl2 .trx span{padding:0 4px;overflow:hidden;text-overflow:ellipsis}

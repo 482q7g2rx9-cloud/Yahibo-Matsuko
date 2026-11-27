@@ -7,7 +7,7 @@ use std::process::Command;
 use std::sync::atomic::AtomicBool;
 
 use matsuko_core::export::{Fps, Settings, TitleImage};
-use matsuko_core::model::{Clip, ClipType, Media, Project, Track, TrackKind};
+use matsuko_core::model::{Clip, ClipType, Media, Project, Track, TrackKind, Transition};
 use matsuko_core::run::export;
 
 fn tool(name: &str) -> Option<PathBuf> {
@@ -207,10 +207,21 @@ fn fixture(ffmpeg: &Path, name: &str) -> Fixture {
                 scale: Some(80.0),
                 rot: Some(5.0),
                 op: Some(90.0),
+                // つなぎ目のトランジション（前のクリップの終わりより後ろ・後ろのクリップの頭より前も使う）
+                xin: Some(Transition {
+                    k: "wipeleft".into(),
+                    d: 1.0,
+                }),
                 ..c("c2", "V1", Some("b"), ClipType::Media, 4.0, 1.0, 5.0)
             },
             c("c2a", "A1", Some("b"), ClipType::Media, 4.0, 1.0, 5.0),
-            c("c3", "V1", Some("img"), ClipType::Media, 8.0, 0.0, 2.0),
+            Clip {
+                xin: Some(Transition {
+                    k: "circleopen".into(),
+                    d: 1.5,
+                }),
+                ..c("c3", "V1", Some("img"), ClipType::Media, 8.0, 0.0, 2.0)
+            },
             c("t1", "V2", None, ClipType::Title, 1.0, 0.0, 2.0),
             c("cr", "V2", None, ClipType::Title, 6.0, 0.0, 3.0),
             c("adj", "V3", None, ClipType::Adj, 0.0, 0.0, 10.0),
