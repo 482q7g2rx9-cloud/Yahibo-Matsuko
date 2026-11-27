@@ -519,7 +519,7 @@ fn audio_step(p: &Project, st: &Settings, f0: u64, f1: u64, output: &Path) -> St
 }
 
 /// プレビューと同じ切り替えができるトランジション（画面側の transitions.ts と同じ名前。FFmpeg の xfade の transition）
-pub const TRANSITIONS: [&str; 12] = [
+pub const TRANSITIONS: [&str; 42] = [
     "fade",
     "fadeblack",
     "fadewhite",
@@ -532,6 +532,36 @@ pub const TRANSITIONS: [&str; 12] = [
     "circleclose",
     "zoomin",
     "pixelize",
+    "wipedown",
+    "wipetl",
+    "wipetr",
+    "wipebl",
+    "wipebr",
+    "slideup",
+    "slidedown",
+    "coverleft",
+    "coverright",
+    "coverup",
+    "coverdown",
+    "revealleft",
+    "revealright",
+    "smoothleft",
+    "smoothright",
+    "vertopen",
+    "vertclose",
+    "horzopen",
+    "horzclose",
+    "diagtl",
+    "diagbr",
+    "radial",
+    "rectcrop",
+    "circlecrop",
+    "dissolve",
+    "hblur",
+    "fadegrays",
+    "squeezeh",
+    "hlslice",
+    "hlwind",
 ];
 
 /// トランジションのある、つなぎ目の前後のクリップ

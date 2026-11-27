@@ -22,6 +22,36 @@ export const TRANSITIONS: TransitionDef[] = [
   { id: 'circleclose', name: '円で閉じる', ff: 'circleclose' },
   { id: 'zoomin', name: 'ズームイン', ff: 'zoomin' },
   { id: 'pixelize', name: 'モザイク', ff: 'pixelize' },
+  { id: 'wipedown', name: 'ワイプ（下へ）', ff: 'wipedown' },
+  { id: 'wipetl', name: 'ワイプ（左上へ）', ff: 'wipetl' },
+  { id: 'wipetr', name: 'ワイプ（右上へ）', ff: 'wipetr' },
+  { id: 'wipebl', name: 'ワイプ（左下へ）', ff: 'wipebl' },
+  { id: 'wipebr', name: 'ワイプ（右下へ）', ff: 'wipebr' },
+  { id: 'slideup', name: 'スライド（上へ）', ff: 'slideup' },
+  { id: 'slidedown', name: 'スライド（下へ）', ff: 'slidedown' },
+  { id: 'coverleft', name: 'かぶせる（左へ）', ff: 'coverleft' },
+  { id: 'coverright', name: 'かぶせる（右へ）', ff: 'coverright' },
+  { id: 'coverup', name: 'かぶせる（上へ）', ff: 'coverup' },
+  { id: 'coverdown', name: 'かぶせる（下へ）', ff: 'coverdown' },
+  { id: 'revealleft', name: 'めくる（左へ）', ff: 'revealleft' },
+  { id: 'revealright', name: 'めくる（右へ）', ff: 'revealright' },
+  { id: 'smoothleft', name: 'ぼかしワイプ（左へ）', ff: 'smoothleft' },
+  { id: 'smoothright', name: 'ぼかしワイプ（右へ）', ff: 'smoothright' },
+  { id: 'vertopen', name: '左右に開く', ff: 'vertopen' },
+  { id: 'vertclose', name: '左右から閉じる', ff: 'vertclose' },
+  { id: 'horzopen', name: '上下に開く', ff: 'horzopen' },
+  { id: 'horzclose', name: '上下から閉じる', ff: 'horzclose' },
+  { id: 'diagtl', name: '斜め（左上へ）', ff: 'diagtl' },
+  { id: 'diagbr', name: '斜め（右下へ）', ff: 'diagbr' },
+  { id: 'radial', name: '時計回り', ff: 'radial' },
+  { id: 'rectcrop', name: '四角で切り替え', ff: 'rectcrop' },
+  { id: 'circlecrop', name: '円で切り替え', ff: 'circlecrop' },
+  { id: 'dissolve', name: '砂のように', ff: 'dissolve' },
+  { id: 'hblur', name: '横ぶれ', ff: 'hblur' },
+  { id: 'fadegrays', name: 'モノクロを挟む', ff: 'fadegrays' },
+  { id: 'squeezeh', name: '上下に縮む', ff: 'squeezeh' },
+  { id: 'hlslice', name: 'スライス（左へ）', ff: 'hlslice' },
+  { id: 'hlwind', name: '風（左へ）', ff: 'hlwind' },
 ];
 
 export const TRANSITION_DEFAULT_D = 1;
@@ -44,6 +74,88 @@ function tmp(W: number, H: number): HTMLCanvasElement {
     tmpCanvas.height = H;
   }
   return tmpCanvas;
+}
+
+/** FFmpeg と同じ乱数（vf_xfade.c の frand） */
+function frand(x: number, y: number): number {
+  const r = Math.sin(x * 12.9898 + y * 78.233) * 43758.545;
+  return r - Math.floor(r);
+}
+let maskCanvas: HTMLCanvasElement | null = null;
+/**
+ * 後ろの絵 b を、場所ごとの濃さ f(u, v)（0〜1、u・v は 0〜1 の位置）で前の絵 a の上に重ねる。
+ * 濃さは mw×mh の細かさで計算して引き伸ばす（smooth が偽なら、ぼかさずに引き伸ばす）
+ */
+function maskMix(
+  cx: CanvasRenderingContext2D,
+  a: CanvasImageSource,
+  b: CanvasImageSource,
+  W: number,
+  H: number,
+  mw: number,
+  mh: number,
+  f: (u: number, v: number, x: number, y: number) => number,
+  smooth = true,
+): void {
+  mw = Math.max(1, Math.round(mw));
+  mh = Math.max(1, Math.round(mh));
+  if (!maskCanvas) maskCanvas = document.createElement('canvas');
+  if (maskCanvas.width !== mw || maskCanvas.height !== mh) {
+    maskCanvas.width = mw;
+    maskCanvas.height = mh;
+  }
+  const mc = maskCanvas.getContext('2d');
+  const t = tmp(W, H), tc = t.getContext('2d');
+  if (!mc || !tc) return;
+  const img = mc.createImageData(mw, mh), d = img.data;
+  for (let y = 0; y < mh; y++) {
+    for (let x = 0; x < mw; x++) {
+      const k = (y * mw + x) * 4;
+      d[k + 3] = Math.round(Math.max(0, Math.min(1, f((x + 0.5) / mw, (y + 0.5) / mh, x, y))) * 255);
+    }
+  }
+  mc.putImageData(img, 0, 0);
+  tc.save();
+  tc.globalCompositeOperation = 'source-over';
+  tc.clearRect(0, 0, W, H);
+  tc.drawImage(b, 0, 0, W, H);
+  tc.globalCompositeOperation = 'destination-in';
+  tc.imageSmoothingEnabled = smooth;
+  tc.drawImage(maskCanvas, 0, 0, W, H);
+  tc.restore();
+  cx.drawImage(a, 0, 0, W, H);
+  cx.drawImage(t, 0, 0, W, H);
+}
+let grayCanvas: HTMLCanvasElement | null = null;
+/** 白黒にした絵（彩度を 0 にする） */
+function gray(img: CanvasImageSource, W: number, H: number, k: number): HTMLCanvasElement {
+  if (!grayCanvas) grayCanvas = document.createElement('canvas');
+  const g = k === 0 ? grayCanvas : document.createElement('canvas');
+  g.width = W;
+  g.height = H;
+  const gc = g.getContext('2d');
+  if (gc) {
+    gc.drawImage(img, 0, 0, W, H);
+    gc.globalCompositeOperation = 'saturation';
+    gc.fillStyle = '#808080';
+    gc.fillRect(0, 0, W, H);
+    gc.globalCompositeOperation = 'source-over';
+  }
+  return g;
+}
+let blurCanvas: HTMLCanvasElement | null = null;
+/** 横にだけぼかした絵（横に縮めてから引き伸ばす） */
+function hblurred(img: CanvasImageSource, W: number, H: number, size: number): CanvasImageSource {
+  if (size <= 1.5) return img;
+  if (!blurCanvas) blurCanvas = document.createElement('canvas');
+  const sw = Math.max(1, Math.round(W / size));
+  blurCanvas.width = sw;
+  blurCanvas.height = H;
+  const bc = blurCanvas.getContext('2d');
+  if (!bc) return img;
+  bc.imageSmoothingEnabled = true;
+  bc.drawImage(img, 0, 0, sw, H);
+  return blurCanvas;
 }
 
 /**
@@ -166,6 +278,146 @@ export function mixTransition(
       }
       break;
     }
+    /* ---------- 追加の 30 種類（FFmpeg の xfade と同じ式。pr は FFmpeg の進み＝1−p） ---------- */
+    case 'wipedown':
+      full(a);
+      clipRect(0, 0, W, H * p, b);
+      break;
+    case 'wipetl':
+    case 'wipetr':
+    case 'wipebl':
+    case 'wipebr': {
+      // 前の絵が、角に向かって小さくなる四角に残る
+      const q = 1 - p, x0 = id === 'wipetr' || id === 'wipebr' ? W * p : 0, y0 = id === 'wipebl' || id === 'wipebr' ? H * p : 0;
+      full(b);
+      clipRect(x0, y0, W * q, H * q, a);
+      break;
+    }
+    case 'slideup':
+      cx.drawImage(a, 0, -H * p, W, H);
+      cx.drawImage(b, 0, H * (1 - p), W, H);
+      break;
+    case 'slidedown':
+      cx.drawImage(a, 0, H * p, W, H);
+      cx.drawImage(b, 0, -H * (1 - p), W, H);
+      break;
+    case 'coverleft':
+      full(a);
+      cx.drawImage(b, W * (1 - p), 0, W, H);
+      break;
+    case 'coverright':
+      full(a);
+      cx.drawImage(b, -W * (1 - p), 0, W, H);
+      break;
+    case 'coverup':
+      full(a);
+      cx.drawImage(b, 0, H * (1 - p), W, H);
+      break;
+    case 'coverdown':
+      full(a);
+      cx.drawImage(b, 0, -H * (1 - p), W, H);
+      break;
+    case 'revealleft':
+      full(b);
+      cx.drawImage(a, -W * p, 0, W, H);
+      break;
+    case 'revealright':
+      full(b);
+      cx.drawImage(a, W * p, 0, W, H);
+      break;
+    case 'smoothleft':
+      maskMix(cx, a, b, W, H, 256, 1, (u) => smooth(0, 1, u + 2 * p - 1));
+      break;
+    case 'smoothright':
+      maskMix(cx, a, b, W, H, 256, 1, (u) => smooth(0, 1, 1 - u + 2 * p - 1));
+      break;
+    case 'vertopen':
+      maskMix(cx, a, b, W, H, 256, 1, (u) => smooth(0, 1, 2 * p - Math.abs(2 * u - 1)));
+      break;
+    case 'vertclose':
+      maskMix(cx, a, b, W, H, 256, 1, (u) => smooth(0, 1, Math.abs(2 * u - 1) + 2 * p - 1));
+      break;
+    case 'horzopen':
+      maskMix(cx, a, b, W, H, 1, 256, (_u, v) => smooth(0, 1, 2 * p - Math.abs(2 * v - 1)));
+      break;
+    case 'horzclose':
+      maskMix(cx, a, b, W, H, 1, 256, (_u, v) => smooth(0, 1, Math.abs(2 * v - 1) + 2 * p - 1));
+      break;
+    case 'diagtl':
+      maskMix(cx, a, b, W, H, 160, 90, (u, v) => smooth(0, 1, u * v + 2 * p - 1));
+      break;
+    case 'diagbr':
+      maskMix(cx, a, b, W, H, 160, 90, (u, v) => smooth(0, 1, (1 - u) * (1 - v) + 2 * p - 1));
+      break;
+    case 'radial': {
+      const pr = 1 - p;
+      maskMix(cx, a, b, W, H, 192, 108, (u, v) => smooth(0, 1, Math.atan2((u - 0.5) * W, (v - 0.5) * H) - (pr - 0.5) * Math.PI * 2.5));
+      break;
+    }
+    case 'rectcrop':
+    case 'circlecrop': {
+      // 黒の中の四角（円）に、前半は前の絵、後半は後ろの絵を見せる
+      const e = Math.abs(0.5 - p);
+      cx.fillStyle = '#000';
+      cx.fillRect(0, 0, W, H);
+      cx.save();
+      cx.beginPath();
+      if (id === 'rectcrop') cx.rect(W / 2 - e * W, H / 2 - e * H, 2 * e * W, 2 * e * H);
+      else cx.arc(W / 2, H / 2, Math.max(0.01, Math.pow(2 * e, 3) * Math.hypot(W / 2, H / 2)), 0, Math.PI * 2);
+      cx.clip();
+      cx.drawImage(p > 0.5 ? b : a, 0, 0, W, H);
+      cx.restore();
+      break;
+    }
+    case 'dissolve': {
+      // 点ごとの乱数より進みが大きいところから、後ろの絵になる
+      const mw = Math.min(W, 960), mh = Math.round((H * mw) / W);
+      maskMix(cx, a, b, W, H, mw, mh, (_u, _v, x, y) => (frand(x, y) < p ? 1 : 0), false);
+      break;
+    }
+    case 'hblur': {
+      const pr = 1 - p, k = pr <= 0.5 ? pr * 2 : (1 - pr) * 2, size = 1 + (W / 2) * k;
+      full(hblurred(a, W, H, size));
+      full(hblurred(b, W, H, size), p);
+      break;
+    }
+    case 'fadegrays': {
+      // fadeblack と同じ重みで、黒のかわりに、それぞれの絵を白黒にしたものを挟む
+      const pr = 1 - p, ph = 0.2, s1 = smooth(1 - ph, 1, pr), s2 = smooth(ph, 1, pr);
+      const wA = s1 * pr, wGA = (1 - s1) * pr, wGB = s2 * (1 - pr), wB = (1 - s2) * (1 - pr);
+      const L: [CanvasImageSource, number][] = [
+        [a, wA],
+        [gray(a, W, H, 0), wGA],
+        [gray(b, W, H, 1), wGB],
+        [b, wB],
+      ];
+      let acc = 0;
+      cx.fillStyle = '#000';
+      cx.fillRect(0, 0, W, H);
+      for (const [img, w] of L) {
+        if (w <= 0) continue;
+        acc += w;
+        full(img, Math.min(1, w / acc));
+      }
+      break;
+    }
+    case 'squeezeh':
+      full(b);
+      cx.drawImage(a, 0, (H * p) / 2, W, H * (1 - p));
+      break;
+    case 'hlslice': {
+      const pr = 1 - p;
+      maskMix(cx, a, b, W, H, Math.min(W, 960), 1, (u) => {
+        const sm = smooth(-0.5, 0, u - pr * 1.5), fr = 10 * u - Math.floor(10 * u);
+        return sm <= fr ? 0 : 1;
+      }, false);
+      break;
+    }
+    case 'hlwind': {
+      const pr = 1 - p, mh = Math.min(H, 540);
+      maskMix(cx, a, b, W, H, 256, mh, (u, _v, _x, y) => smooth(0, -0.2, (1 - u) * 0.8 + 0.2 * frand(0, Math.round((y * H) / mh)) - (1 - pr) * 1.2), true);
+      break;
+    }
     default:
       full(a);
       full(b, p);
@@ -176,7 +428,7 @@ export function mixTransition(
 /* 一覧に出す見本（A＝濃いグレー、B＝明るいグレーのカードを、進み 0.4 で切り替えた絵） */
 const thumbs: Record<string, string> = {};
 /* 見本の進み（形がわかりやすいところ） */
-const THUMB_P: Record<string, number> = { fadeblack: 0.6, fadewhite: 0.6, circleopen: 0.45, circleclose: 0.55, zoomin: 0.3, pixelize: 0.4 };
+const THUMB_P: Record<string, number> = { fadeblack: 0.6, fadewhite: 0.6, circleopen: 0.45, circleclose: 0.55, zoomin: 0.3, pixelize: 0.4, fadegrays: 0.5, rectcrop: 0.75, circlecrop: 0.75, dissolve: 0.5, hblur: 0.35, radial: 0.5, diagtl: 0.5, diagbr: 0.5, hlwind: 0.5, hlslice: 0.5 };
 function card(label: string, bg: string, fg: string, W: number, H: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = W;
