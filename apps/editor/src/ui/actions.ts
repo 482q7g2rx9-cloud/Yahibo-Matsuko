@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { presetById } from './titleStyles';
 import { applyTransition } from './transPreview';
-import { applyImport, closeImport, confirmLink, gotoClip, gotoRow, importScript, linkClips, pickScriptFile, setScriptSetting, syncScriptWatch, undoImport, unlink } from './scriptLink';
+import { assignScene, sceneMedia, applyImport, closeImport, confirmLink, gotoClip, gotoRow, importScript, linkClips, pickScriptFile, setScriptSetting, syncScriptWatch, undoImport, unlink } from './scriptLink';
 import { addBin, deleteBin, focusBinName } from './bins';
 import { frameSec, openProjectSettings, rebuildProxies, renderProjectSettings, setPs } from './projectSettings';
 import { openHistory, restoreHistory } from './history';
@@ -39,8 +39,9 @@ ACT={
   mdel:function(v){var m=M(v);if(!m)return;if(isUsed(m))return toast('タイムラインで使っているため削除できません。先にクリップを削除してください');
     ask('素材を削除','「'+m.n+'」をプロジェクトから削除します。元のファイルはパソコンに残ります。','削除',function(){if(HOST){HOST.media.cancel([m.id]);delete JOBS[m.id];}else{if(m.url)URL.revokeObjectURL(m.url);IDB.del('files',m.id);}delete E.imgs[m.id];P.media=P.media.filter(function(x){return x!==m;});S.media=P.media[0]?P.media[0].id:null;if(S.src===m.id)S.src=null;saveP();draw();});},
   ctab:function(v){S.ctab=v;draw();},cflt:function(v){S.cflt=v;draw();},
-  scene:function(v){S.scene=v;var s=D.scenes.filter(function(x){return x.id===v;})[0];if(s.m&&M(s.m)){stopAll();S.src=s.m;S.t.cut=0;}draw();},
-  csrc:function(v){if(S.src!==v){stopAll();S.src=v;S.t.cut=0;}var s=D.scenes.filter(function(x){return x.m===v;})[0];if(s)S.scene=s.id;draw();},
+  scene:function(v){S.scene=v;S.cutRow=null;var mid=P.script?sceneMedia()[v]:((D.scenes.filter(function(x){return x.id===v;})[0]||{}).m);if(mid&&M(mid)){stopAll();S.src=mid;S.t.cut=0;}draw();},
+  csrc:function(v){if(S.src!==v){stopAll();S.src=v;S.t.cut=0;}if(P.script){var sm=sceneMedia(),sid=Object.keys(sm).filter(function(k){return sm[k]===v;})[0];if(sid&&sid!==S.scene){S.scene=sid;S.cutRow=null;}}else{var s=D.scenes.filter(function(x){return x.m===v;})[0];if(s)S.scene=s.id;}draw();},
+  sceneAssign:function(){if(S.scene&&S.src)assignScene(S.scene,S.src);},sceneUnassign:function(){if(S.scene)assignScene(S.scene,null);},cutRow:function(v){S.cutRow=v;draw();},
   rsel:function(v){S.sel=selIds(v);draw();},
   rate:function(v){var m=M(S.src);if(m){mark();m.rate=v;saveP();}draw();},
   mark:function(v){var k=D.clip.marks[+v];k.done=!k.done;draw();},

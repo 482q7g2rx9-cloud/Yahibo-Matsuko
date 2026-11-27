@@ -9,6 +9,7 @@ import { HOST } from './desktop';
 import { toast } from './menus';
 import { draw, go } from './render';
 import { A, btn, h, tc } from './util';
+import { ACT } from './actions';
 import { CHANGE_AUTO, CHANGE_LABEL, ROW_TEXT_KEYS, applyLink, diffLink, linkState, rowNumbers, rowText } from '../core/link';
 
 export function scriptSettings() { return (P.settings && P.settings.script) || {}; }
@@ -155,7 +156,46 @@ export function syncScriptWatch(force) {
   WKEY = key;
   HOST.script.watch(st.path && st.watch !== false && HOST.project.current ? st.path : null).catch(function () {});
 }
+/* ---------- カットページ：シーンと素材、行に合わせてカットを作る ---------- */
+export function sceneMedia() { return P.sceneMedia || (P.sceneMedia = {}); }
+export function scenesSorted() { return P.script ? P.script.scenes.slice().sort(function (a, b) { return a.order - b.order; }) : []; }
+export function rowsOfScene(sid) { return P.script ? P.script.rows.filter(function (r) { return r.sceneId === sid && !r.deleted; }).sort(function (a, b) { return a.order - b.order; }) : []; }
+export function assignScene(sid, mid) {
+  if (!P.script) return;
+  var sm = sceneMedia(), m = mid && M(mid), sc = P.script.scenes.filter(function (x) { return x.id === sid; })[0];
+  if (!sc) return;
+  if (m) sm[sid] = m.id; else delete sm[sid];
+  changed();
+  toast(m ? '「' + m.n + '」を ' + (sc.title || 'シーン') + ' に割り当てました' : '割り当てを外しました');
+}
+/* カットを作る行：選んだシーンの、まだクリップのない最初の行（選び直せる） */
+export function cutRow() {
+  if (!P.script || !S.scene) return null;
+  var L = rowsOfScene(S.scene);
+  if (S.cutRow && L.some(function (r) { return r.id === S.cutRow; })) return S.cutRow;
+  var r = L.filter(function (x) { return !linksOfRow(x.id).length; })[0] || L[0];
+  return r ? r.id : null;
+}
+/* 仮編集へ追加・上書きで新しくできたクリップを、カットを作る行に紐づけ、次の行へ進める */
+function wrapCut(name) {
+  var f = ACT[name]; if (!f || f.__wrapped) return;
+  var g = function () {
+    var before = {}; P.clips.forEach(function (c) { before[c.id] = 1; });
+    var sm = P.script && S.scene ? sceneMedia()[S.scene] : null, rid = (!sm || sm === S.src) ? cutRow() : null;
+    f.apply(this, arguments);
+    var r = rid && rowById(rid); if (!r) return;
+    var made = P.clips.filter(function (c) { return !before[c.id]; });
+    if (!made.length) return;
+    made.forEach(function (c) { links().push({ id: uid('lk'), clipId: c.id, rowId: r.id, rev: r.rev || 0, seen: rowText(r) }); });
+    var L = rowsOfScene(S.scene), i = L.map(function (x) { return x.id; }).indexOf(r.id), nx = L.slice(i + 1).filter(function (x) { return !linksOfRow(x.id).length; })[0];
+    S.cutRow = nx ? nx.id : r.id;
+    saveP(); draw();
+  };
+  g.__wrapped = true;
+  ACT[name] = g;
+}
 export function init() {
+  wrapCut('cutIns'); wrapCut('cutOvr');
   S.imp = null; S.scrNotice = false; S.scrFilter = 'all'; S.scrRow = null;
   if (HOST && HOST.script) HOST.script.onChanged(function (p) {
     if (p !== scriptSettings().path) return;
