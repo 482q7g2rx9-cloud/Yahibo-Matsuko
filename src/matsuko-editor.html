@@ -445,6 +445,10 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .tl2 .trx .tre.l{left:-3px}.tl2 .trx .tre.r{right:-3px}
 .tl2 .trx .tre:hover{background:rgba(255,255,255,.5)}
 
+/* トランジションの一覧の見出し */
+.tsh{font-weight:500;color:var(--tx2);margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--dv)}
+.tsh:first-child{margin-top:0}
+
 </style>
 <div id="app">
 <header id="top"></header>
@@ -1184,6 +1188,14 @@ const TRANSITIONS = [
   { id: "squeezeh", name: "上下に縮む", ff: "squeezeh" },
   { id: "hlslice", name: "スライス（左へ）", ff: "hlslice" },
   { id: "hlwind", name: "風（左へ）", ff: "hlwind" }
+];
+const TRANSITION_GROUPS = [
+  ["基本", ["fade", "fadeblack", "fadewhite", "fadegrays", "dissolve"]],
+  ["ワイプ", ["wipeleft", "wiperight", "wipeup", "wipedown", "wipetl", "wipetr", "wipebl", "wipebr", "smoothleft", "smoothright"]],
+  ["スライド", ["slideleft", "slideright", "slideup", "slidedown", "coverleft", "coverright", "coverup", "coverdown", "revealleft", "revealright"]],
+  ["開く・閉じる", ["vertopen", "vertclose", "horzopen", "horzclose", "squeezeh"]],
+  ["図形", ["circleopen", "circleclose", "circlecrop", "rectcrop", "radial", "diagtl", "diagbr"]],
+  ["効果", ["zoomin", "pixelize", "hblur", "hlslice", "hlwind"]]
 ];
 const TRANSITION_DEFAULT_D = 1;
 function transitionById(id) {
@@ -2387,9 +2399,13 @@ function trTarget() {
   return best;
 }
 function transGallery() {
-  return '<div class="tsg" role="list">' + TRANSITIONS.map(function(x) {
-    return '<button class="tsl" role="listitem" data-trn="' + x.id + '" title="' + h(x.name) + '" aria-label="' + h(x.name) + '"' + A("trApply", x.id) + '><span class="tsb"><img src="' + transitionThumb(x.id) + '" alt=""></span><span class="tsn">' + h(x.name) + "</span></button>";
-  }).join("") + "</div>";
+  return TRANSITION_GROUPS.map(function(g) {
+    return '<div class="tsh">' + h(g[0]) + '</div><div class="tsg" role="list" aria-label="' + h(g[0]) + '">' + g[1].map(function(id) {
+      var x = transitionById(id);
+      if (!x) return "";
+      return '<button class="tsl" role="listitem" data-trn="' + x.id + '" title="' + h(x.name) + '" aria-label="' + h(x.name) + '"' + A("trApply", x.id) + '><span class="tsb"><img src="' + transitionThumb(x.id) + '" alt=""></span><span class="tsn">' + h(x.name) + "</span></button>";
+    }).join("") + "</div>";
+  }).join("");
 }
 function applyTransition(id) {
   var b = trTarget(), def = transitionById(id);

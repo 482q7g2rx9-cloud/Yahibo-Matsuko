@@ -440,3 +440,7 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .tl2 .trx .tre{position:absolute;top:0;bottom:0;width:6px;cursor:ew-resize}
 .tl2 .trx .tre.l{left:-3px}.tl2 .trx .tre.r{right:-3px}
 .tl2 .trx .tre:hover{background:rgba(255,255,255,.5)}
+
+/* トランジションの一覧の見出し */
+.tsh{font-weight:500;color:var(--tx2);margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--dv)}
+.tsh:first-child{margin-top:0}

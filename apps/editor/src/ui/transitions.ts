@@ -54,6 +54,16 @@ export const TRANSITIONS: TransitionDef[] = [
   { id: 'hlwind', name: '風（左へ）', ff: 'hlwind' },
 ];
 
+/** 一覧の分類（見出しと、そこに並べる種類） */
+export const TRANSITION_GROUPS: [string, string[]][] = [
+  ['基本', ['fade', 'fadeblack', 'fadewhite', 'fadegrays', 'dissolve']],
+  ['ワイプ', ['wipeleft', 'wiperight', 'wipeup', 'wipedown', 'wipetl', 'wipetr', 'wipebl', 'wipebr', 'smoothleft', 'smoothright']],
+  ['スライド', ['slideleft', 'slideright', 'slideup', 'slidedown', 'coverleft', 'coverright', 'coverup', 'coverdown', 'revealleft', 'revealright']],
+  ['開く・閉じる', ['vertopen', 'vertclose', 'horzopen', 'horzclose', 'squeezeh']],
+  ['図形', ['circleopen', 'circleclose', 'circlecrop', 'rectcrop', 'radial', 'diagtl', 'diagbr']],
+  ['効果', ['zoomin', 'pixelize', 'hblur', 'hlslice', 'hlwind']],
+];
+
 export const TRANSITION_DEFAULT_D = 1;
 
 export function transitionById(id: string | undefined): TransitionDef | undefined {

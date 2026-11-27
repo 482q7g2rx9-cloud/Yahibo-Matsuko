@@ -8,7 +8,7 @@ import { E, heads, pairAt, progStop, redrawProg, sync, trPairs, activeVideos } f
 import { primary } from './editOps';
 import { toast } from './menus';
 import { A, h } from './util';
-import { TRANSITIONS, TRANSITION_DEFAULT_D, transitionById, transitionThumb } from './transitions';
+import { TRANSITION_GROUPS, TRANSITION_DEFAULT_D, transitionById, transitionThumb } from './transitions';
 
 /* つなぎ目の後ろのクリップ（同じ映像トラックで、すぐ前に映像・画像のクリップがあるもの） */
 function prevOf(b) {
@@ -28,9 +28,13 @@ export function trTarget() {
 
 /* 一覧 */
 export function transGallery() {
-  return '<div class="tsg" role="list">' + TRANSITIONS.map(function (x) {
-    return '<button class="tsl" role="listitem" data-trn="' + x.id + '" title="' + h(x.name) + '" aria-label="' + h(x.name) + '"' + A('trApply', x.id) + '><span class="tsb"><img src="' + transitionThumb(x.id) + '" alt=""></span><span class="tsn">' + h(x.name) + '</span></button>';
-  }).join('') + '</div>';
+  return TRANSITION_GROUPS.map(function (g) {
+    return '<div class="tsh">' + h(g[0]) + '</div><div class="tsg" role="list" aria-label="' + h(g[0]) + '">' + g[1].map(function (id) {
+      var x = transitionById(id);
+      if (!x) return '';
+      return '<button class="tsl" role="listitem" data-trn="' + x.id + '" title="' + h(x.name) + '" aria-label="' + h(x.name) + '"' + A('trApply', x.id) + '><span class="tsb"><img src="' + transitionThumb(x.id) + '" alt=""></span><span class="tsn">' + h(x.name) + '</span></button>';
+    }).join('') + '</div>';
+  }).join('');
 }
 
 /* 押したとき：つなぎ目に付ける（もう付いていれば種類を変える） */
