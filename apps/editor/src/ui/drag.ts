@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { SYS_PREFIX, fontById } from './titleStyles';
+import { SYS_PREFIX, canQueryLocalFonts, fontById, queryLocalFonts, systemFontsState } from './titleStyles';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
 import { C, M, cEnd } from './project';
@@ -112,3 +112,12 @@ document.addEventListener('keydown',function(e){
   if((e.key==='Enter'||e.key===' ')&&e.target.getAttribute('role')==='button'){e.preventDefault();e.target.click();}
 });
 }
+
+/* ブラウザ版：フォントの一覧を開こうとしたときに、PC のフォントを自動で読みに行く。
+   ブラウザは、使う人の操作（クリック・キー）の中でしか一覧を読ませてくれないため、ここで呼ぶ。
+   初めてのときはブラウザが許可を求め、許可すると一覧に PC のフォントが加わる（次からは起動時に読む） */
+function wantSysFonts(e){var t=e.target;if(HOST||!t||!t.dataset||t.dataset.in!=='tfont')return;
+  if(!canQueryLocalFonts()||systemFontsState()!=='none')return;
+  queryLocalFonts().then(function(){draw();});}
+document.addEventListener('pointerdown',wantSysFonts,true);
+document.addEventListener('keydown',wantSysFonts,true);

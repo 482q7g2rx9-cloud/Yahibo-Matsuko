@@ -93,8 +93,7 @@ function fontRow(c){var cur=c.font||'gothic',sys=systemFonts(),st=systemFontsSta
   if(sys.length||missing)o+='<optgroup label="PC のフォント'+(sys.length?'（'+sys.length+'）':'')+'">'+(missing?opt(cur,fontById(cur).name+(st==='ok'?'（この PC にありません）':'')):'')+sys.map(function(f){return opt(SYS_PREFIX+f.family,f.name);}).join('')+'</optgroup>';
   var r='<div class="fg"><span>フォント</span><select class="inp" data-in="tfont" aria-label="フォント">'+o+'</select></div>';
   if(desk){if(st!=='ok')r+='<div class="mu" style="font-size:11px">PC のフォントを読み込んでいます…</div>';}
-  else{if(canQueryLocalFonts()&&st!=='ok')r+='<div class="row" style="gap:8px;justify-content:flex-end">'+btn(st==='loading'?'読み込み中…':'PC のフォントを読み込む','tSysFonts','','s')+'</div>'+(st==='error'?'<div class="mu" style="font-size:11px">PC のフォントを読めませんでした。下の欄に名前を入れても使えます。</div>':'');
-    if(!canQueryLocalFonts()||st==='error')r+='<div class="fg"><span>名前で指定</span><input class="inp" data-in="tfontname" placeholder="例：メイリオ" aria-label="PC のフォントの名前" value="'+(isSystemFont(cur)?h(cur.slice(SYS_PREFIX.length)):'')+'"></div>';}
+  else if(st==='error'||!canQueryLocalFonts())r+='<div class="fg"><span>名前で指定</span><input class="inp" data-in="tfontname" placeholder="例：メイリオ" aria-label="PC のフォントの名前" value="'+(isSystemFont(cur)?h(cur.slice(SYS_PREFIX.length)):'')+'"></div>'+(st==='error'?'<div class="mu" style="font-size:11px">PC のフォントの一覧を読めませんでした。名前を入れると使えます。</div>':'');
   return r;}
 /* テロップのスタイルの一覧（titleStyles.ts）。テロップを選んでいればそのスタイルを変え、選んでいなければ新しく追加する */
 export function styleGallery(){var t=selTitle(),cur=t&&t.lookId;

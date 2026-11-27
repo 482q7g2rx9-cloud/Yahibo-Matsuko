@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { presetById, queryLocalFonts } from './titleStyles';
+import { presetById } from './titleStyles';
 import { frameSec, openProjectSettings, rebuildProxies, renderProjectSettings, setPs } from './projectSettings';
 import { openHistory, restoreHistory } from './history';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
@@ -114,7 +114,6 @@ ACT={
     var L=S.sel.map(C).filter(function(c){return c&&c.type==='title'&&!locked(c);});
     if(L.length){mark();L.forEach(function(c){c.look=lk();c.lookId=pr.id;});changed();return toast('スタイルを「'+pr.name+'」にしました');}
     addTitle('name',S.t.edit);var c=C(S.sel[0]);if(c&&c.type==='title'){c.look=lk();c.lookId=pr.id;changed();}},
-  tSysFonts:function(){var p=queryLocalFonts();draw();p.then(function(ok){draw();if(!ok)toast('PC のフォントを読めませんでした');else toast('PC のフォントを読み込みました');});},
   tSet:function(v){var i=v.indexOf('|'),k=v.slice(0,i),x=v.slice(i+1),L=S.sel.map(C).filter(function(c){return c&&c.type==='title'&&!locked(c);});if(!L.length)return;mark();L.forEach(function(c){c[k]=k==='weight'?+x:x;});changed();},
   tLookOff:function(){var L=S.sel.map(C).filter(function(c){return c&&c.type==='title'&&c.look;});if(!L.length)return;mark();L.forEach(function(c){delete c.look;delete c.lookId;});changed();toast('スタイルを外しました');},
   psOpen:function(){openProjectSettings();},psTab:function(v){S.pstab=v;renderProjectSettings();},psSet:function(v){var i=v.indexOf('|');setPs(v.slice(0,i),v.slice(i+1));},psProxy:function(){rebuildProxies();},
