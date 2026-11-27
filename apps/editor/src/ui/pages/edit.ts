@@ -45,7 +45,7 @@ export function tlInner(){var pps=S.pps||10,dur=progDur(),b=document.querySelect
     '<div class="rul" data-rul><div class="rin" style="width:'+W+'px;background-image:repeating-linear-gradient(90deg,var(--bd2) 0 1px,transparent 1px '+(step*pps/5).toFixed(2)+'px)">'+lab+'<div class="rd" style="width:'+(dur*pps)+'px;right:auto"></div>'+rng+'<div class="phk" data-head="edit" style="left:'+ph0+'px;top:16px"></div></div></div>'+
     '<div class="heads" data-heads><div class="hin" style="height:'+H+'px">'+hd+'</div></div>'+
     '<div class="body" data-body><div class="tlc" style="width:'+W+'px;height:'+Math.max(H,10)+'px">'+ln+cl+
-      (P.clips.length?'':'<div class="mu" style="position:absolute;left:12px;top:'+((ROWS.filter(function(r){return r.id==='V1';})[0]||{y:0}).y+30)+'px;pointer-events:none">左の素材を、ここへドラッグするか「＋」で追加してください</div>')+
+      ''+
       '<div class="phl" data-head="edit" style="left:'+ph0+'px"></div><div class="snapl" data-snapl hidden></div><div class="marq" data-marq hidden></div><div class="ghost" data-ghost hidden></div></div></div>';}
 export function syncTLScroll(){var b=document.querySelector('[data-body]');if(!b)return;var r=document.querySelector('[data-rul] .rin'),hd=document.querySelector('[data-heads] .hin');if(r)r.style.transform='translateX('+(-b.scrollLeft)+'px)';if(hd)hd.style.transform='translateY('+(-b.scrollTop)+'px)';}
 export function tlAfter(){var b=document.querySelector('[data-body]');if(!b)return;if(S.pps==null){fitZoom();drawTL();return;}b.scrollLeft=S.tlx||0;b.scrollTop=S.tly||0;syncTLScroll();}
@@ -59,7 +59,7 @@ export function propVal(c,key){if(key==='fsz'&&c.fsz==null)return TITLE_PX[c.sz|
 export function propPct(key,v){var p=PROPS[key];return Math.max(0,Math.min(100,(v-p.min)/(p.max-p.min)*100));}
 export function propTxt(key,v){return (+v).toFixed(PROPS[key].dec);}
 export function numRow(label,c,key){var p=PROPS[key],v=propVal(c,key),id=c.id;
-  return '<div class="pr"><button class="kf" aria-label="'+label+'のキーフレーム" title="キーフレーム（エフェクトページの本実装で使えるようになります）"'+A('kfTodo')+'>'+diamond(false)+'</button><span class="t2">'+label+'</span>'+
+  return '<div class="pr"><button class="kf" aria-label="'+label+'のキーフレーム" title="キーフレーム"'+A('kfTodo')+'>'+diamond(false)+'</button><span class="t2">'+label+'</span>'+
     '<input type="range" class="rg" min="'+p.min+'" max="'+p.max+'" step="'+p.step+'" value="'+v+'" style="--p:'+propPct(key,v)+'%" data-in="cp" data-k="'+key+'" data-cid="'+id+'" aria-label="'+label+'">'+
     '<span class="stp"><button aria-label="'+label+'を減らす"'+A('cstep',id+'|'+key+'|-1')+'>'+TRI.l+'</button><button aria-label="'+label+'を増やす"'+A('cstep',id+'|'+key+'|1')+'>'+TRI.r+'</button></span>'+
     '<span class="v hot" tabindex="0" role="spinbutton" aria-label="'+label+'" aria-valuenow="'+v+'" aria-valuemin="'+p.min+'" aria-valuemax="'+p.max+'" data-hot data-k="'+key+'" data-cid="'+id+'" title="左右にドラッグで増減、クリックで入力">'+propTxt(key,v)+'<small>'+p.unit+'</small></span></div>';}
@@ -92,7 +92,7 @@ function fontRow(c){var cur=c.font||'gothic',sys=systemFonts(),st=systemFontsSta
   var missing=isSystemFont(cur)&&!sys.some(function(f){return SYS_PREFIX+f.family===cur;});
   if(sys.length||missing)o+='<optgroup label="PC のフォント'+(sys.length?'（'+sys.length+'）':'')+'">'+(missing?opt(cur,fontById(cur).name+(st==='ok'?'（この PC にありません）':'')):'')+sys.map(function(f){return opt(SYS_PREFIX+f.family,f.name);}).join('')+'</optgroup>';
   var r='<div class="fg"><span>フォント</span><select class="inp" data-in="tfont" aria-label="フォント">'+o+'</select></div>';
-  if(!desk&&(st==='error'||!canQueryLocalFonts()))r+='<div class="fg"><span>名前で指定</span><input class="inp" data-in="tfontname" placeholder="例：メイリオ" aria-label="PC のフォントの名前" value="'+(isSystemFont(cur)?h(cur.slice(SYS_PREFIX.length)):'')+'"></div>';
+  if(!desk&&(st==='error'||!canQueryLocalFonts()))r+='<div class="fg"><span>名前で指定</span><input class="inp" data-in="tfontname" aria-label="PC のフォントの名前" value="'+(isSystemFont(cur)?h(cur.slice(SYS_PREFIX.length)):'')+'"></div>';
   return r;}
 /* テロップのスタイルの一覧（titleStyles.ts）。テロップを選んでいればそのスタイルを変え、選んでいなければ新しく追加する */
 export function styleGallery(){var t=selTitle(),cur=t&&t.lookId;
@@ -102,7 +102,7 @@ export function titleMotion(c){return numRow('位置 X',c,'x')+numRow('位置 Y'
   '<div class="row" style="justify-content:flex-end;padding-top:8px">'+btn('元に戻す','mreset',c.id,'s')+'</div>';}
 export function selTitle(){var c=primary();return c&&c.type==='title'?c:null;}
 export function inspector(){var L=S.sel.map(C).filter(Boolean),c=primary();
-  if(!c)return {name:'',html:fsec('clip','クリップ',null,'<div class="mu" style="padding:6px 0;line-height:1.7">タイムラインのクリップを選ぶと、ここに情報が出ます。<br>Shift／Ctrl＋クリック、または何もないところからドラッグすると、複数選べます。</div>')};
+  if(!c)return {name:'',html:fsec('clip','クリップ',null,'')};
   var pair=L.length===2&&L[0].link&&L[0].link===L[1].link;
   if(L.length>1&&!pair){var tot=L.reduce(function(a,x){return a+cLen(x);},0);
     return {name:L.length+' 個を選択',html:fsec('clip','選んだクリップ',null,kv('数',L.length+' 個')+kv('合計の長さ',mmss(tot))+'<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">'+btn('削除','delSel','','s')+btn('リップル削除','rdel','','s')+btn(L.some(function(x){return x.link;})?'リンク解除':'リンク','lnk','','s')+btn('コピー','copy','','s')+'</div>')};}
@@ -123,8 +123,8 @@ export function keepSegs(m,a,b){return KS.keepSegments(m.marks,a,b);}
 export function silPanel(m){if(m.k==='画像')return '';var L=m.marks||[];
   return '<div class="blk"><div class="cap">不要部分（無音）</div><div class="row" style="gap:6px;margin-bottom:8px"><span class="mu">音量</span>'+sel('無音とみなす音量',['-45 dB','-40 dB','-35 dB','-30 dB','-25 dB'],S.sil.thr,'height:26px;width:84px','silthr')+'<span class="mu">長さ</span>'+sel('最短の長さ',['0.3 秒','0.5 秒','1 秒','2 秒'],S.sil.min,'height:26px;width:76px','silmin')+btn('検出','detect','','s')+'</div>'+
     (L.length?'<div style="max-height:220px;overflow:auto">'+L.map(function(k,i){return '<div style="display:grid;grid-template-columns:1fr 44px 56px;gap:8px;align-items:center;height:36px;border-bottom:1px solid var(--dv)"><span>'+ms1(k.a)+'–'+ms1(k.b)+'</span>'+(k.done?'<span class="t-ok">削除</span>':'<span class="t-wn">残す</span>')+btn(k.done?'戻す':'削除','smk',i,'s')+'</div>';}).join('')+'</div>'+
-      '<div class="mu" style="margin-top:8px;line-height:1.6">削除 '+L.filter(function(k){return k.done;}).length+'件（'+ms1(L.filter(function(k){return k.done;}).reduce(function(s,k){return s+k.b-k.a;},0))+'）。削除にした部分は、仮編集へ追加するときに除かれます。</div>'
-     :'<div class="mu" style="line-height:1.6">'+(m.peaks?'「検出」を押すと、音のない部分を探します。':m.sample?'見本の素材では検出できません。':'この素材は音声の波形がないため検出できません。')+'</div>')+'</div>';}
+      '<div class="mu" style="margin-top:8px;line-height:1.6">削除 '+L.filter(function(k){return k.done;}).length+'件（'+ms1(L.filter(function(k){return k.done;}).reduce(function(s,k){return s+k.b-k.a;},0))+'）</div>'
+     :'<div class="mu" style="line-height:1.6">'+(m.peaks?'':m.sample?'見本の素材では検出できません。':'この素材は音声の波形がないため検出できません。')+'</div>')+'</div>';}
 export function xRange(){var d=progDur();if(S.x&&S.x.range==='イン点〜アウト点'&&(P.pin!=null||P.pout!=null)){var a=P.pin||0,b=P.pout!=null?P.pout:d;return [Math.min(a,d),Math.min(b,d)];}return [0,d];}
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
@@ -137,17 +137,17 @@ PROPS={fsz:{min:12,max:300,step:1,unit:'px',def:59,dec:0},lh:{min:80,max:300,ste
 R.edit=function(){
   var left;
   if(S.etab!=='text'){var L=P.media.filter(function(m){return m.k==='映像'||m.k==='音声'||m.k==='画像'||m.k==='テイク';});
-    left='<div class="row" style="padding:12px 16px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="'+h(S.eq||'')+'" style="height:28px">'+btn('＋ 読込','imp')+'</div><div class="mu" style="padding:0 16px 8px">タイムラインへドラッグして置けます（Ctrl で挿入）</div><div class="scroll"><div class="asg">'+
+    left='<div class="row" style="padding:12px 16px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="'+h(S.eq||'')+'" style="height:28px">'+btn('＋ 読込','imp')+'</div><div class="scroll"><div class="asg">'+
     L.filter(function(m){return !S.eq||m.n.indexOf(S.eq)>=0;}).map(function(m){var r=D.rights[m.r]||['—',''],can=(m.url&&!m.loading)||(m.sample&&m.k!=='音声'&&m.k!=='テイク');
       return '<div style="position:relative"'+(can?' data-am="'+m.id+'"':'')+'><div class="tb" style="cursor:'+(can?'grab':'default')+';background:'+(m.thumb?'#000 url('+m.thumb+') center / cover':m.k==='音声'?'#2f6b45':m.k==='テイク'?'#5a4a8a':(m.col||['#555'])[0])+'"><span>'+m.k+'</span><span>'+(m.k==='画像'?'':mmss(m.d))+'</span></div>'+
       (can?'<button class="b s" aria-label="「'+h(m.n)+'」をタイムラインに追加" title="タイムラインに追加"'+A('addtl',m.id)+' style="position:absolute;right:4px;top:4px;width:24px;height:24px;padding:0;border-radius:50%">'+ic('plus',14)+'</button>':'')+
-      '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(m.k==='音声'?h(m.c)+' ':'')+h(m.n)+'</div><div class="'+(m.r==='wn'?'t-wn':'t-ok')+'">'+r[0]+'</div></div>';}).join('')+'</div>'+(L.length?'':'<div class="mu" style="padding:0 16px">「＋ 読込」で動画・音声・画像を読み込めます。</div>')+'</div>';}
+      '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(m.k==='音声'?h(m.c)+' ':'')+h(m.n)+'</div><div class="'+(m.r==='wn'?'t-wn':'t-ok')+'">'+r[0]+'</div></div>';}).join('')+'</div>'+'</div>';}
   else left='<div class="scroll" style="padding:14px">'+styleGallery()+'</div>';
   var tools=[['select','選択',keyOf('tSel')],['split','分割',keyOf('tSplit')],['trash','削除',''],['hand','ハンド',keyOf('tHand')],['text','文字','']],ins=inspector(),rngOn=P.pin!=null||P.pout!=null;
   return '<div class="pn l" style="width:'+pw('editL')+'px">'+splitter('editL','l')+''+ph('素材')+tabs([['assets','アセット'],['text','テロップ']],S.etab==='text'?'text':'assets','etab','素材の種類')+left+'</div>'+
   '<div class="pc" style="background:var(--bg0)">'+
     '<div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">'+ph('プレビュー','<span class="x">全長 '+mmss(progDur())+'</span>')+'<div class="mon" style="flex:1;min-height:0"><canvas data-prog '+canvasAttrs()+' style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas></div>'+
-      '<div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">'+tc(S.t.edit)+'</span><span class="mid">'+ibtn('inPt','イン点を設定（I キー）','pin')+ibtn('outPt','アウト点を設定（O キー）','pout')+'<span class="vsep"></span>'+ibtn('prevCut','前の編集点へ（↑）','prev')+ibtn('back','1フレーム戻る（←）','fb')+playBtn(E.playing)+ibtn('fwd','1フレーム進む（→）','ff')+ibtn('nextCut','次の編集点へ（↓）','next')+'<span class="vsep"></span>'+ibtn('split','再生ヘッドで分割（S キー）','split')+'</span><span class="end row" style="justify-content:flex-end;gap:6px"><button class="b s" style="height:24px;padding:0 8px;border:0;background:none;color:var(--mu)" title="プレビューの画質（プロジェクト設定で変えられます）"'+A('psOpen')+'>'+pqLabel()+'</button>'+ibtn('full','全画面','todo')+'</span></div></div>'+
+      '<div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">'+tc(S.t.edit)+'</span><span class="mid">'+ibtn('inPt','イン点を設定（I キー）','pin')+ibtn('outPt','アウト点を設定（O キー）','pout')+'<span class="vsep"></span>'+ibtn('prevCut','前の編集点へ（↑）','prev')+ibtn('back','1フレーム戻る（←）','fb')+playBtn(E.playing)+ibtn('fwd','1フレーム進む（→）','ff')+ibtn('nextCut','次の編集点へ（↓）','next')+'<span class="vsep"></span>'+ibtn('split','再生ヘッドで分割（S キー）','split')+'</span><span class="end row" style="justify-content:flex-end;gap:6px"><button class="b s" style="height:24px;padding:0 8px;border:0;background:none;color:var(--mu)" title="プレビューの画質"'+A('psOpen')+'>'+pqLabel()+'</button>'+ibtn('full','全画面','todo')+'</span></div></div>'+
     '<div style="flex:1;min-height:0;display:flex"><div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px;background:var(--bg1);border-right:1px solid var(--ln)">'+
       tools.map(function(t){var on=S.tool===t[0];return '<button aria-label="'+t[1]+'" title="'+t[1]+(t[2]?'（'+t[2]+' キー）':'')+'" aria-pressed="'+on+'"'+A('tool',t[0])+' style="width:38px;height:44px;padding:0;border:0;border-radius:4px;background:'+(on?'var(--bg4)':'transparent')+';color:'+(on?'var(--ac)':'var(--tx2)')+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">'+ic(t[0],16)+'<span style="font-size:10px;color:var(--tx2)">'+t[1]+'</span></button>';}).join('')+'</div>'+
       '<div style="flex:1;min-width:0;display:flex;flex-direction:column"><div class="row tlbar">'+

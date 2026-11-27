@@ -67,7 +67,7 @@ export function jobText(m,short){var j=JOBS[m.id]||{};if(m.missing)return '<span
 export function jobsFoot(){var ids=Object.keys(JOBS).filter(function(id){return M(id)&&Object.keys(JOBS[id]).length;});if(!ids.length)return '';
   var px=ids.filter(function(id){return JOBS[id].proxy!=null;}),cur=px[0]?M(px[0]):null;
   return '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">'+(cur?'プロキシ作成中：'+h(cur.n):'サムネイルと波形を作成中')+'</span>'+(cur?'<div class="prog" style="width:140px;flex:none"><i data-jobbar style="width:'+Math.round(JOBS[cur.id].proxy*100)+'%"></i></div><span class="t-ac" data-jobpct>'+Math.round(JOBS[cur.id].proxy*100)+'%</span>':'')+
-    '<span class="mu" style="white-space:nowrap">あと '+ids.length+'件・作業はそのまま続けられます</span><span class="grow"></span>';}
+    '<span class="mu" style="white-space:nowrap">あと '+ids.length+'件</span><span class="grow"></span>';}
 export var lateDraw;
 export function drawWhenIdle(){if(lateDraw)return;lateDraw=setTimeout(function again(){var a=document.activeElement,busy=PDOWN||(a&&(a.tagName==='TEXTAREA'||(a.tagName==='INPUT'&&a.type!=='range'&&a.type!=='checkbox'))||a&&a.isContentEditable);
   if(busy){lateDraw=setTimeout(again,400);return;}lateDraw=0;draw();},120);}
@@ -93,7 +93,6 @@ export function newProjectDlg(){var d=document.getElementById('dlg'),loc=null;
   function render(def){d.innerHTML='<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT" style="width:480px"><h2 id="dlgT">新規プロジェクト</h2>'+
     '<div class="fg" style="grid-template-columns:72px 1fr"><span class="t2">名前</span><input class="inp" id="npName" value="無題のプロジェクト" aria-label="プロジェクトの名前"></div>'+
     '<div class="fg" style="grid-template-columns:72px 1fr auto"><span class="t2">場所</span><span class="mu" id="npLoc" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+h(loc||def)+'">'+h(loc||def)+'</span>'+btn('変更…','npLoc','','s')+'</div>'+
-    '<p class="mu" style="margin:10px 0 20px">この場所に、プロジェクトの名前のフォルダーを作ります。素材のファイルはコピーせず、元の場所のまま使います。</p>'+
     '<div class="row" style="gap:8px;justify-content:flex-end">'+btn('キャンセル','dlgNo','','sec')+btn('作成','npOk','','pri')+'</div></div>';d.hidden=false;var i=d.querySelector('#npName');i.focus();i.select();
     i.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();ACT.npOk();}});}
   HOST.project.defaultLocation().then(function(def){newProjectDlg.def=def;render(def);});

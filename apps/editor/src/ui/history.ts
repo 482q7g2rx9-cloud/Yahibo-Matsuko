@@ -62,7 +62,6 @@ export function openHistory() {
   if (!ready()) return toast(HOST ? 'プロジェクトを開くと、変更履歴が残るようになります' : 'このブラウザでは変更履歴を使えません');
   var d = document.getElementById('dlg');
   d.innerHTML = '<div class="dlg hist" role="dialog" aria-modal="true" aria-labelledby="dlgT"><h2 id="dlgT">変更履歴・復元</h2>' +
-    '<p class="mu">編集しているあいだ、2分ごとにプロジェクトの写しを残しています（新しい順に100件）。戻したい時点の「復元」を押してください。復元したあとも、Ctrl+Z で元に戻せます。</p>' +
     '<div class="hlist" data-hlist><div class="mu" style="padding:16px">読み込んでいます…</div></div>' +
     '<div class="row" style="justify-content:flex-end;margin-top:16px">' + btn('閉じる', 'dlgNo', '', 'pri') + '</div></div>';
   d.hidden = false;
@@ -73,7 +72,7 @@ export function openHistory() {
     box.innerHTML = L.length ? L.map(function (r) {
       return '<div class="hsnap"><span>' + h(formatTime(r.at)) + '</span><span class="chip ' + (r.kind === 'auto' ? 'c-mu' : 'c-in') + '">' + h(KIND_LABEL[r.kind] || r.kind) + '</span>' +
         '<span class="t2">' + h(r.summary) + '</span>' + btn('復元', 'hRestore', r.id + '|' + r.at, 's') + '</div>';
-    }).join('') : '<div class="mu" style="padding:16px">まだ履歴がありません。編集すると、2分ごとに残ります。</div>';
+    }).join('') : '<div class="mu" style="padding:16px">まだ履歴がありません</div>';
   }).catch(function (e) {
     var box = d.querySelector('[data-hlist]');
     if (box) box.innerHTML = '<div class="t-wn" style="padding:16px">変更履歴を読み込めませんでした：' + h(String(e)) + '</div>';

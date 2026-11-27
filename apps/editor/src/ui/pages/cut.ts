@@ -11,7 +11,7 @@ import { silPanel } from './edit';
 
 /* ---- カット ---- */
 export function roughStrip(){var L=v1Clips(),sum=L.reduce(function(a,c){return a+cLen(c);},0)||1;
-  if(!L.length)return '<div class="mu" style="padding:22px 0">まだカットがありません。ソースでイン点とアウト点を決めて「仮編集へ追加」を押してください。</div>';
+  if(!L.length)return '<div class="mu" style="padding:22px 0">まだカットがありません</div>';
   return '<div style="display:flex;gap:2px" data-rough>'+L.map(function(c,i){var x=M(c.m)||{n:'（削除された素材）'},on=S.sel.indexOf(c.id)>=0;
     return '<div class="li" role="button" tabindex="0" data-rc="'+c.id+'"'+A('rsel',c.id)+' title="'+h(x.n)+'　'+tc(c.start)+'から" style="width:'+(cLen(c)/sum*100).toFixed(2)+'%;min-width:24px;height:78px;position:relative;background:'+(on?'#bfe9f8':'#8fd3ee')+';border:1px solid rgba(0,0,0,.35);border-radius:3px;'+(on?'box-shadow:0 0 0 2px var(--wt);':'')+'overflow:hidden"><div style="height:20px;padding:0 6px;line-height:20px;color:#06222f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b style="margin-right:6px;font-weight:500">'+(i+1)+'</b>'+h(x.n)+'　'+mmss(cLen(c))+'</div><div style="position:absolute;left:0;right:0;top:20px;bottom:0;'+filmStyle(x)+'"></div></div>';}).join('')+'</div>';}
 
@@ -22,12 +22,12 @@ R.cut=function(){
   if(S.ctab==='board')left='<div class="row" style="height:56px;flex:none;gap:8px;padding:0 16px;border-bottom:1px solid var(--dv)"><div class="grow" style="line-height:1.5"><div>台本アプリから読み込み</div><div class="mu">v3　最終同期 14:30</div></div>'+btn('更新を確認','todo','','s')+'</div><div class="scroll">'+
     D.scenes.map(function(s){var m=s.m&&M(s.m);return '<div class="li'+(S.scene===s.id?' selr':'')+'" role="button" tabindex="0"'+A('scene',s.id)+' style="display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;height:82px;padding:0 16px;border-bottom:1px solid var(--dv)">'+
       '<div style="width:96px;height:54px;border:1px solid var(--dv);border-radius:4px;background:var(--bg0)"></div><div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px"><b style="font-weight:500;color:var(--lb)">'+s.no+'</b>　'+h(s.n)+'</span><span class="mu">'+s.t+'　'+h(s.shot)+'</span><span>'+(m?chip('素材 '+m.c,'c-ok'):chip('素材 未割り当て','c-wn'))+'</span></div></div>';}).join('')+
-    '</div><div class="mu" style="padding:12px 16px;border-top:1px solid var(--dv);line-height:1.6">シーンを選ぶと、割り当てた素材をソースに表示します。</div>';
+    '</div>';
   else{var cnt=function(k){return vids.filter(function(m){return k==='all'||(m.rate||'未確認')===k;}).length;};
     left=tabs([['all','すべて '+cnt('all')],['未確認','未確認 '+cnt('未確認')],['採用','採用 '+cnt('採用')],['不採用','不採用 '+cnt('不採用')]],S.cflt,'cflt','評価で絞り込み')+'<div class="scroll">'+
     vids.filter(function(m){return S.cflt==='all'||(m.rate||'未確認')===S.cflt;}).map(function(m){var rt=m.rate||'未確認',c={'採用':'c-ok','保留':'c-wn','不採用':'c-er'}[rt]||'c-mu';return '<div class="li'+(S.src===m.id?' selr':'')+'" role="button" tabindex="0"'+A('csrc',m.id)+' style="display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:center;height:60px;padding:0 16px;border-bottom:1px solid var(--dv)">'+mthumb(m,64,36)+
       '<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+h(m.n)+'</span><span class="row" style="gap:8px"><span class="mu">'+(m.k==='画像'?'画像':mmss(m.d))+'</span>'+chip(rt,c)+'</span></div></div>';}).join('')+
-    (vids.length?'':'<div class="mu" style="padding:20px 14px">映像の素材がありません。メディアページで読み込んでください。</div>')+'</div>';}
+    (vids.length?'':'<div class="mu" style="padding:20px 14px">映像の素材がありません</div>')+'</div>';}
   var m=M(S.src)||vids[0],main='';
   if(!m)main=ph('ソース')+'<div class="mon" style="height:calc(240px + var(--xh,0px)*.5);color:#9a9a9a">素材を選んでください</div>';
   else{var C2=D.clip,isMain=m.id==='v03'&&m.sample,img=m.k==='画像',tot=img?5:(m.d||60);TOTAL.cut=tot;S.t.cut=Math.min(S.t.cut,tot);
@@ -48,7 +48,7 @@ R.cut=function(){
     '<div class="row" style="height:48px;flex:none;gap:8px;padding:0 16px;border-bottom:1px solid var(--dv)">'+btn('イン点','setIn','','','イン点（I キー）')+btn('アウト点','setOut','','','アウト点（O キー）')+'<span class="vsep"></span>'+btn('不要部分を削除','delAll')+btn('無音を検出','detect')+'<span class="grow"></span>'+btn('仮編集へ追加（挿入）','cutIns','','on')+btn('上書き','cutOvr')+'</div>'+
     ph('仮編集（ラフカット）＝ V1','<span class="x">合計 '+mmss(v1Clips().reduce(function(a,c){return a+cLen(c);},0))+'　'+v1Clips().length+'カット</span>'+(onV1?btn('選択したカットを削除','rdel','','s'):''))+
     '<div style="flex:1;min-height:0;padding:14px;background:var(--bg0);overflow:auto">'+roughStrip()+
-    '<div class="mu" style="margin-top:10px">ドラッグで並べ替え　／　'+(vi>=0?'カット'+(vi+1)+'の後ろに挿入されます':'V1 の最後に追加されます')+'（後ろのクリップは、ほかのトラックも一緒にずれます）</div></div>';}
+    '</div>';}
   var right='';
   if(m){var isM=m.id==='v03'&&m.sample,rate=m.rate||'未確認',stars=isM?4:(rate==='採用'?3:rate==='保留'?2:0),C3=D.clip;
     right='<div class="blk"><div class="cap">評価</div><div class="seg" style="margin-bottom:10px">'+['採用','保留','不採用'].map(function(k){var on=rate===k,c={'採用':'ok','保留':'wn','不採用':'er'}[k];return '<button class="b" style="flex:1;height:32px'+(on?';background:var(--'+c+'b);color:var(--'+c+');border-color:var(--'+c+')':'')+'" aria-pressed="'+on+'"'+A('rate',k)+'>'+k+'</button>';}).join('')+'</div>'+

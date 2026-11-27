@@ -36,7 +36,7 @@ R.fx=function(){
       (after?'<div style="position:absolute;left:250px;top:50px;width:84px;height:120px;border:2px solid #ffb454"></div><div style="position:absolute;left:250px;top:30px;height:20px;padding:0 8px;background:#ffb454;color:#2a1a00;line-height:20px">追跡中　被写体1</div>'+
       [[150,132],[170,128],[190,125],[210,122],[230,120]].map(function(p){return '<span style="position:absolute;left:'+p[0]+'px;top:'+p[1]+'px;width:5px;height:5px;background:#ffb454"></span>';}).join('')+
       [[248,48],[330,48],[248,168],[330,168]].map(function(p){return '<span style="position:absolute;left:'+p[0]+'px;top:'+p[1]+'px;width:7px;height:7px;background:#fff;border:1px solid #ffb454"></span>';}).join(''):'')+'</div></div>'+
-    transport('fx',ibtn('toStart','前のカットへ','todo')+playBtn(!!FXP)+ibtn('nextCut','次のカットへ','todo'),'<span class="mu">見本の画面です</span>')+
+    transport('fx',ibtn('toStart','前のカットへ','todo')+playBtn(!!FXP)+ibtn('nextCut','次のカットへ','todo'),'')+
     '<div class="row" style="height:40px;flex:none;gap:6px;padding:0 12px;border-bottom:1px solid var(--dv)"><span style="font-weight:500;margin-right:4px;white-space:nowrap">キーフレーム</span>'+kfBtns+'<span class="grow"></span>'+sel('対象プロパティ',['拡大率','位置','回転','透明度'],'拡大率','height:26px')+'</div>'+
     timeline(D.fxtl,'fx',{kf:1,noTc:1})+'</div>'+
   '<div class="pn r" style="width:'+pw('fxR')+'px">'+splitter('fxR','r')+''+ph('エフェクトコントロール','<span class="x">店主 インタビュー</span>')+'<div class="scroll">'+

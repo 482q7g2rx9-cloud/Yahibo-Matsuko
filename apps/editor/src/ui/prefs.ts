@@ -3,23 +3,23 @@
 import { S } from './state';
 import { A, btn, h } from './util';
 import { closeMenu, toast } from './menus';
-import { KB, KEYMAP, MOUSE, keyLabel, keyOf, saveKeys } from './keys';
+import { KB, KEYMAP, MOUSE, keyLabel, saveKeys } from './keys';
 
 /* ---------- 環境設定（ファイル → 環境設定） ---------- */
 export var PREF;
 export function savePref(){try{localStorage.setItem('matsuko.pref',JSON.stringify(PREF));}catch(e){}}
 export function openPrefs(tab){closeMenu();S.ptab=tab||S.ptab||'general';S.capture=null;renderPrefs();}
-export function prefRow(label,ctl,note){return '<div class="prow"><div><div>'+label+'</div>'+(note?'<div class="mu" style="margin-top:2px">'+note+'</div>':'')+'</div><div>'+ctl+'</div></div>';}
+export function prefRow(label,ctl){return '<div class="prow"><div><div>'+label+'</div></div><div>'+ctl+'</div></div>';}
 export function renderPrefs(){var d=document.getElementById('dlg'),t=S.ptab,body='';
   if(t==='general')body='<h3>一般</h3>'+
     prefRow('テーマ','<span class="seg">'+[['light','ライト'],['dark','ダーク'],['system','システムに合わせる']].map(function(x){return btn(x[1],'pTheme',x[0],'s'+(S.theme===x[0]?' on':''));}).join('')+'</span>')+
-    prefRow('表示サイズ','<span class="seg">'+[[0.9,'大'],[0.75,'デフォルト'],[0.65,'小']].map(function(x){return btn(x[1],'pUi',x[0],'s'+(PREF.ui===x[0]?' on':''));}).join('')+'</span>','文字や部品の大きさです（大 90%・デフォルト 75%・小 65%）。ウインドウを大きくすると、広くなった分だけ作業スペース（プレビューやタイムライン）が広がります。ウインドウが小さいときは、全体を縮小して収めます。')+
+    prefRow('表示サイズ','<span class="seg">'+[[0.9,'大'],[0.75,'デフォルト'],[0.65,'小']].map(function(x){return btn(x[1],'pUi',x[0],'s'+(PREF.ui===x[0]?' on':''));}).join('')+'</span>')+
     prefRow('アクセントカラー','<span class="row" style="gap:8px">'+[['blue','青','#378ef0'],['green','緑','#2d9d78'],['orange','オレンジ','#e68619'],['purple','紫','#9256d9']].map(function(x){return '<button class="sw'+(S.accent===x[0]?' on':'')+'" aria-label="'+x[1]+'" aria-pressed="'+(S.accent===x[0])+'" title="'+x[1]+'"'+A('pAcc',x[0])+' style="background:'+x[2]+'"></button>';}).join('')+'</span>');
   else if(t==='timeline')body='<h3>タイムライン</h3>'+
-    prefRow('スナップ','<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"'+(PREF.snap?' checked':'')+'>最初から入れておく</label>','クリップの端・再生ヘッド・イン点／アウト点に吸い付きます。編集中は '+(keyOf('snapT')||'—')+' キーで切り替えられます。')+
-    prefRow('再生中の表示','<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"'+(PREF.follow?' checked':'')+'>再生ヘッドを追いかける</label>','再生ヘッドが画面の外に出たら、タイムラインを自動で動かします。');
+    prefRow('スナップ','<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"'+(PREF.snap?' checked':'')+'>最初から入れておく</label>')+
+    prefRow('再生中の表示','<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"'+(PREF.follow?' checked':'')+'>再生ヘッドを追いかける</label>');
   else{var groups=[];KB.forEach(function(k){if(groups.indexOf(k[1])<0)groups.push(k[1]);});
-    body='<h3>ショートカット</h3><div class="mu" style="margin-bottom:10px;line-height:1.6">「変更」を押してから、割り当てたいキーを押してください。Esc で取り消します。ほかの動作で使っているキーを選ぶと、そちらからは外れます。</div>'+
+    body='<h3>ショートカット</h3>'+
     groups.map(function(g){return '<div class="pgrp">'+g+'</div>'+KB.filter(function(k){return k[1]===g;}).map(function(k){var cap=S.capture===k[0],keys=KEYMAP[k[0]],custom=JSON.stringify(keys)!==JSON.stringify(k[3]);
       return '<div class="krow'+(cap?' cap':'')+'" data-krow="'+k[0]+'"><span>'+h(k[2])+'</span><span class="row" style="gap:4px;flex-wrap:wrap">'+(cap?'<span class="t-ac">キーを押してください…</span>':keys.length?keys.map(function(c){return '<kbd>'+h(keyLabel(c))+'</kbd>';}).join(''):'<span class="mu">なし</span>')+'</span>'+
         '<span class="row" style="gap:4px;justify-content:flex-end">'+(cap?btn('取り消し','kCancel','','s'):btn('変更','kSet',k[0],'s'))+(custom&&!cap?btn('戻す','kReset',k[0],'s'):'')+'</span></div>';}).join('');}).join('')+

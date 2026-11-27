@@ -53,13 +53,13 @@ R.export=function(){
       else if(q.st==='err'){st='<span class="t-er">'+h(q.msg||'失敗しました')+'</span>';btns=btn('削除','xdel',q.id,'s');}
       else{st='<span class="row" style="gap:8px"><span class="prog" style="width:200px"><i data-q="'+q.id+'" style="width:'+q.p+'%"></i></span><span class="t-ac" style="white-space:nowrap" data-qt="'+q.id+'">'+Math.round(q.p)+'%'+(q.st==='pause'?'（一時停止中）':'')+'</span></span>';btns=(HOST?'':btn(q.st==='pause'?'再開':'一時停止','xpause',q.id,'s'))+btn('中止','xcancel',q.id,'s');}
       return '<div class="row" style="height:43px;gap:12px;padding:0 16px;border-bottom:1px solid var(--dv)"><span style="width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+h(q.n)+'">'+h(q.n)+'</span><span class="grow">'+st+'</span><span class="row" style="gap:6px">'+btns+'</span></div>';}).join('')
-      :'<div class="mu" style="padding:14px">「書き出し」を押すと、ここに進み具合が出ます。'+(HOST?'書き出す場所は、始める前に選びます。':'書き出しには動画の長さと同じだけ時間がかかります。')+'</div>')+'</div></div>'+
+      :'')+'</div></div>'+
   '<div class="pn r" style="width:350px">'+ph('書き出し設定','<span class="x">'+h(D.presets[S.preset].n)+'</span>')+'<div class="scroll" style="padding:4px 14px">'+
     [['ファイル名','<span class="row" style="gap:6px"><input class="inp grow" aria-label="ファイル名" data-in="xfile" value="'+h(x.file)+'"><span class="mu">.'+ext+'</span></span>'],
      ['範囲',sel('範囲',D.opts.range,x.range||'シーケンス全体','width:100%','xrange')],['形式',fmts.length?sel('形式',fmts,x.fmt,'width:100%','xfmt'):'<span class="t-er">対応形式なし</span>']]
      .concat(x.audio?[['音声',sel('音声',D.opts.au,x.au,'width:100%','xau')]]:[['解像度',sel('解像度',D.opts.res,x.res,'width:100%','xres')],['フレームレート',sel('フレームレート',D.opts.fps,x.fps,'width:100%','xfps')],['ビットレート',sel('ビットレート',D.opts.br,x.br,'width:100%','xbr')],['音声',sel('音声',D.opts.au,x.au,'width:100%','xau')]])
      .map(function(r){return '<div style="display:grid;grid-template-columns:100px 1fr;align-items:center;height:40px"><span class="t2">'+r[0]+'</span>'+r[1]+'</div>';}).join('')+
-    '<div class="box" style="margin-top:12px;padding:14px;border:1px solid var(--dv);line-height:1.9">推定サイズ　約 '+mb(est||0)+(HOST?'<br>FFmpeg で書き出します。多くの場合、番組の長さより短い時間で終わります<br>':'<br>書き出しにかかる時間　約 '+mmss(rg[1]-rg[0])+'（実際の長さと同じ）<br>')+'<span class="mu">画面の比率が違う素材は、黒い帯を付けて収めます。</span></div></div>'+
+    '<div class="box" style="margin-top:12px;padding:14px;border:1px solid var(--dv);line-height:1.9">推定サイズ　約 '+mb(est||0)+(HOST?'<br>':'<br>書き出しにかかる時間　約 '+mmss(rg[1]-rg[0])+'（実際の長さと同じ）<br>')+'</div></div>'+
     '<div class="row" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv)">'+btn('キューに追加','qadd','','sec','','flex:1;height:36px')+btn('書き出し','xrun','','pri','','flex:1;height:36px')+'</div></div>';
 };
 }

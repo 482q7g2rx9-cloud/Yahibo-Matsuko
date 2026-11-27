@@ -61,18 +61,18 @@ export function renderProjectSettings() {
   var tabs = [['seq', 'シーケンス'], ['preview', 'プレビュー']].concat(HOST ? [['proxy', 'プロキシ']] : []).concat([['audio', '音声']]);
   if (!tabs.some(function (x) { return x[0] === t; })) t = S.pstab = 'seq';
   if (t === 'seq') body = '<h3>シーケンス</h3>' +
-    prefRow('解像度', select('res', RES_OPTS, s.res, '解像度'), 'プレビューの縦横の比率になります。書き出しの解像度がこれと違う比率のときは、書き出し前のチェックで知らせます。') +
-    prefRow('フレームレート', select('fps', FPS_OPTS, s.fps, 'フレームレート'), 'タイムコードと、1フレームずつ動かすときの幅に使います。日本のテレビ放送は 29.97 fps です。');
+    prefRow('解像度', select('res', RES_OPTS, s.res, '解像度')) +
+    prefRow('フレームレート', select('fps', FPS_OPTS, s.fps, 'フレームレート'));
   else if (t === 'preview') body = '<h3>プレビュー</h3>' +
-    prefRow('画質', seg('pq', PQ_OPTS, s.pq), PQ_OPTS.map(function (o) { return o[1] + '：' + o[2]; }).join('<br>') + '<br>再生が途切れるときは、軽くしてください。書き出しの画質は変わりません。');
+    prefRow('画質', seg('pq', PQ_OPTS, s.pq));
   else if (t === 'proxy') body = '<h3>プロキシ</h3>' +
-    prefRow('プロキシの高さ', seg('proxy', PROXY_OPTS, s.proxy), '重い素材（4K など）を編集するときに使う、軽い動画の大きさです。これから作るプロキシに使います。書き出しには元の素材を使うので、書き出しの画質は変わりません。') +
-    prefRow('作り直す', btn('いまのプロキシを作り直す', 'psProxy', '', 's'), '設定を変えたあと、作ってあるプロキシもこの高さにしたいときに押します。作っている間も編集を続けられます。');
+    prefRow('プロキシの高さ', seg('proxy', PROXY_OPTS, s.proxy)) +
+    prefRow('作り直す', btn('いまのプロキシを作り直す', 'psProxy', '', 's'));
   else body = '<h3>音声</h3>' +
-    prefRow('サンプリング周波数', seg('ar', AR_OPTS, s.ar), '書き出す音声の細かさです。ふつうは 48 kHz のままでかまいません。');
+    prefRow('サンプリング周波数', seg('ar', AR_OPTS, s.ar));
   d.innerHTML = '<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">プロジェクト設定</h2>' + btn('閉じる', 'dlgNo', '', 's') + '</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">' +
     tabs.map(function (x) { return '<button' + (t === x[0] ? ' aria-current="true"' : '') + A('psTab', x[0]) + '>' + x[1] + '</button>'; }).join('') + '</nav><div class="pcont">' + body +
-    '<div class="mu" style="margin-top:16px;line-height:1.6">この設定はプロジェクトに保存されます（プロジェクトごとに違う設定にできます）。</div></div></div></div>';
+    '</div></div></div>';
   d.hidden = false;
   [].forEach.call(d.querySelectorAll('[data-ps]'), function (el) { el.addEventListener('change', function () { setPs(el.dataset.ps, el.value); }); });
 }

@@ -1359,7 +1359,7 @@ function historyTick(kind) {
 function openHistory() {
   if (!ready()) return toast(HOST ? "プロジェクトを開くと、変更履歴が残るようになります" : "このブラウザでは変更履歴を使えません");
   var d = document.getElementById("dlg");
-  d.innerHTML = '<div class="dlg hist" role="dialog" aria-modal="true" aria-labelledby="dlgT"><h2 id="dlgT">変更履歴・復元</h2><p class="mu">編集しているあいだ、2分ごとにプロジェクトの写しを残しています（新しい順に100件）。戻したい時点の「復元」を押してください。復元したあとも、Ctrl+Z で元に戻せます。</p><div class="hlist" data-hlist><div class="mu" style="padding:16px">読み込んでいます…</div></div><div class="row" style="justify-content:flex-end;margin-top:16px">' + btn("閉じる", "dlgNo", "", "pri") + "</div></div>";
+  d.innerHTML = '<div class="dlg hist" role="dialog" aria-modal="true" aria-labelledby="dlgT"><h2 id="dlgT">変更履歴・復元</h2><div class="hlist" data-hlist><div class="mu" style="padding:16px">読み込んでいます…</div></div><div class="row" style="justify-content:flex-end;margin-top:16px">' + btn("閉じる", "dlgNo", "", "pri") + "</div></div>";
   d.hidden = false;
   d.querySelector('[data-a="dlgNo"]').focus();
   Promise.resolve(store.list()).then(function(L) {
@@ -1367,7 +1367,7 @@ function openHistory() {
     if (!box) return;
     box.innerHTML = L.length ? L.map(function(r) {
       return '<div class="hsnap"><span>' + h(formatTime(r.at)) + '</span><span class="chip ' + (r.kind === "auto" ? "c-mu" : "c-in") + '">' + h(KIND_LABEL[r.kind] || r.kind) + '</span><span class="t2">' + h(r.summary) + "</span>" + btn("復元", "hRestore", r.id + "|" + r.at, "s") + "</div>";
-    }).join("") : '<div class="mu" style="padding:16px">まだ履歴がありません。編集すると、2分ごとに残ります。</div>';
+    }).join("") : '<div class="mu" style="padding:16px">まだ履歴がありません</div>';
   }).catch(function(e) {
     var box = d.querySelector("[data-hlist]");
     if (box) box.innerHTML = '<div class="t-wn" style="padding:16px">変更履歴を読み込めませんでした：' + h(String(e)) + "</div>";
@@ -2168,14 +2168,14 @@ function init$k() {
     var L = mediaList(), m = M(S.media) || L[0] || P.media[0], body, tag = function(x) {
       return x.sample ? ' <span class="chip c-mu" style="margin-left:6px">見本</span>' : "";
     };
-    if (!P.media.length) body = '<div class="scroll" style="display:flex;align-items:center;justify-content:center"><div style="text-align:center;line-height:2"><div style="font-size:15px;font-weight:500">素材がまだありません</div><div class="mu">動画・音声・画像のファイルを、この画面へドラッグするか「＋ 読み込み」から選んでください。</div><div style="margin-top:10px">' + btn("＋ 読み込み", "imp", "", "pri") + "</div></div></div>";
+    if (!P.media.length) body = '<div class="scroll" style="display:flex;align-items:center;justify-content:center"><div style="text-align:center;line-height:2"><div style="font-size:15px;font-weight:500">素材がまだありません</div><div style="margin-top:10px">' + btn("＋ 読み込み", "imp", "", "pri") + "</div></div></div>";
     else if (S.mview === "list") body = '<div class="mt h"><span></span><span>名前</span><span>種別</span><span>長さ</span><span>記号</span><span>権利</span><span>台本行</span><span>状態</span></div><div class="scroll">' + L.map(function(x) {
       return '<div class="mt r li' + (m && x.id === m.id ? " selr" : "") + '" role="button" tabindex="0"' + A("mrow", x.id) + ' title="ダブルクリックでタイムラインに追加">' + mthumb(x, 64, 36) + '<span style="font-size:13px">' + h(x.n) + tag(x) + '</span><span class="t2">' + h(x.k) + "</span><span>" + (x.d ? mmss(x.d) : "—") + "</span><span>" + h(x.c) + "</span><span>" + rightsChip(x) + '</span><span class="mu">' + h(x.sr) + "</span><span>" + (HOST && x.file ? '<span data-pxt="' + x.id + '" data-short>' + (jobText(x, 1) || useText(x)) + "</span>" : useText(x)) + "</span></div>";
     }).join("") + (L.length ? "" : '<div class="mu" style="padding:24px">該当する素材はありません</div>') + "</div>";
     else body = '<div class="scroll"><div class="thg">' + L.map(function(x) {
       return '<div class="tc li' + (m && x.id === m.id ? " selr" : "") + '" role="button" tabindex="0"' + A("mrow", x.id) + ">" + mthumb(x, "fill") + '<div style="margin-top:6px;font-size:13px">' + h(x.n) + tag(x) + '</div><div class="row" style="gap:8px;margin-top:4px"><span class="mu">' + h(x.k) + "　" + (x.d ? mmss(x.d) : "—") + '</span><span class="grow"></span>' + rightsChip(x) + "</div></div>";
     }).join("") + "</div></div>";
-    var jf = HOST && !IMP.total ? jobsFoot() : "", foot = jf ? jf : IMP.total ? "<span>読み込み中：" + h(IMP.cur) + '</span><div class="prog" style="width:200px"><i style="width:' + Math.round(IMP.done / IMP.total * 100) + '%"></i></div><span class="t-ac">' + IMP.done + " / " + IMP.total + '</span><span class="grow"></span>' : '<span class="mu">ファイルをこの画面へドラッグしても読み込めます（動画・音声・画像）</span><span class="grow"></span><span class="mu">読み込んだ素材 ' + P.media.filter(function(x) {
+    var jf = HOST && !IMP.total ? jobsFoot() : "", foot = jf ? jf : IMP.total ? "<span>読み込み中：" + h(IMP.cur) + '</span><div class="prog" style="width:200px"><i style="width:' + Math.round(IMP.done / IMP.total * 100) + '%"></i></div><span class="t-ac">' + IMP.done + " / " + IMP.total + '</span><span class="grow"></span>' : '<span class="grow"></span><span class="mu">読み込んだ素材 ' + P.media.filter(function(x) {
       return x.file;
     }).length + "件</span>";
     var right = "";
@@ -2235,9 +2235,7 @@ function tlInner() {
   var step = tickStep(pps), lab = "";
   for (var t = 0; t * pps < W; t += step) lab += '<div class="rl" style="left:' + (t * pps).toFixed(1) + 'px">' + tc(t) + "</div>";
   var rng2 = P.pin != null || P.pout != null ? '<div class="rng" style="left:' + (P.pin || 0) * pps + "px;width:" + ((P.pout != null ? P.pout : dur) - (P.pin || 0)) * pps + 'px" title="書き出し範囲"></div>' : "", ph0 = S.t.edit * pps;
-  return '<div class="corner" data-time="edit">' + tc(S.t.edit) + '</div><div class="rul" data-rul><div class="rin" style="width:' + W + "px;background-image:repeating-linear-gradient(90deg,var(--bd2) 0 1px,transparent 1px " + (step * pps / 5).toFixed(2) + 'px)">' + lab + '<div class="rd" style="width:' + dur * pps + 'px;right:auto"></div>' + rng2 + '<div class="phk" data-head="edit" style="left:' + ph0 + 'px;top:16px"></div></div></div><div class="heads" data-heads><div class="hin" style="height:' + H + 'px">' + hd + '</div></div><div class="body" data-body><div class="tlc" style="width:' + W + "px;height:" + Math.max(H, 10) + 'px">' + ln + cl + (P.clips.length ? "" : '<div class="mu" style="position:absolute;left:12px;top:' + ((ROWS.filter(function(r) {
-    return r.id === "V1";
-  })[0] || { y: 0 }).y + 30) + 'px;pointer-events:none">左の素材を、ここへドラッグするか「＋」で追加してください</div>') + '<div class="phl" data-head="edit" style="left:' + ph0 + 'px"></div><div class="snapl" data-snapl hidden></div><div class="marq" data-marq hidden></div><div class="ghost" data-ghost hidden></div></div></div>';
+  return '<div class="corner" data-time="edit">' + tc(S.t.edit) + '</div><div class="rul" data-rul><div class="rin" style="width:' + W + "px;background-image:repeating-linear-gradient(90deg,var(--bd2) 0 1px,transparent 1px " + (step * pps / 5).toFixed(2) + 'px)">' + lab + '<div class="rd" style="width:' + dur * pps + 'px;right:auto"></div>' + rng2 + '<div class="phk" data-head="edit" style="left:' + ph0 + 'px;top:16px"></div></div></div><div class="heads" data-heads><div class="hin" style="height:' + H + 'px">' + hd + '</div></div><div class="body" data-body><div class="tlc" style="width:' + W + "px;height:" + Math.max(H, 10) + 'px">' + ln + cl + '<div class="phl" data-head="edit" style="left:' + ph0 + 'px"></div><div class="snapl" data-snapl hidden></div><div class="marq" data-marq hidden></div><div class="ghost" data-ghost hidden></div></div></div>';
 }
 function syncTLScroll() {
   var b = document.querySelector("[data-body]");
@@ -2281,7 +2279,7 @@ function propTxt(key, v) {
 }
 function numRow(label, c, key) {
   var p = PROPS[key], v = propVal(c, key), id = c.id;
-  return '<div class="pr"><button class="kf" aria-label="' + label + 'のキーフレーム" title="キーフレーム（エフェクトページの本実装で使えるようになります）"' + A("kfTodo") + ">" + diamond(false) + '</button><span class="t2">' + label + '</span><input type="range" class="rg" min="' + p.min + '" max="' + p.max + '" step="' + p.step + '" value="' + v + '" style="--p:' + propPct(key, v) + '%" data-in="cp" data-k="' + key + '" data-cid="' + id + '" aria-label="' + label + '"><span class="stp"><button aria-label="' + label + 'を減らす"' + A("cstep", id + "|" + key + "|-1") + ">" + TRI.l + '</button><button aria-label="' + label + 'を増やす"' + A("cstep", id + "|" + key + "|1") + ">" + TRI.r + '</button></span><span class="v hot" tabindex="0" role="spinbutton" aria-label="' + label + '" aria-valuenow="' + v + '" aria-valuemin="' + p.min + '" aria-valuemax="' + p.max + '" data-hot data-k="' + key + '" data-cid="' + id + '" title="左右にドラッグで増減、クリックで入力">' + propTxt(key, v) + "<small>" + p.unit + "</small></span></div>";
+  return '<div class="pr"><button class="kf" aria-label="' + label + 'のキーフレーム" title="キーフレーム"' + A("kfTodo") + ">" + diamond(false) + '</button><span class="t2">' + label + '</span><input type="range" class="rg" min="' + p.min + '" max="' + p.max + '" step="' + p.step + '" value="' + v + '" style="--p:' + propPct(key, v) + '%" data-in="cp" data-k="' + key + '" data-cid="' + id + '" aria-label="' + label + '"><span class="stp"><button aria-label="' + label + 'を減らす"' + A("cstep", id + "|" + key + "|-1") + ">" + TRI.l + '</button><button aria-label="' + label + 'を増やす"' + A("cstep", id + "|" + key + "|1") + ">" + TRI.r + '</button></span><span class="v hot" tabindex="0" role="spinbutton" aria-label="' + label + '" aria-valuenow="' + v + '" aria-valuemin="' + p.min + '" aria-valuemax="' + p.max + '" data-hot data-k="' + key + '" data-cid="' + id + '" title="左右にドラッグで増減、クリックで入力">' + propTxt(key, v) + "<small>" + p.unit + "</small></span></div>";
 }
 function motionForm(c) {
   return numRow("位置 X", c, "x") + numRow("位置 Y", c, "y") + numRow("拡大率", c, "scale") + numRow("回転", c, "rot") + numRow("不透明度", c, "op") + '<div class="row" style="justify-content:flex-end;padding-top:8px">' + btn("元に戻す", "mreset", c.id, "s") + "</div>";
@@ -2364,7 +2362,7 @@ function fontRow(c) {
     return opt(SYS_PREFIX + f.family, f.name);
   }).join("") + "</optgroup>";
   var r = '<div class="fg"><span>フォント</span><select class="inp" data-in="tfont" aria-label="フォント">' + o + "</select></div>";
-  if (!desk && (st === "error" || !canQueryLocalFonts())) r += '<div class="fg"><span>名前で指定</span><input class="inp" data-in="tfontname" placeholder="例：メイリオ" aria-label="PC のフォントの名前" value="' + (isSystemFont(cur) ? h(cur.slice(SYS_PREFIX.length)) : "") + '"></div>';
+  if (!desk && (st === "error" || !canQueryLocalFonts())) r += '<div class="fg"><span>名前で指定</span><input class="inp" data-in="tfontname" aria-label="PC のフォントの名前" value="' + (isSystemFont(cur) ? h(cur.slice(SYS_PREFIX.length)) : "") + '"></div>';
   return r;
 }
 function styleGallery() {
@@ -2382,7 +2380,7 @@ function selTitle() {
 }
 function inspector() {
   var L = S.sel.map(C).filter(Boolean), c = primary();
-  if (!c) return { name: "", html: fsec("clip", "クリップ", null, '<div class="mu" style="padding:6px 0;line-height:1.7">タイムラインのクリップを選ぶと、ここに情報が出ます。<br>Shift／Ctrl＋クリック、または何もないところからドラッグすると、複数選べます。</div>') };
+  if (!c) return { name: "", html: fsec("clip", "クリップ", null, "") };
   var pair = L.length === 2 && L[0].link && L[0].link === L[1].link;
   if (L.length > 1 && !pair) {
     var tot = L.reduce(function(a2, x) {
@@ -2425,7 +2423,7 @@ function silPanel(m) {
     return k.done;
   }).reduce(function(s, k) {
     return s + k.b - k.a;
-  }, 0)) + "）。削除にした部分は、仮編集へ追加するときに除かれます。</div>" : '<div class="mu" style="line-height:1.6">' + (m.peaks ? "「検出」を押すと、音のない部分を探します。" : m.sample ? "見本の素材では検出できません。" : "この素材は音声の波形がないため検出できません。") + "</div>") + "</div>";
+  }, 0)) + "）</div>" : '<div class="mu" style="line-height:1.6">' + (m.peaks ? "" : m.sample ? "見本の素材では検出できません。" : "この素材は音声の波形がないため検出できません。") + "</div>") + "</div>";
 }
 function xRange() {
   var d = progDur();
@@ -2456,15 +2454,15 @@ function init$j() {
       var L = P.media.filter(function(m) {
         return m.k === "映像" || m.k === "音声" || m.k === "画像" || m.k === "テイク";
       });
-      left = '<div class="row" style="padding:12px 16px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="' + h(S.eq || "") + '" style="height:28px">' + btn("＋ 読込", "imp") + '</div><div class="mu" style="padding:0 16px 8px">タイムラインへドラッグして置けます（Ctrl で挿入）</div><div class="scroll"><div class="asg">' + L.filter(function(m) {
+      left = '<div class="row" style="padding:12px 16px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="' + h(S.eq || "") + '" style="height:28px">' + btn("＋ 読込", "imp") + '</div><div class="scroll"><div class="asg">' + L.filter(function(m) {
         return !S.eq || m.n.indexOf(S.eq) >= 0;
       }).map(function(m) {
         var r = D.rights[m.r] || ["—", ""], can = m.url && !m.loading || m.sample && m.k !== "音声" && m.k !== "テイク";
         return '<div style="position:relative"' + (can ? ' data-am="' + m.id + '"' : "") + '><div class="tb" style="cursor:' + (can ? "grab" : "default") + ";background:" + (m.thumb ? "#000 url(" + m.thumb + ") center / cover" : m.k === "音声" ? "#2f6b45" : m.k === "テイク" ? "#5a4a8a" : (m.col || ["#555"])[0]) + '"><span>' + m.k + "</span><span>" + (m.k === "画像" ? "" : mmss(m.d)) + "</span></div>" + (can ? '<button class="b s" aria-label="「' + h(m.n) + '」をタイムラインに追加" title="タイムラインに追加"' + A("addtl", m.id) + ' style="position:absolute;right:4px;top:4px;width:24px;height:24px;padding:0;border-radius:50%">' + ic("plus", 14) + "</button>" : "") + '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (m.k === "音声" ? h(m.c) + " " : "") + h(m.n) + '</div><div class="' + (m.r === "wn" ? "t-wn" : "t-ok") + '">' + r[0] + "</div></div>";
-      }).join("") + "</div>" + (L.length ? "" : '<div class="mu" style="padding:0 16px">「＋ 読込」で動画・音声・画像を読み込めます。</div>') + "</div>";
+      }).join("") + "</div></div>";
     } else left = '<div class="scroll" style="padding:14px">' + styleGallery() + "</div>";
     var tools = [["select", "選択", keyOf("tSel")], ["split", "分割", keyOf("tSplit")], ["trash", "削除", ""], ["hand", "ハンド", keyOf("tHand")], ["text", "文字", ""]], ins = inspector(), rngOn = P.pin != null || P.pout != null;
-    return '<div class="pn l" style="width:' + pw("editL") + 'px">' + splitter("editL", "l") + ph("素材") + tabs([["assets", "アセット"], ["text", "テロップ"]], S.etab === "text" ? "text" : "assets", "etab", "素材の種類") + left + '</div><div class="pc" style="background:var(--bg0)"><div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">' + ph("プレビュー", '<span class="x">全長 ' + mmss(progDur()) + "</span>") + '<div class="mon" style="flex:1;min-height:0"><canvas data-prog ' + canvasAttrs() + ' style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas></div><div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">' + tc(S.t.edit) + '</span><span class="mid">' + ibtn("inPt", "イン点を設定（I キー）", "pin") + ibtn("outPt", "アウト点を設定（O キー）", "pout") + '<span class="vsep"></span>' + ibtn("prevCut", "前の編集点へ（↑）", "prev") + ibtn("back", "1フレーム戻る（←）", "fb") + playBtn(E.playing) + ibtn("fwd", "1フレーム進む（→）", "ff") + ibtn("nextCut", "次の編集点へ（↓）", "next") + '<span class="vsep"></span>' + ibtn("split", "再生ヘッドで分割（S キー）", "split") + '</span><span class="end row" style="justify-content:flex-end;gap:6px"><button class="b s" style="height:24px;padding:0 8px;border:0;background:none;color:var(--mu)" title="プレビューの画質（プロジェクト設定で変えられます）"' + A("psOpen") + ">" + pqLabel() + "</button>" + ibtn("full", "全画面", "todo") + '</span></div></div><div style="flex:1;min-height:0;display:flex"><div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px;background:var(--bg1);border-right:1px solid var(--ln)">' + tools.map(function(t) {
+    return '<div class="pn l" style="width:' + pw("editL") + 'px">' + splitter("editL", "l") + ph("素材") + tabs([["assets", "アセット"], ["text", "テロップ"]], S.etab === "text" ? "text" : "assets", "etab", "素材の種類") + left + '</div><div class="pc" style="background:var(--bg0)"><div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">' + ph("プレビュー", '<span class="x">全長 ' + mmss(progDur()) + "</span>") + '<div class="mon" style="flex:1;min-height:0"><canvas data-prog ' + canvasAttrs() + ' style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas></div><div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">' + tc(S.t.edit) + '</span><span class="mid">' + ibtn("inPt", "イン点を設定（I キー）", "pin") + ibtn("outPt", "アウト点を設定（O キー）", "pout") + '<span class="vsep"></span>' + ibtn("prevCut", "前の編集点へ（↑）", "prev") + ibtn("back", "1フレーム戻る（←）", "fb") + playBtn(E.playing) + ibtn("fwd", "1フレーム進む（→）", "ff") + ibtn("nextCut", "次の編集点へ（↓）", "next") + '<span class="vsep"></span>' + ibtn("split", "再生ヘッドで分割（S キー）", "split") + '</span><span class="end row" style="justify-content:flex-end;gap:6px"><button class="b s" style="height:24px;padding:0 8px;border:0;background:none;color:var(--mu)" title="プレビューの画質"' + A("psOpen") + ">" + pqLabel() + "</button>" + ibtn("full", "全画面", "todo") + '</span></div></div><div style="flex:1;min-height:0;display:flex"><div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px;background:var(--bg1);border-right:1px solid var(--ln)">' + tools.map(function(t) {
       var on = S.tool === t[0];
       return '<button aria-label="' + t[1] + '" title="' + t[1] + (t[2] ? "（" + t[2] + " キー）" : "") + '" aria-pressed="' + on + '"' + A("tool", t[0]) + ' style="width:38px;height:44px;padding:0;border:0;border-radius:4px;background:' + (on ? "var(--bg4)" : "transparent") + ";color:" + (on ? "var(--ac)" : "var(--tx2)") + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">' + ic(t[0], 16) + '<span style="font-size:10px;color:var(--tx2)">' + t[1] + "</span></button>";
     }).join("") + '</div><div style="flex:1;min-width:0;display:flex;flex-direction:column"><div class="row tlbar"><button class="b s' + (S.snap ? " on" : "") + '" aria-pressed="' + S.snap + '"' + A("snapT") + ' title="スナップ（N キー）">スナップ</button>' + btn("＋ トラック", "addTrk", "", "s", "トラックを追加") + (rngOn ? '<span class="t-ac" style="margin-left:6px">書き出し範囲 ' + tc(P.pin || 0) + " – " + tc(P.pout != null ? P.pout : progDur()) + "</span>" + btn("範囲を消去", "pclear", "", "s") : "") + '</div><div class="tl tl2" data-tlwrap>' + tlInner() + '</div><div class="tlfoot"><button aria-label="縮小" title="縮小（' + keyOf("zout") + '）"' + A("zout") + '>−</button><input type="range" min="0" max="100" value="' + zoomVal() + '" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（' + keyOf("zin") + '）"' + A("zin") + '>＋</button></div></div></div></div><div class="pn r" style="width:' + pw("editR") + 'px">' + splitter("editR", "r") + ph("インスペクタ", '<span class="x">' + h(ins.name) + "</span>") + '<div class="scroll">' + ins.html + (P.sample ? '<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>' : "") + "</div></div>";
@@ -2717,8 +2715,8 @@ function openPrefs(tab) {
   S.capture = null;
   renderPrefs();
 }
-function prefRow(label, ctl, note) {
-  return '<div class="prow"><div><div>' + label + "</div>" + (note ? '<div class="mu" style="margin-top:2px">' + note + "</div>" : "") + "</div><div>" + ctl + "</div></div>";
+function prefRow(label, ctl) {
+  return '<div class="prow"><div><div>' + label + "</div></div><div>" + ctl + "</div></div>";
 }
 function renderPrefs() {
   var d = document.getElementById("dlg"), t = S.ptab, body = "";
@@ -2726,16 +2724,16 @@ function renderPrefs() {
     return btn(x[1], "pTheme", x[0], "s" + (S.theme === x[0] ? " on" : ""));
   }).join("") + "</span>") + prefRow("表示サイズ", '<span class="seg">' + [[0.9, "大"], [0.75, "デフォルト"], [0.65, "小"]].map(function(x) {
     return btn(x[1], "pUi", x[0], "s" + (PREF.ui === x[0] ? " on" : ""));
-  }).join("") + "</span>", "文字や部品の大きさです（大 90%・デフォルト 75%・小 65%）。ウインドウを大きくすると、広くなった分だけ作業スペース（プレビューやタイムライン）が広がります。ウインドウが小さいときは、全体を縮小して収めます。") + prefRow("アクセントカラー", '<span class="row" style="gap:8px">' + [["blue", "青", "#378ef0"], ["green", "緑", "#2d9d78"], ["orange", "オレンジ", "#e68619"], ["purple", "紫", "#9256d9"]].map(function(x) {
+  }).join("") + "</span>") + prefRow("アクセントカラー", '<span class="row" style="gap:8px">' + [["blue", "青", "#378ef0"], ["green", "緑", "#2d9d78"], ["orange", "オレンジ", "#e68619"], ["purple", "紫", "#9256d9"]].map(function(x) {
     return '<button class="sw' + (S.accent === x[0] ? " on" : "") + '" aria-label="' + x[1] + '" aria-pressed="' + (S.accent === x[0]) + '" title="' + x[1] + '"' + A("pAcc", x[0]) + ' style="background:' + x[2] + '"></button>';
   }).join("") + "</span>");
-  else if (t === "timeline") body = "<h3>タイムライン</h3>" + prefRow("スナップ", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"' + (PREF.snap ? " checked" : "") + ">最初から入れておく</label>", "クリップの端・再生ヘッド・イン点／アウト点に吸い付きます。編集中は " + (keyOf("snapT") || "—") + " キーで切り替えられます。") + prefRow("再生中の表示", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"' + (PREF.follow ? " checked" : "") + ">再生ヘッドを追いかける</label>", "再生ヘッドが画面の外に出たら、タイムラインを自動で動かします。");
+  else if (t === "timeline") body = "<h3>タイムライン</h3>" + prefRow("スナップ", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"' + (PREF.snap ? " checked" : "") + ">最初から入れておく</label>") + prefRow("再生中の表示", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"' + (PREF.follow ? " checked" : "") + ">再生ヘッドを追いかける</label>");
   else {
     var groups = [];
     KB.forEach(function(k) {
       if (groups.indexOf(k[1]) < 0) groups.push(k[1]);
     });
-    body = '<h3>ショートカット</h3><div class="mu" style="margin-bottom:10px;line-height:1.6">「変更」を押してから、割り当てたいキーを押してください。Esc で取り消します。ほかの動作で使っているキーを選ぶと、そちらからは外れます。</div>' + groups.map(function(g) {
+    body = "<h3>ショートカット</h3>" + groups.map(function(g) {
       return '<div class="pgrp">' + g + "</div>" + KB.filter(function(k) {
         return k[1] === g;
       }).map(function(k) {
@@ -2889,13 +2887,13 @@ function init$g() {
         btns = (HOST ? "" : btn(q.st === "pause" ? "再開" : "一時停止", "xpause", q.id, "s")) + btn("中止", "xcancel", q.id, "s");
       }
       return '<div class="row" style="height:43px;gap:12px;padding:0 16px;border-bottom:1px solid var(--dv)"><span style="width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + h(q.n) + '">' + h(q.n) + '</span><span class="grow">' + st + '</span><span class="row" style="gap:6px">' + btns + "</span></div>";
-    }).join("") : '<div class="mu" style="padding:14px">「書き出し」を押すと、ここに進み具合が出ます。' + (HOST ? "書き出す場所は、始める前に選びます。" : "書き出しには動画の長さと同じだけ時間がかかります。") + "</div>") + '</div></div><div class="pn r" style="width:350px">' + ph("書き出し設定", '<span class="x">' + h(D.presets[S.preset].n) + "</span>") + '<div class="scroll" style="padding:4px 14px">' + [
+    }).join("") : "") + '</div></div><div class="pn r" style="width:350px">' + ph("書き出し設定", '<span class="x">' + h(D.presets[S.preset].n) + "</span>") + '<div class="scroll" style="padding:4px 14px">' + [
       ["ファイル名", '<span class="row" style="gap:6px"><input class="inp grow" aria-label="ファイル名" data-in="xfile" value="' + h(x.file) + '"><span class="mu">.' + ext + "</span></span>"],
       ["範囲", sel("範囲", D.opts.range, x.range || "シーケンス全体", "width:100%", "xrange")],
       ["形式", fmts.length ? sel("形式", fmts, x.fmt, "width:100%", "xfmt") : '<span class="t-er">対応形式なし</span>']
     ].concat(x.audio ? [["音声", sel("音声", D.opts.au, x.au, "width:100%", "xau")]] : [["解像度", sel("解像度", D.opts.res, x.res, "width:100%", "xres")], ["フレームレート", sel("フレームレート", D.opts.fps, x.fps, "width:100%", "xfps")], ["ビットレート", sel("ビットレート", D.opts.br, x.br, "width:100%", "xbr")], ["音声", sel("音声", D.opts.au, x.au, "width:100%", "xau")]]).map(function(r) {
       return '<div style="display:grid;grid-template-columns:100px 1fr;align-items:center;height:40px"><span class="t2">' + r[0] + "</span>" + r[1] + "</div>";
-    }).join("") + '<div class="box" style="margin-top:12px;padding:14px;border:1px solid var(--dv);line-height:1.9">推定サイズ　約 ' + mb(est || 0) + (HOST ? "<br>FFmpeg で書き出します。多くの場合、番組の長さより短い時間で終わります<br>" : "<br>書き出しにかかる時間　約 " + mmss(rg[1] - rg[0]) + "（実際の長さと同じ）<br>") + '<span class="mu">画面の比率が違う素材は、黒い帯を付けて収めます。</span></div></div><div class="row" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv)">' + btn("キューに追加", "qadd", "", "sec", "", "flex:1;height:36px") + btn("書き出し", "xrun", "", "pri", "", "flex:1;height:36px") + "</div></div>";
+    }).join("") + '<div class="box" style="margin-top:12px;padding:14px;border:1px solid var(--dv);line-height:1.9">推定サイズ　約 ' + mb(est || 0) + (HOST ? "<br>" : "<br>書き出しにかかる時間　約 " + mmss(rg[1] - rg[0]) + "（実際の長さと同じ）<br>") + '</div></div><div class="row" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv)">' + btn("キューに追加", "qadd", "", "sec", "", "flex:1;height:36px") + btn("書き出し", "xrun", "", "pri", "", "flex:1;height:36px") + "</div></div>";
   };
 }
 var SCALE, BASE_W, BASE_H;
@@ -4305,7 +4303,7 @@ function jobsFoot() {
   var px = ids.filter(function(id) {
     return JOBS[id].proxy != null;
   }), cur = px[0] ? M(px[0]) : null;
-  return '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">' + (cur ? "プロキシ作成中：" + h(cur.n) : "サムネイルと波形を作成中") + "</span>" + (cur ? '<div class="prog" style="width:140px;flex:none"><i data-jobbar style="width:' + Math.round(JOBS[cur.id].proxy * 100) + '%"></i></div><span class="t-ac" data-jobpct>' + Math.round(JOBS[cur.id].proxy * 100) + "%</span>" : "") + '<span class="mu" style="white-space:nowrap">あと ' + ids.length + '件・作業はそのまま続けられます</span><span class="grow"></span>';
+  return '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">' + (cur ? "プロキシ作成中：" + h(cur.n) : "サムネイルと波形を作成中") + "</span>" + (cur ? '<div class="prog" style="width:140px;flex:none"><i data-jobbar style="width:' + Math.round(JOBS[cur.id].proxy * 100) + '%"></i></div><span class="t-ac" data-jobpct>' + Math.round(JOBS[cur.id].proxy * 100) + "%</span>" : "") + '<span class="mu" style="white-space:nowrap">あと ' + ids.length + '件</span><span class="grow"></span>';
 }
 var lateDraw;
 function drawWhenIdle() {
@@ -4404,7 +4402,7 @@ function relink(m) {
 function newProjectDlg() {
   var d = document.getElementById("dlg"), loc = null;
   function render(def) {
-    d.innerHTML = '<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT" style="width:480px"><h2 id="dlgT">新規プロジェクト</h2><div class="fg" style="grid-template-columns:72px 1fr"><span class="t2">名前</span><input class="inp" id="npName" value="無題のプロジェクト" aria-label="プロジェクトの名前"></div><div class="fg" style="grid-template-columns:72px 1fr auto"><span class="t2">場所</span><span class="mu" id="npLoc" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + h(loc || def) + '">' + h(loc || def) + "</span>" + btn("変更…", "npLoc", "", "s") + '</div><p class="mu" style="margin:10px 0 20px">この場所に、プロジェクトの名前のフォルダーを作ります。素材のファイルはコピーせず、元の場所のまま使います。</p><div class="row" style="gap:8px;justify-content:flex-end">' + btn("キャンセル", "dlgNo", "", "sec") + btn("作成", "npOk", "", "pri") + "</div></div>";
+    d.innerHTML = '<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT" style="width:480px"><h2 id="dlgT">新規プロジェクト</h2><div class="fg" style="grid-template-columns:72px 1fr"><span class="t2">名前</span><input class="inp" id="npName" value="無題のプロジェクト" aria-label="プロジェクトの名前"></div><div class="fg" style="grid-template-columns:72px 1fr auto"><span class="t2">場所</span><span class="mu" id="npLoc" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + h(loc || def) + '">' + h(loc || def) + "</span>" + btn("変更…", "npLoc", "", "s") + '</div><div class="row" style="gap:8px;justify-content:flex-end">' + btn("キャンセル", "dlgNo", "", "sec") + btn("作成", "npOk", "", "pri") + "</div></div>";
     d.hidden = false;
     var i = d.querySelector("#npName");
     i.focus();
@@ -5222,15 +5220,13 @@ function renderProjectSettings() {
   if (!tabs2.some(function(x) {
     return x[0] === t;
   })) t = S.pstab = "seq";
-  if (t === "seq") body = "<h3>シーケンス</h3>" + prefRow("解像度", select("res", RES_OPTS, s.res, "解像度"), "プレビューの縦横の比率になります。書き出しの解像度がこれと違う比率のときは、書き出し前のチェックで知らせます。") + prefRow("フレームレート", select("fps", FPS_OPTS, s.fps, "フレームレート"), "タイムコードと、1フレームずつ動かすときの幅に使います。日本のテレビ放送は 29.97 fps です。");
-  else if (t === "preview") body = "<h3>プレビュー</h3>" + prefRow("画質", seg("pq", PQ_OPTS, s.pq), PQ_OPTS.map(function(o) {
-    return o[1] + "：" + o[2];
-  }).join("<br>") + "<br>再生が途切れるときは、軽くしてください。書き出しの画質は変わりません。");
-  else if (t === "proxy") body = "<h3>プロキシ</h3>" + prefRow("プロキシの高さ", seg("proxy", PROXY_OPTS, s.proxy), "重い素材（4K など）を編集するときに使う、軽い動画の大きさです。これから作るプロキシに使います。書き出しには元の素材を使うので、書き出しの画質は変わりません。") + prefRow("作り直す", btn("いまのプロキシを作り直す", "psProxy", "", "s"), "設定を変えたあと、作ってあるプロキシもこの高さにしたいときに押します。作っている間も編集を続けられます。");
-  else body = "<h3>音声</h3>" + prefRow("サンプリング周波数", seg("ar", AR_OPTS, s.ar), "書き出す音声の細かさです。ふつうは 48 kHz のままでかまいません。");
+  if (t === "seq") body = "<h3>シーケンス</h3>" + prefRow("解像度", select("res", RES_OPTS, s.res, "解像度")) + prefRow("フレームレート", select("fps", FPS_OPTS, s.fps, "フレームレート"));
+  else if (t === "preview") body = "<h3>プレビュー</h3>" + prefRow("画質", seg("pq", PQ_OPTS, s.pq));
+  else if (t === "proxy") body = "<h3>プロキシ</h3>" + prefRow("プロキシの高さ", seg("proxy", PROXY_OPTS, s.proxy)) + prefRow("作り直す", btn("いまのプロキシを作り直す", "psProxy", "", "s"));
+  else body = "<h3>音声</h3>" + prefRow("サンプリング周波数", seg("ar", AR_OPTS, s.ar));
   d.innerHTML = '<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">プロジェクト設定</h2>' + btn("閉じる", "dlgNo", "", "s") + '</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">' + tabs2.map(function(x) {
     return "<button" + (t === x[0] ? ' aria-current="true"' : "") + A("psTab", x[0]) + ">" + x[1] + "</button>";
-  }).join("") + '</nav><div class="pcont">' + body + '<div class="mu" style="margin-top:16px;line-height:1.6">この設定はプロジェクトに保存されます（プロジェクトごとに違う設定にできます）。</div></div></div></div>';
+  }).join("") + '</nav><div class="pcont">' + body + "</div></div></div>";
   d.hidden = false;
   [].forEach.call(d.querySelectorAll("[data-ps]"), function(el) {
     el.addEventListener("change", function() {
@@ -5409,14 +5405,14 @@ function init$7() {
 }
 function init$6() {
   R.script = function() {
-    return '<div class="pc" style="align-items:center;justify-content:center;background:var(--bg1);text-align:center"><div style="font-size:16px;font-weight:500">台本ページは、台本アプリとの紐づけ後に表示されます</div><div class="mu" style="margin-top:14px">紐づけると、台本の表示、台本行とタイムラインの連携、絵コンテの読み込みが使えます。</div><div style="margin-top:18px">' + (S.linked ? '<span class="t-ok">紐づけました（台本の表示は、これから作ります）</span>' : btn("台本アプリと紐づける", "link", "", "pri")) + "</div></div>";
+    return '<div class="pc" style="align-items:center;justify-content:center;background:var(--bg1);text-align:center"><div style="font-size:16px;font-weight:500">台本ページは、台本アプリとの紐づけ後に表示されます</div><div style="margin-top:18px">' + (S.linked ? '<span class="t-ok">紐づけました</span>' : btn("台本アプリと紐づける", "link", "", "pri")) + "</div></div>";
   };
 }
 function roughStrip() {
   var L = v1Clips(), sum = L.reduce(function(a, c) {
     return a + cLen(c);
   }, 0) || 1;
-  if (!L.length) return '<div class="mu" style="padding:22px 0">まだカットがありません。ソースでイン点とアウト点を決めて「仮編集へ追加」を押してください。</div>';
+  if (!L.length) return '<div class="mu" style="padding:22px 0">まだカットがありません</div>';
   return '<div style="display:flex;gap:2px" data-rough>' + L.map(function(c, i) {
     var x = M(c.m) || { n: "（削除された素材）" }, on = S.sel.indexOf(c.id) >= 0;
     return '<div class="li" role="button" tabindex="0" data-rc="' + c.id + '"' + A("rsel", c.id) + ' title="' + h(x.n) + "　" + tc(c.start) + 'から" style="width:' + (cLen(c) / sum * 100).toFixed(2) + "%;min-width:24px;height:78px;position:relative;background:" + (on ? "#bfe9f8" : "#8fd3ee") + ";border:1px solid rgba(0,0,0,.35);border-radius:3px;" + (on ? "box-shadow:0 0 0 2px var(--wt);" : "") + 'overflow:hidden"><div style="height:20px;padding:0 6px;line-height:20px;color:#06222f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b style="margin-right:6px;font-weight:500">' + (i + 1) + "</b>" + h(x.n) + "　" + mmss(cLen(c)) + '</div><div style="position:absolute;left:0;right:0;top:20px;bottom:0;' + filmStyle(x) + '"></div></div>';
@@ -5430,7 +5426,7 @@ function init$5() {
     if (S.ctab === "board") left = '<div class="row" style="height:56px;flex:none;gap:8px;padding:0 16px;border-bottom:1px solid var(--dv)"><div class="grow" style="line-height:1.5"><div>台本アプリから読み込み</div><div class="mu">v3　最終同期 14:30</div></div>' + btn("更新を確認", "todo", "", "s") + '</div><div class="scroll">' + D.scenes.map(function(s) {
       var m2 = s.m && M(s.m);
       return '<div class="li' + (S.scene === s.id ? " selr" : "") + '" role="button" tabindex="0"' + A("scene", s.id) + ' style="display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;height:82px;padding:0 16px;border-bottom:1px solid var(--dv)"><div style="width:96px;height:54px;border:1px solid var(--dv);border-radius:4px;background:var(--bg0)"></div><div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px"><b style="font-weight:500;color:var(--lb)">' + s.no + "</b>　" + h(s.n) + '</span><span class="mu">' + s.t + "　" + h(s.shot) + "</span><span>" + (m2 ? chip("素材 " + m2.c, "c-ok") : chip("素材 未割り当て", "c-wn")) + "</span></div></div>";
-    }).join("") + '</div><div class="mu" style="padding:12px 16px;border-top:1px solid var(--dv);line-height:1.6">シーンを選ぶと、割り当てた素材をソースに表示します。</div>';
+    }).join("") + "</div>";
     else {
       var cnt = function(k) {
         return vids.filter(function(m2) {
@@ -5442,7 +5438,7 @@ function init$5() {
       }).map(function(m2) {
         var rt = m2.rate || "未確認", c = { "採用": "c-ok", "保留": "c-wn", "不採用": "c-er" }[rt] || "c-mu";
         return '<div class="li' + (S.src === m2.id ? " selr" : "") + '" role="button" tabindex="0"' + A("csrc", m2.id) + ' style="display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:center;height:60px;padding:0 16px;border-bottom:1px solid var(--dv)">' + mthumb(m2, 64, 36) + '<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h(m2.n) + '</span><span class="row" style="gap:8px"><span class="mu">' + (m2.k === "画像" ? "画像" : mmss(m2.d)) + "</span>" + chip(rt, c) + "</span></div></div>";
-      }).join("") + (vids.length ? "" : '<div class="mu" style="padding:20px 14px">映像の素材がありません。メディアページで読み込んでください。</div>') + "</div>";
+      }).join("") + (vids.length ? "" : '<div class="mu" style="padding:20px 14px">映像の素材がありません</div>') + "</div>";
     }
     var m = M(S.src) || vids[0], main = "";
     if (!m) main = ph("ソース") + '<div class="mon" style="height:calc(240px + var(--xh,0px)*.5);color:#9a9a9a">素材を選んでください</div>';
@@ -5466,10 +5462,11 @@ function init$5() {
         return '<div style="position:absolute;left:' + l + "%;width:" + w + "%;top:44px;height:56px;background:repeating-linear-gradient(135deg,rgba(230,60,60,.8) 0 3px,transparent 3px 7px);opacity:" + (k.done ? 1 : 0.5) + ';pointer-events:none"></div>' + (w >= 4 ? '<div style="position:absolute;left:' + l + '%;top:22px;padding:1px 6px;border-radius:3px;background:var(--erb);color:var(--er);font-weight:500;white-space:nowrap;pointer-events:none">無音</div>' : "");
       }).join("");
       var mon = m.url && m.k === "映像" ? '<div data-srcbox style="height:calc(214px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain;background:#000"></div>' : m.thumb ? '<img src="' + m.thumb + '" alt="" style="height:calc(214px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;object-fit:contain">' : '<div class="frame" style="height:calc(214px + var(--xh,0px)*.5);width:auto;aspect-ratio:16/9;max-width:100%;background:' + (m.col ? m.col[0] : "#333") + '">' + (m.sample ? '<span style="color:rgba(255,255,255,.7)">' + h(m.n) + "（見本）</span>" : "") + "</div>";
-      var p = primary(), onV1 = p && p.tr === "V1", vi = onV1 ? v1Clips().indexOf(p) : -1;
+      var p = primary(), onV1 = p && p.tr === "V1";
+      onV1 ? v1Clips().indexOf(p) : -1;
       main = ph("ソース　" + h(m.n), '<span class="x">IN ' + tc(inP) + "　OUT " + tc(outP) + "　長さ " + mmss(outP - inP) + "</span>") + '<div class="mon" style="height:calc(240px + var(--xh,0px)*.5)">' + mon + "</div>" + transport("cut", ibtn("back", "1フレーム戻る", "sfb") + playBtn(SRC.playing) + ibtn("fwd", "1フレーム進む", "sff"), "全長 " + mmss(tot)) + '<div style="height:116px;flex:none;padding:12px 16px 0;background:var(--bg0);border-bottom:1px solid var(--dv)"><div style="position:relative;height:100%;cursor:pointer" data-scrub="cut"><div style="position:relative;height:22px">' + labels + '</div><div style="position:absolute;left:0;right:0;top:44px;height:56px;background:#2f78b7;border:1px solid #8cc4ee;overflow:hidden">' + (img ? "" : waveOf(m, 0, tot, 150)) + "</div>" + marks + '<div data-head="cut" style="position:absolute;left:' + S.t.cut / tot * 100 + '%;top:28px;height:72px;width:1px;background:var(--tx);pointer-events:none"></div></div></div><div class="row" style="height:48px;flex:none;gap:8px;padding:0 16px;border-bottom:1px solid var(--dv)">' + btn("イン点", "setIn", "", "", "イン点（I キー）") + btn("アウト点", "setOut", "", "", "アウト点（O キー）") + '<span class="vsep"></span>' + btn("不要部分を削除", "delAll") + btn("無音を検出", "detect") + '<span class="grow"></span>' + btn("仮編集へ追加（挿入）", "cutIns", "", "on") + btn("上書き", "cutOvr") + "</div>" + ph("仮編集（ラフカット）＝ V1", '<span class="x">合計 ' + mmss(v1Clips().reduce(function(a, c) {
         return a + cLen(c);
-      }, 0)) + "　" + v1Clips().length + "カット</span>" + (onV1 ? btn("選択したカットを削除", "rdel", "", "s") : "")) + '<div style="flex:1;min-height:0;padding:14px;background:var(--bg0);overflow:auto">' + roughStrip() + '<div class="mu" style="margin-top:10px">ドラッグで並べ替え　／　' + (vi >= 0 ? "カット" + (vi + 1) + "の後ろに挿入されます" : "V1 の最後に追加されます") + "（後ろのクリップは、ほかのトラックも一緒にずれます）</div></div>";
+      }, 0)) + "　" + v1Clips().length + "カット</span>" + (onV1 ? btn("選択したカットを削除", "rdel", "", "s") : "")) + '<div style="flex:1;min-height:0;padding:14px;background:var(--bg0);overflow:auto">' + roughStrip() + "</div>";
     }
     var right = "";
     if (m) {
@@ -5538,7 +5535,7 @@ function init$4() {
       return '<span style="position:absolute;left:' + p[0] + "px;top:" + p[1] + 'px;width:5px;height:5px;background:#ffb454"></span>';
     }).join("") + [[248, 48], [330, 48], [248, 168], [330, 168]].map(function(p) {
       return '<span style="position:absolute;left:' + p[0] + "px;top:" + p[1] + 'px;width:7px;height:7px;background:#fff;border:1px solid #ffb454"></span>';
-    }).join("") : "") + "</div></div>" + transport("fx", ibtn("toStart", "前のカットへ", "todo") + playBtn(!!FXP) + ibtn("nextCut", "次のカットへ", "todo"), '<span class="mu">見本の画面です</span>') + '<div class="row" style="height:40px;flex:none;gap:6px;padding:0 12px;border-bottom:1px solid var(--dv)"><span style="font-weight:500;margin-right:4px;white-space:nowrap">キーフレーム</span>' + kfBtns + '<span class="grow"></span>' + sel("対象プロパティ", ["拡大率", "位置", "回転", "透明度"], "拡大率", "height:26px") + "</div>" + timeline(D.fxtl, "fx", { kf: 1, noTc: 1 }) + '</div><div class="pn r" style="width:' + pw("fxR") + 'px">' + splitter("fxR", "r") + ph("エフェクトコントロール", '<span class="x">店主 インタビュー</span>') + '<div class="scroll">' + fsec("track", "トラッキング", true, '<div class="fg"><span>追跡対象</span>' + sel("追跡対象", ["被写体1（店主）", "被写体2"], "被写体1（店主）") + '</div><div class="row" style="gap:6px;height:42px">' + btn(TRI.l + "後方", "todo", "", "", "後方") + btn(ic("stop", 12) + "停止", "todo", "", "", "停止") + btn(TRI.r + "前方", "todo", "", "on", "前方") + '</div><div class="fg"><span>状態</span><span class="row" style="gap:8px"><span class="prog" style="flex:1"><i style="width:100%;background:var(--ok)"></i></span><span class="t-ok">解析済み</span></span></div><div class="fg"><span>追従先</span>' + sel("追従先", ["テロップを追従（質問テロップ）", "なし"], "テロップを追従（質問テロップ）") + "</div>" + prop(["滑らかさ", 40, "40"]), 1) + fsec("color", "色補正", true, [["明るさ", 55, "8.0"], ["コントラスト", 58, "12.0"], ["彩度", 60, "110", 1]].map(prop).join(""), 1) + fsec("blur", "ぼかし", false, "", 1) + fsec("tin", "開始トランジション", true, "", 1) + fsec("motion", "モーション", true, "", 1) + "</div></div>";
+    }).join("") : "") + "</div></div>" + transport("fx", ibtn("toStart", "前のカットへ", "todo") + playBtn(!!FXP) + ibtn("nextCut", "次のカットへ", "todo"), "") + '<div class="row" style="height:40px;flex:none;gap:6px;padding:0 12px;border-bottom:1px solid var(--dv)"><span style="font-weight:500;margin-right:4px;white-space:nowrap">キーフレーム</span>' + kfBtns + '<span class="grow"></span>' + sel("対象プロパティ", ["拡大率", "位置", "回転", "透明度"], "拡大率", "height:26px") + "</div>" + timeline(D.fxtl, "fx", { kf: 1, noTc: 1 }) + '</div><div class="pn r" style="width:' + pw("fxR") + 'px">' + splitter("fxR", "r") + ph("エフェクトコントロール", '<span class="x">店主 インタビュー</span>') + '<div class="scroll">' + fsec("track", "トラッキング", true, '<div class="fg"><span>追跡対象</span>' + sel("追跡対象", ["被写体1（店主）", "被写体2"], "被写体1（店主）") + '</div><div class="row" style="gap:6px;height:42px">' + btn(TRI.l + "後方", "todo", "", "", "後方") + btn(ic("stop", 12) + "停止", "todo", "", "", "停止") + btn(TRI.r + "前方", "todo", "", "on", "前方") + '</div><div class="fg"><span>状態</span><span class="row" style="gap:8px"><span class="prog" style="flex:1"><i style="width:100%;background:var(--ok)"></i></span><span class="t-ok">解析済み</span></span></div><div class="fg"><span>追従先</span>' + sel("追従先", ["テロップを追従（質問テロップ）", "なし"], "テロップを追従（質問テロップ）") + "</div>" + prop(["滑らかさ", 40, "40"]), 1) + fsec("color", "色補正", true, [["明るさ", 55, "8.0"], ["コントラスト", 58, "12.0"], ["彩度", 60, "110", 1]].map(prop).join(""), 1) + fsec("blur", "ぼかし", false, "", 1) + fsec("tin", "開始トランジション", true, "", 1) + fsec("motion", "モーション", true, "", 1) + "</div></div>";
   };
 }
 function init$3() {
