@@ -45,3 +45,12 @@ export function init(){
 P=sampleProject();
 uid=coreUid;
 }
+
+/* 音声のフェード：[フェードインの長さ, フェードアウトの長さ]（秒）。足してクリップより長いときは、同じ割合で縮める */
+export function fades(c){var L=cLen(c),fi=Math.max(0,+c.fin||0),fo=Math.max(0,+c.fout||0);if(fi+fo>L&&fi+fo>0){var k=L/(fi+fo);fi*=k;fo*=k;}return [fi,fo];}
+/* クリップの頭から lt 秒の位置での、フェードの倍率（0〜1、直線） */
+export function fadeAt(c,lt){var f=fades(c),L=cLen(c),g=1;if(f[0]>0&&lt<f[0])g=Math.max(0,lt/f[0]);if(f[1]>0&&lt>L-f[1])g=Math.min(g,Math.max(0,(L-lt)/f[1]));return g;}
+/* ゲインライン：音量（dB）と、クリップの高さに対する位置（上が 0）。+15 dB が上端、-60 dB が下端 */
+export var GAIN_MAX=15,GAIN_MIN=-60;
+export function gainFrac(db){return (GAIN_MAX-Math.max(GAIN_MIN,Math.min(GAIN_MAX,db||0)))/(GAIN_MAX-GAIN_MIN);}
+export function gainFromFrac(f){return GAIN_MAX-Math.max(0,Math.min(1,f))*(GAIN_MAX-GAIN_MIN);}

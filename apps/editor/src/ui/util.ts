@@ -36,13 +36,15 @@ export function waveSvg(a,fill){var b='';for(var i=0;i<a.length;i++){var hh=Math
    0 dBFS を超えた（音が割れる）ところは、上下の端を赤くする */
 var WCACHE={},WKEYS=[];
 export function waveOf(m,a,b,n,fill,opt){opt=opt||{};n=Math.max(2,Math.min(2000,Math.round(n)));var g=opt.gain==null?1:opt.gain,sp=!!opt.split;
-  var key=(m?m.id:'')+'|'+(m&&m.wf?m.wf.d.length+':'+m.wf.n:m&&m.peaks?'p'+m.peaks.length:'s')+'|'+a.toFixed(3)+'|'+b.toFixed(3)+'|'+n+'|'+g.toFixed(4)+'|'+sp+'|'+(fill||'');
+  var key=(m?m.id:'')+'|'+(m&&m.wf?m.wf.d.length+':'+m.wf.n:m&&m.peaks?'p'+m.peaks.length:'s')+'|'+a.toFixed(3)+'|'+b.toFixed(3)+'|'+n+'|'+g.toFixed(4)+'|'+sp+'|'+(fill||'')+'|'+(opt.fades?opt.fades.map(function(v){return v.toFixed(3);}).join(','):'');
   if(WCACHE[key])return WCACHE[key];
   var cols;
   if(m&&m.wf&&m.wf.d)cols=waveColumns(m.wf,a,b,n,g);
   else if(m&&m.peaks&&m.d)cols=peakCols(m,a,b,n,g);
   else if(m&&m.file)return '';
   else cols=fakeCols(m,a,b,n,g);
+  /* フェード：クリップの頭と終わりで、波形も小さくする（直線） */
+  var fd=opt.fades;if(fd&&(fd[0]>0||fd[1]>0)){var L=b-a;for(var x=0;x<cols.n;x++){var lt=(x+.5)/cols.n*L,k=1;if(fd[0]>0&&lt<fd[0])k=lt/fd[0];if(fd[1]>0&&lt>L-fd[1])k=Math.min(k,(L-lt)/fd[1]);if(k<1)for(var c=0;c<cols.ch;c++){var j=x*cols.ch+c;cols.max[j]*=k;cols.min[j]*=k;cols.rms[j]*=k;}}}
   var out=waveSvgReal(cols,fill||'#a9d6f5',sp);
   WCACHE[key]=out;WKEYS.push(key);if(WKEYS.length>600){delete WCACHE[WKEYS.shift()];}
   return out;}

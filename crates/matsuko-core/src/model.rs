@@ -152,6 +152,11 @@ pub struct Clip {
     /// 音量（dB）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vol: Option<f64>,
+    /// 音声のフェードイン・フェードアウトの長さ（秒）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fin: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fout: Option<f64>,
     /// テロップ：文字、種類（name / q / sub / credit）、大きさ（小 / 中 / 大）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -165,6 +170,18 @@ impl Clip {
     /// クリップの長さ（秒）
     pub fn len(&self) -> f64 {
         (self.src_out - self.src_in).max(0.0)
+    }
+    /// フェードの長さ（イン, アウト）。足してクリップより長いときは、同じ割合で縮める（画面の fades と同じ）
+    pub fn fades(&self) -> (f64, f64) {
+        let l = self.len();
+        let mut fi = self.fin.unwrap_or(0.0).max(0.0);
+        let mut fo = self.fout.unwrap_or(0.0).max(0.0);
+        if fi + fo > l && fi + fo > 0.0 {
+            let k = l / (fi + fo);
+            fi *= k;
+            fo *= k;
+        }
+        (fi, fo)
     }
     /// タイムライン上の終了（秒）
     pub fn end(&self) -> f64 {

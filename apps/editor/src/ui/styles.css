@@ -299,6 +299,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--ac);width:14px;height:
 .tl2 .ci.snd.bgm{background:#157a63;border-color:#6fd8b8}
 .tl2 .ci.snd.na{background:#5b3fa3;border-color:#bba5ee}
 .tl2 .ci.snd .cl{color:#fff;text-shadow:0 0 3px rgba(0,0,0,.8)}
+/* ゲインライン・フェードのハンドル */
+.tl2 .ci.snd .gl{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.tl2 .ci.snd .gln{position:absolute;height:8px;cursor:ns-resize;z-index:2}
+.tl2 .ci.snd .fhd{position:absolute;top:0;width:10px;height:10px;background:#fff;border:1px solid rgba(0,0,0,.45);box-sizing:border-box;cursor:ew-resize;z-index:3;opacity:0}
+.tl2 .ci.snd:hover .fhd,.tl2 .ci.snd.on .fhd,.tl2 .ci.snd .fhd.act{opacity:1}
+.gtip{position:absolute;z-index:60;pointer-events:none;background:rgba(20,20,20,.92);color:#fff;font-size:12px;line-height:1;padding:6px 8px;border-radius:4px;white-space:nowrap}
 .tl2 .ci.on{box-shadow:0 0 0 2px var(--wt);z-index:2}
 .tl2 .ci.mv{opacity:.82;z-index:3}
 .tl2 .ci.lkd{pointer-events:none;filter:saturate(.6)}

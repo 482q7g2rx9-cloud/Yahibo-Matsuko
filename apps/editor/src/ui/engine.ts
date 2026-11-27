@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { drawLookText, loadFont, titleFont } from './titleStyles';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
-import { C, M, P, T, cEnd, progDur, vTracks } from './project';
+import { C, M, P, T, cEnd, fadeAt, progDur, vTracks } from './project';
 import { S } from './state';
 import { tc } from './util';
 import { HOST } from './desktop';
@@ -45,7 +45,8 @@ export function sync(t,play){var want={},near=[];
     else if(!play&&!a&&(s>t&&s-t<20||e<=t&&t-e<20))near.push({c:c,m:m,a:a,lt:s>t?c.in:Math.max(c.in,c.in+(e-s)-0.05),pre:1,d:s>t?s-t:t-e});});
   near.sort(function(x,y){return x.d-y.d;}).slice(0,4).forEach(function(w){want[w.c.id]=w;});
   Object.keys(want).forEach(function(id){var w=want[id],e=elFor(w.c,w.m,w.a);
-    if(w.a){var lin=dbLin(w.c.vol);if(e._g){e._g.gain.value=lin;e.volume=1;}else e.volume=Math.min(1,lin);}
+    /* 音量（dB）とフェード。再生中は少しなめらかに変える */
+    if(w.a){var lin=dbLin(w.c.vol)*(w.pre?0:fadeAt(w.c,t-w.c.start));if(e._g){var gg=e._g.gain;if(play&&E.ctx){try{gg.setTargetAtTime(lin,E.ctx.currentTime,0.015);}catch(x){gg.value=lin;}}else{if(gg.cancelScheduledValues&&E.ctx)gg.cancelScheduledValues(E.ctx.currentTime);gg.value=lin;}e.volume=1;}else e.volume=Math.min(1,lin);}
     if(w.pre){if(!e.paused)e.pause();if(Math.abs(e.currentTime-w.lt)>0.05&&!e.seeking){try{e.currentTime=w.lt;}catch(x){}}return;}
     if(!play)seekTo(e,w.lt);else{e._want=null;if(Math.abs(e.currentTime-w.lt)>0.3){try{e.currentTime=w.lt;}catch(x){}}}
     if(play&&e.paused){var pr=e.play();if(pr&&pr.catch)pr.catch(function(){});}if(!play&&!e.paused)e.pause();});

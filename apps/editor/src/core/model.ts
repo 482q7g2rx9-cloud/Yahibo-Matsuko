@@ -100,6 +100,9 @@ export interface Clip {
   rot?: number;
   op?: number;
   vol?: number;
+  /** 音声のフェードイン・フェードアウトの長さ（秒） */
+  fin?: number;
+  fout?: number;
   /** テロップ：文字、種類（name / q / sub / credit）、大きさ（小 / 中 / 大） */
   label?: string;
   st?: string;

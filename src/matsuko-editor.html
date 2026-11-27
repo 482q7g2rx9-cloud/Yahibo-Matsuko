@@ -303,6 +303,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--ac);width:14px;height:
 .tl2 .ci.snd.bgm{background:#157a63;border-color:#6fd8b8}
 .tl2 .ci.snd.na{background:#5b3fa3;border-color:#bba5ee}
 .tl2 .ci.snd .cl{color:#fff;text-shadow:0 0 3px rgba(0,0,0,.8)}
+/* ゲインライン・フェードのハンドル */
+.tl2 .ci.snd .gl{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.tl2 .ci.snd .gln{position:absolute;height:8px;cursor:ns-resize;z-index:2}
+.tl2 .ci.snd .fhd{position:absolute;top:0;width:10px;height:10px;background:#fff;border:1px solid rgba(0,0,0,.45);box-sizing:border-box;cursor:ew-resize;z-index:3;opacity:0}
+.tl2 .ci.snd:hover .fhd,.tl2 .ci.snd.on .fhd,.tl2 .ci.snd .fhd.act{opacity:1}
+.gtip{position:absolute;z-index:60;pointer-events:none;background:rgba(20,20,20,.92);color:#fff;font-size:12px;line-height:1;padding:6px 8px;border-radius:4px;white-space:nowrap}
 .tl2 .ci.on{box-shadow:0 0 0 2px var(--wt);z-index:2}
 .tl2 .ci.mv{opacity:.82;z-index:3}
 .tl2 .ci.lkd{pointer-events:none;filter:saturate(.6)}
@@ -853,6 +859,28 @@ function setP(v) {
 function init$q() {
   P = sampleProject();
   uid = uid$1;
+}
+function fades(c) {
+  var L = cLen(c), fi = Math.max(0, +c.fin || 0), fo = Math.max(0, +c.fout || 0);
+  if (fi + fo > L && fi + fo > 0) {
+    var k = L / (fi + fo);
+    fi *= k;
+    fo *= k;
+  }
+  return [fi, fo];
+}
+function fadeAt(c, lt) {
+  var f = fades(c), L = cLen(c), g = 1;
+  if (f[0] > 0 && lt < f[0]) g = Math.max(0, lt / f[0]);
+  if (f[1] > 0 && lt > L - f[1]) g = Math.min(g, Math.max(0, (L - lt) / f[1]));
+  return g;
+}
+var GAIN_MAX = 15, GAIN_MIN = -60;
+function gainFrac(db) {
+  return (GAIN_MAX - Math.max(GAIN_MIN, Math.min(GAIN_MAX, db || 0))) / (GAIN_MAX - GAIN_MIN);
+}
+function gainFromFrac(f) {
+  return GAIN_MAX - Math.max(0, Math.min(1, f)) * (GAIN_MAX - GAIN_MIN);
 }
 var S;
 var TOTAL;
@@ -2345,7 +2373,17 @@ function clipHtml(c, r, pps) {
     return '<div class="ci video' + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + '"><div class="chd">' + fx + nm + (c.link ? '<span class="lnk" aria-hidden="true">⛓</span>' : "") + "</div>" + (r.h >= 40 ? '<div class="fm" style="' + filmStyle(m) + '"></div>' : "") + tm + "</div>";
   }
   var k = m && m.k === "音声" ? "bgm" : m && m.k === "テイク" ? "na" : "wave", fill = { wave: "#cfe9ff", bgm: "#c4f5e4", na: "#e4dafc" }[k];
-  return '<div class="ci ' + k + " snd" + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + '">' + (m && m.k !== "画像" ? waveOf(m, c.in, c.out, Math.max(4, Math.round(w)), fill, { gain: Math.pow(10, (c.vol || 0) / 20), split: r.h >= 36 }) : "") + '<span class="cl">' + nm + (c.vol ? "　" + (c.vol > 0 ? "+" : "") + c.vol + " dB" : "") + "</span>" + tm + "</div>";
+  return '<div class="ci ' + k + " snd" + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + '">' + (m && m.k !== "画像" ? waveOf(m, c.in, c.out, Math.max(4, Math.round(w)), fill, { gain: Math.pow(10, (c.vol || 0) / 20), split: r.h >= 36, fades: fades(c) }) : "") + '<span class="cl">' + nm + (c.vol ? "　" + (c.vol > 0 ? "+" : "") + (+c.vol).toFixed(1) + " dB" : "") + "</span>" + gainHtml(c, w, r.h - 2, pps, tr.lock) + tm + "</div>";
+}
+function gainHtml(c, w, hh, pps, lk) {
+  if (w < 10 || hh < 12) return "";
+  var f = fades(c), xi = f[0] * pps, xo = w - f[1] * pps, gy = Math.round(gainFrac(c.vol) * hh * 10) / 10, o = "";
+  var line = (xi > 0 ? "0," + hh + " " : "") + xi.toFixed(1) + "," + gy + " " + xo.toFixed(1) + "," + gy + (xo < w ? " " + w.toFixed(1) + "," + hh : "");
+  if (xi > 0) o += '<polygon points="0,0 ' + xi.toFixed(1) + ",0 " + xi.toFixed(1) + "," + gy + " 0," + hh + '"/>';
+  if (xo < w) o += '<polygon points="' + xo.toFixed(1) + ",0 " + w.toFixed(1) + ",0 " + w.toFixed(1) + "," + hh + " " + xo.toFixed(1) + "," + gy + '"/>';
+  var s = '<svg class="gl" width="' + w.toFixed(1) + '" height="' + hh + '" aria-hidden="true"><g fill="rgba(0,0,0,.32)">' + o + '</g><polyline points="' + line + '" fill="none" stroke="#fff" stroke-width="1.2"/></svg>';
+  if (lk) return s;
+  return s + '<span class="gln" data-gain data-cid="' + c.id + '" style="left:' + xi.toFixed(1) + "px;width:" + Math.max(4, xo - xi).toFixed(1) + "px;top:" + (gy - 4) + 'px"></span><span class="fhd" data-fade="in" data-cid="' + c.id + '" style="left:' + Math.max(0, Math.min(w - 10, xi - 5)).toFixed(1) + 'px"></span><span class="fhd" data-fade="out" data-cid="' + c.id + '" style="left:' + Math.max(0, Math.min(w - 10, xo - 5)).toFixed(1) + 'px"></span>';
 }
 function tlInner() {
   var pps = S.pps || 10, dur = progDur(), b = document.querySelector("[data-body]"), bw = b ? b.clientWidth : 900, W = Math.ceil(Math.max(dur * pps + 400, bw + 200)), y = 0, hd = "", ln = "", cl = "";
@@ -2419,6 +2457,7 @@ function motionForm(c) {
 function setProp(cid, key, v) {
   var c = C(cid), p = PROPS[key];
   if (!c || !p || isNaN(v)) return;
+  if (key === "fin" || key === "fout") v = Math.min(v, Math.max(0, cLen(c) - (key === "fin" ? fades(c)[1] : fades(c)[0])));
   v = Math.round(Math.max(p.min, Math.min(p.max, v)) / p.step) * p.step;
   v = +v.toFixed(3);
   c[key] = v;
@@ -2433,7 +2472,10 @@ function setProp(cid, key, v) {
   });
   redrawProg();
   saveP();
-  if (key === "vol") sync(S.t.edit, E.playing);
+  if (key === "vol" || key === "fin" || key === "fout") {
+    sync(S.t.edit, E.playing);
+    drawTL();
+  }
 }
 function hotEdit(el) {
   var cid = el.dataset.cid, key = el.dataset.k, c = C(cid);
@@ -2529,7 +2571,7 @@ function inspector() {
   var info = kv("素材", h(m ? m.n : c.label || "—")) + kv("トラック", c.tr + (a && v ? " / " + a.tr : "")) + kv("開始", tc(c.start)) + (c.type === "media" ? kv("イン", tc(c.in)) + kv("アウト", tc(c.out)) : "") + kv("長さ", mmss(cLen(c))) + '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">' + btn("再生ヘッドで分割", "split", "", "s") + btn("削除", "delSel", "", "s") + btn("リップル削除", "rdel", "", "s") + (c.link || pair ? btn("リンク解除", "lnk", "", "s") : "") + "</div>";
   var h2 = fsec("clip", "クリップ", null, info);
   if (v && v.type === "media") h2 += fsec("motion", "モーション・不透明度", null, motionForm(v), 1);
-  if (a) h2 += fsec("audio", "音量", null, numRow("音量", a, "vol"));
+  if (a) h2 += fsec("audio", "音量", null, numRow("音量", a, "vol") + numRow("フェードイン", a, "fin") + numRow("フェードアウト", a, "fout"));
   if (m) h2 += '<div style="padding:10px 16px;border-bottom:1px solid var(--dv);line-height:1.6"><div style="font-weight:500">リンク中の台本行</div><div class="mu">' + h(m.line && m.line !== "—" ? m.line : "—") + "</div></div>";
   return { name: m ? m.n : c.label || "", html: h2 };
 }
@@ -2578,7 +2620,9 @@ function init$j() {
     scale: { min: 10, max: 400, step: 1, unit: "%", def: 100, dec: 1 },
     rot: { min: -180, max: 180, step: 1, unit: "°", def: 0, dec: 1 },
     op: { min: 0, max: 100, step: 1, unit: "%", def: 100, dec: 1 },
-    vol: { min: -30, max: 12, step: 0.5, unit: "dB", def: 0, dec: 1 }
+    vol: { min: -60, max: 15, step: 0.1, unit: "dB", def: 0, dec: 1 },
+    fin: { min: 0, max: 600, step: 0.05, unit: "s", def: 0, dec: 2 },
+    fout: { min: 0, max: 600, step: 0.05, unit: "s", def: 0, dec: 2 }
   };
   R.edit = function() {
     var left;
@@ -4782,9 +4826,19 @@ function sync(t, play) {
   Object.keys(want).forEach(function(id) {
     var w = want[id], e = elFor(w.c, w.m, w.a);
     if (w.a) {
-      var lin = dbLin(w.c.vol);
+      var lin = dbLin(w.c.vol) * (w.pre ? 0 : fadeAt(w.c, t - w.c.start));
       if (e._g) {
-        e._g.gain.value = lin;
+        var gg = e._g.gain;
+        if (play && E.ctx) {
+          try {
+            gg.setTargetAtTime(lin, E.ctx.currentTime, 0.015);
+          } catch (x) {
+            gg.value = lin;
+          }
+        } else {
+          if (gg.cancelScheduledValues && E.ctx) gg.cancelScheduledValues(E.ctx.currentTime);
+          gg.value = lin;
+        }
         e.volume = 1;
       } else e.volume = Math.min(1, lin);
     }
@@ -5209,13 +5263,30 @@ function waveOf(m, a, b, n, fill, opt) {
   opt = opt || {};
   n = Math.max(2, Math.min(2e3, Math.round(n)));
   var g = opt.gain == null ? 1 : opt.gain, sp = !!opt.split;
-  var key = (m ? m.id : "") + "|" + (m && m.wf ? m.wf.d.length + ":" + m.wf.n : m && m.peaks ? "p" + m.peaks.length : "s") + "|" + a.toFixed(3) + "|" + b.toFixed(3) + "|" + n + "|" + g.toFixed(4) + "|" + sp + "|" + (fill || "");
+  var key = (m ? m.id : "") + "|" + (m && m.wf ? m.wf.d.length + ":" + m.wf.n : m && m.peaks ? "p" + m.peaks.length : "s") + "|" + a.toFixed(3) + "|" + b.toFixed(3) + "|" + n + "|" + g.toFixed(4) + "|" + sp + "|" + (fill || "") + "|" + (opt.fades ? opt.fades.map(function(v) {
+    return v.toFixed(3);
+  }).join(",") : "");
   if (WCACHE[key]) return WCACHE[key];
   var cols;
   if (m && m.wf && m.wf.d) cols = waveColumns(m.wf, a, b, n, g);
   else if (m && m.peaks && m.d) cols = peakCols(m, a, b, n, g);
   else if (m && m.file) return "";
   else cols = fakeCols(m, a, b, n, g);
+  var fd = opt.fades;
+  if (fd && (fd[0] > 0 || fd[1] > 0)) {
+    var L = b - a;
+    for (var x = 0; x < cols.n; x++) {
+      var lt = (x + 0.5) / cols.n * L, k = 1;
+      if (fd[0] > 0 && lt < fd[0]) k = lt / fd[0];
+      if (fd[1] > 0 && lt > L - fd[1]) k = Math.min(k, (L - lt) / fd[1]);
+      if (k < 1) for (var c = 0; c < cols.ch; c++) {
+        var j = x * cols.ch + c;
+        cols.max[j] *= k;
+        cols.min[j] *= k;
+        cols.rms[j] *= k;
+      }
+    }
+  }
   var out = waveSvgReal(cols, fill || "#a9d6f5", sp);
   WCACHE[key] = out;
   WKEYS.push(key);
@@ -5817,6 +5888,33 @@ function prevEnd(c) {
     return x !== c && x.tr === c.tr && cEnd(x) <= c.start + EPS ? Math.max(a, cEnd(x)) : a;
   }, 0);
 }
+function gainTip(e, d) {
+  var el = document.getElementById("gtip");
+  if (!e) {
+    if (el) el.remove();
+    return;
+  }
+  var c = C(d.cid);
+  if (!c) return;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "gtip";
+    el.className = "gtip";
+    document.getElementById("app").appendChild(el);
+  }
+  var t;
+  if (d.k === "gain") {
+    var v = c.vol || 0, dv = v - d.v0;
+    t = v.toFixed(1) + " dB　(" + (dv >= 0 ? "+" : "") + dv.toFixed(1) + " dB)";
+  } else {
+    var f = fades(c);
+    t = (d.side === "in" ? "フェードイン " : "フェードアウト ") + f[d.side === "in" ? 0 : 1].toFixed(2) + " 秒";
+  }
+  el.textContent = t;
+  var a = document.getElementById("app").getBoundingClientRect();
+  el.style.left = (e.clientX - a.left) / SCALE + 14 + "px";
+  el.style.top = (e.clientY - a.top) / SCALE + 14 + "px";
+}
 function nextStart(c) {
   return P.clips.reduce(function(a, x) {
     return x !== c && x.tr === c.tr && x.start >= cEnd(c) - EPS ? Math.min(a, x.start) : a;
@@ -5868,6 +5966,16 @@ function init$2() {
     }
     if (S.tool === "text") {
       addTitle("name", t, row && row.kind === "v" ? row.id : null);
+      return;
+    }
+    var gl = S.tool === "select" && e.target.closest("[data-gain],[data-fade]"), gc = gl && C(gl.dataset.cid);
+    if (gc && !locked(gc)) {
+      mark();
+      if (S.sel.indexOf(gc.id) < 0) S.sel = [gc.id];
+      var fd = gl.dataset.fade;
+      DRAG = { k: fd ? "fade" : "gain", side: fd, cid: gc.id, x0: p.x, y0: p.y, v0: fd ? fades(gc)[fd === "in" ? 0 : 1] : gc.vol || 0, moved: false };
+      draw();
+      gainTip(e, DRAG);
       return;
     }
     var ce = e.target.closest("[data-c]"), c = ce && C(ce.dataset.c);
@@ -5942,6 +6050,27 @@ function init$2() {
         b2.scrollLeft = d.sl - (e.clientX - d.x0);
         b2.scrollTop = d.st - (e.clientY - d.y0);
       }
+      return;
+    }
+    if (d.k === "gain" || d.k === "fade") {
+      var gp = bodyPos(e), gc = C(d.cid);
+      if (!gc) return;
+      if (!d.moved && Math.abs(gp.x - d.x0) + Math.abs(gp.y - d.y0) < 2) return;
+      d.moved = true;
+      if (d.k === "gain") {
+        var rw = ROWS.filter(function(z) {
+          return z.id === gc.tr;
+        })[0], hh = Math.max(10, (rw ? rw.h : 40) - 2), fine = e.shiftKey ? 0.1 : 1;
+        gc.vol = Math.round(gainFromFrac(gainFrac(d.v0) + (gp.y - d.y0) * fine / hh) * 10) / 10;
+        if (Math.abs(gc.vol) < 0.05) gc.vol = 0;
+      } else {
+        var dt = (gp.x - d.x0) / (S.pps || 10), ff = fades(gc), L = cLen(gc);
+        if (d.side === "in") gc.fin = Math.round(Math.max(0, Math.min(L - ff[1], d.v0 + dt)) * 100) / 100;
+        else gc.fout = Math.round(Math.max(0, Math.min(L - ff[0], d.v0 - dt)) * 100) / 100;
+      }
+      drawTL();
+      gainTip(e, d);
+      if (E.playing) sync(S.t.edit, true);
       return;
     }
     var p = bodyPos(e), pps = S.pps || 10;
@@ -6063,6 +6192,22 @@ function init$2() {
         HIST.pop();
         hotEdit(d.el);
       } else drawTL();
+      return;
+    }
+    if (d.k === "gain" || d.k === "fade") {
+      gainTip(null);
+      if (!d.moved) {
+        HIST.pop();
+        return;
+      }
+      var gc = C(d.cid);
+      if (gc) {
+        if (!gc.vol) delete gc.vol;
+        if (!gc.fin) delete gc.fin;
+        if (!gc.fout) delete gc.fout;
+      }
+      changed();
+      sync(S.t.edit, E.playing);
       return;
     }
     if (d.k === "marq") {

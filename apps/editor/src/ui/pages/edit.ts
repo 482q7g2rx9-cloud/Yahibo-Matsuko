@@ -6,7 +6,7 @@ import { pw, splitter } from '../panels';
 import * as KS from '../../core/silence';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from '../data';
-import { C, M, P, T, cEnd, cLen, hasFx, progDur } from '../project';
+import { C, M, P, T, cEnd, cLen, fades, gainFrac, hasFx, progDur } from '../project';
 import { S } from '../state';
 import { A, TRI, btn, diamond, filmStyle, fsec, h, ibtn, ic, kv, mmss, ph, playBtn, sel, tabs, tc, waveOf } from '../util';
 import { mark, saveP } from '../store';
@@ -32,7 +32,16 @@ export function clipHtml(c,r,pps){var m=c.m?M(c.m):null,on=S.sel.indexOf(c.id)>=
     if(c.type==='adj')return '<div class="ci adj'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'line-height:'+(r.h-2)+'px">'+nm+tm+'</div>';
     return '<div class="ci video'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'"><div class="chd">'+fx+nm+(c.link?'<span class="lnk" aria-hidden="true">⛓</span>':'')+'</div>'+(r.h>=40?'<div class="fm" style="'+filmStyle(m)+'"></div>':'')+tm+'</div>';}
   var k=m&&m.k==='音声'?'bgm':m&&m.k==='テイク'?'na':'wave',fill={wave:'#cfe9ff',bgm:'#c4f5e4',na:'#e4dafc'}[k];
-  return '<div class="ci '+k+' snd'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'">'+(m&&m.k!=='画像'?waveOf(m,c.in,c.out,Math.max(4,Math.round(w)),fill,{gain:Math.pow(10,(c.vol||0)/20),split:r.h>=36}):'')+'<span class="cl">'+nm+(c.vol?'　'+(c.vol>0?'+':'')+c.vol+' dB':'')+'</span>'+tm+'</div>';}
+  return '<div class="ci '+k+' snd'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'">'+(m&&m.k!=='画像'?waveOf(m,c.in,c.out,Math.max(4,Math.round(w)),fill,{gain:Math.pow(10,(c.vol||0)/20),split:r.h>=36,fades:fades(c)}):'')+'<span class="cl">'+nm+(c.vol?'　'+(c.vol>0?'+':'')+(+c.vol).toFixed(1)+' dB':'')+'</span>'+gainHtml(c,w,r.h-2,pps,tr.lock)+tm+'</div>';}
+/* ゲインライン（白い線：上下にドラッグで音量）と、フェードのハンドル（上の角の四角：左右にドラッグ） */
+export function gainHtml(c,w,hh,pps,lk){if(w<10||hh<12)return '';var f=fades(c),xi=f[0]*pps,xo=w-f[1]*pps,gy=Math.round(gainFrac(c.vol)*hh*10)/10,o='';
+  var line=(xi>0?'0,'+hh+' ':'')+xi.toFixed(1)+','+gy+' '+xo.toFixed(1)+','+gy+(xo<w?' '+w.toFixed(1)+','+hh:'');
+  if(xi>0)o+='<polygon points="0,0 '+xi.toFixed(1)+',0 '+xi.toFixed(1)+','+gy+' 0,'+hh+'"/>';
+  if(xo<w)o+='<polygon points="'+xo.toFixed(1)+',0 '+w.toFixed(1)+',0 '+w.toFixed(1)+','+hh+' '+xo.toFixed(1)+','+gy+'"/>';
+  var s='<svg class="gl" width="'+w.toFixed(1)+'" height="'+hh+'" aria-hidden="true"><g fill="rgba(0,0,0,.32)">'+o+'</g><polyline points="'+line+'" fill="none" stroke="#fff" stroke-width="1.2"/></svg>';
+  if(lk)return s;
+  return s+'<span class="gln" data-gain data-cid="'+c.id+'" style="left:'+xi.toFixed(1)+'px;width:'+Math.max(4,xo-xi).toFixed(1)+'px;top:'+(gy-4)+'px"></span>'+
+    '<span class="fhd" data-fade="in" data-cid="'+c.id+'" style="left:'+Math.max(0,Math.min(w-10,xi-5)).toFixed(1)+'px"></span><span class="fhd" data-fade="out" data-cid="'+c.id+'" style="left:'+Math.max(0,Math.min(w-10,xo-5)).toFixed(1)+'px"></span>';}
 export function tlInner(){var pps=S.pps||10,dur=progDur(),b=document.querySelector('[data-body]'),bw=b?b.clientWidth:900,W=Math.ceil(Math.max(dur*pps+400,bw+200)),y=0,hd='',ln='',cl='';ROWS=[];
   P.tracks.forEach(function(tr){ROWS.push({id:tr.id,kind:tr.kind,y:y,h:tr.h});var off=tr.kind==='v'?tr.hide:!audible(tr);
     hd+='<div class="hrow'+(tr.lock?' lk':'')+(off?' off':'')+'" data-trh="'+tr.id+'" style="top:'+y+'px;height:'+tr.h+'px"><b>'+tr.id+'</b><span class="mu nm">'+h(tr.name||'')+'</span>'+
@@ -66,9 +75,9 @@ export function numRow(label,c,key){var p=PROPS[key],v=propVal(c,key),id=c.id;
 export function motionForm(c){return numRow('位置 X',c,'x')+numRow('位置 Y',c,'y')+numRow('拡大率',c,'scale')+numRow('回転',c,'rot')+numRow('不透明度',c,'op')+
   '<div class="row" style="justify-content:flex-end;padding-top:8px">'+btn('元に戻す','mreset',c.id,'s')+'</div>';}
 /* 値を変えて、同じ値を表示している部品（スライダー・数値）をそろえる */
-export function setProp(cid,key,v){var c=C(cid),p=PROPS[key];if(!c||!p||isNaN(v))return;v=Math.round(Math.max(p.min,Math.min(p.max,v))/p.step)*p.step;v=+v.toFixed(3);c[key]=v;
+export function setProp(cid,key,v){var c=C(cid),p=PROPS[key];if(!c||!p||isNaN(v))return;if(key==='fin'||key==='fout')v=Math.min(v,Math.max(0,cLen(c)-(key==='fin'?fades(c)[1]:fades(c)[0])));v=Math.round(Math.max(p.min,Math.min(p.max,v))/p.step)*p.step;v=+v.toFixed(3);c[key]=v;
   [].forEach.call(document.querySelectorAll('[data-k="'+key+'"][data-cid="'+cid+'"]'),function(x){if(x.tagName==='INPUT'&&x.type==='range'){x.value=v;x.style.setProperty('--p',propPct(key,v)+'%');}else if(x.hasAttribute('data-hot')){x.firstChild.nodeValue=propTxt(key,v);x.setAttribute('aria-valuenow',v);}});
-  redrawProg();saveP();if(key==='vol')sync(S.t.edit,E.playing);}
+  redrawProg();saveP();if(key==='vol'||key==='fin'||key==='fout'){sync(S.t.edit,E.playing);drawTL();}}
 /* 数値をクリックしたときの入力欄 */
 export function hotEdit(el){var cid=el.dataset.cid,key=el.dataset.k,c=C(cid);if(!c)return;var inp=document.createElement('input');inp.className='inp hotin';inp.type='number';inp.step=PROPS[key].step;inp.value=propVal(c,key);inp.setAttribute('aria-label',el.getAttribute('aria-label'));
   el.replaceWith(inp);inp.focus();inp.select();var done=false;
@@ -112,7 +121,7 @@ export function inspector(){var L=S.sel.map(C).filter(Boolean),c=primary();
     '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">'+btn('再生ヘッドで分割','split','','s')+btn('削除','delSel','','s')+btn('リップル削除','rdel','','s')+(c.link||pair?btn('リンク解除','lnk','','s'):'')+'</div>';
   var h2=fsec('clip','クリップ',null,info);
   if(v&&v.type==='media')h2+=fsec('motion','モーション・不透明度',null,motionForm(v),1);
-  if(a)h2+=fsec('audio','音量',null,numRow('音量',a,'vol'));
+  if(a)h2+=fsec('audio','音量',null,numRow('音量',a,'vol')+numRow('フェードイン',a,'fin')+numRow('フェードアウト',a,'fout'));
   if(m)h2+='<div style="padding:10px 16px;border-bottom:1px solid var(--dv);line-height:1.6"><div style="font-weight:500">リンク中の台本行</div><div class="mu">'+h(m.line&&m.line!=='—'?m.line:'—')+'</div></div>';
   return {name:m?m.n:c.label||'',html:h2};}
 export function ms1(s){var m=Math.floor(s/60),x=s-m*60;return m+':'+(x<10?'0':'')+x.toFixed(1);}
@@ -133,7 +142,8 @@ ROWS=[];
 EYE='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8z"/></svg>';
 LOCK='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0110 0v3h1v11H6V10zm2 0h6V7a3 3 0 00-6 0z"/></svg>';
 PROPS={fsz:{min:12,max:300,step:1,unit:'px',def:59,dec:0},lh:{min:80,max:300,step:5,unit:'%',def:135,dec:0},ls:{min:-20,max:100,step:1,unit:'px',def:0,dec:0},x:{min:-100,max:100,step:1,unit:'%',def:0,dec:1},y:{min:-100,max:100,step:1,unit:'%',def:0,dec:1},scale:{min:10,max:400,step:1,unit:'%',def:100,dec:1},
-  rot:{min:-180,max:180,step:1,unit:'°',def:0,dec:1},op:{min:0,max:100,step:1,unit:'%',def:100,dec:1},vol:{min:-30,max:12,step:0.5,unit:'dB',def:0,dec:1}};
+  rot:{min:-180,max:180,step:1,unit:'°',def:0,dec:1},op:{min:0,max:100,step:1,unit:'%',def:100,dec:1},vol:{min:-60,max:15,step:0.1,unit:'dB',def:0,dec:1},
+  fin:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2},fout:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2}};
 R.edit=function(){
   var left;
   if(S.etab!=='text'){var L=P.media.filter(function(m){return m.k==='映像'||m.k==='音声'||m.k==='画像'||m.k==='テイク';});

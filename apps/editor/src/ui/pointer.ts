@@ -1,9 +1,9 @@
 // @ts-nocheck
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
-import { C, P, T, cEnd, cLen, srcMax, srcMin, uid } from './project';
+import { C, P, T, cEnd, cLen, fades, gainFrac, gainFromFrac, srcMax, srcMin, uid } from './project';
 import { S, TOTAL } from './state';
 import { HIST, changed, mark } from './store';
-import { E, progStop, setProg } from './engine';
+import { E, progStop, setProg, sync } from './engine';
 import { srcSeek } from './source';
 import { EPS, addTitle, carve, delClips, linked, locked, openRange, selClips, selIds, splitAt } from './editOps';
 import { PROPS, ROWS, drawTL, hotEdit, propVal, setProp } from './pages/edit';
@@ -21,6 +21,12 @@ export function snapPts(skip){var p=[0,S.t.edit];if(P.pin!=null)p.push(P.pin);if
 export function snapBy(times,pts){if(!S.snap)return null;var thr=8/(S.pps||10),best=null;times.forEach(function(t){pts.forEach(function(p){var d=p-t;if(Math.abs(d)<=thr&&(!best||Math.abs(d)<Math.abs(best.d)))best={d:d,p:p};});});return best;}
 export function showSnap(p){var l=document.querySelector('[data-snapl]');if(!l)return;if(p==null){l.hidden=true;return;}l.hidden=false;l.style.left=(p*(S.pps||10))+'px';}
 export function prevEnd(c){return P.clips.reduce(function(a,x){return x!==c&&x.tr===c.tr&&cEnd(x)<=c.start+EPS?Math.max(a,cEnd(x)):a;},0);}
+/* ゲインライン・フェードをドラッグしている間の表示（音量は「いまの値（変えた量）」） */
+export function gainTip(e,d){var el=document.getElementById('gtip');if(!e){if(el)el.remove();return;}var c=C(d.cid);if(!c)return;
+  if(!el){el=document.createElement('div');el.id='gtip';el.className='gtip';document.getElementById('app').appendChild(el);}
+  var t;if(d.k==='gain'){var v=c.vol||0,dv=v-d.v0;t=v.toFixed(1)+' dB　('+(dv>=0?'+':'')+dv.toFixed(1)+' dB)';}
+  else{var f=fades(c);t=(d.side==='in'?'フェードイン ':'フェードアウト ')+f[d.side==='in'?0:1].toFixed(2)+' 秒';}
+  el.textContent=t;var a=document.getElementById('app').getBoundingClientRect();el.style.left=((e.clientX-a.left)/SCALE+14)+'px';el.style.top=((e.clientY-a.top)/SCALE+14)+'px';}
 export function nextStart(c){return P.clips.reduce(function(a,x){return x!==c&&x.tr===c.tr&&x.start>=cEnd(c)-EPS?Math.min(a,x.start):a;},1e9);}
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
@@ -38,6 +44,10 @@ document.addEventListener('pointerdown',function(e){if(e.button!==0)return;
   var p=bodyPos(e),t=p.x/pps,row=rowAt(p.y);e.preventDefault();
   if(S.tool==='hand'){DRAG={k:'pan',x0:e.clientX,y0:e.clientY,sl:p.b.scrollLeft,st:p.b.scrollTop};return;}
   if(S.tool==='text'){addTitle('name',t,row&&row.kind==='v'?row.id:null);return;}
+  /* ゲインライン（音量）・フェードのハンドル */
+  var gl=S.tool==='select'&&e.target.closest('[data-gain],[data-fade]'),gc=gl&&C(gl.dataset.cid);
+  if(gc&&!locked(gc)){mark();if(S.sel.indexOf(gc.id)<0)S.sel=[gc.id];var fd=gl.dataset.fade;
+    DRAG={k:fd?'fade':'gain',side:fd,cid:gc.id,x0:p.x,y0:p.y,v0:fd?fades(gc)[fd==='in'?0:1]:(gc.vol||0),moved:false};draw();gainTip(e,DRAG);return;}
   var ce=e.target.closest('[data-c]'),c=ce&&C(ce.dataset.c);
   if(c&&locked(c))c=null;
   if(!c){DRAG={k:'marq',x0:p.x,y0:p.y,add:e.shiftKey||e.ctrlKey||e.metaKey,base:S.sel.slice(),moved:false};return;}
@@ -56,6 +66,12 @@ document.addEventListener('pointermove',function(e){if(!DRAG)return;var d=DRAG;
   if(d.k==='scut'){var r=d.el.getBoundingClientRect();srcSeek((e.clientX-r.left)/r.width*TOTAL.cut);return;}
   if(d.k==='seek'){var ru=document.querySelector('[data-rul]'),b=document.querySelector('[data-body]');if(ru)setProg(((e.clientX-ru.getBoundingClientRect().left)/SCALE+(b?b.scrollLeft:0))/(S.pps||10));return;}
   if(d.k==='pan'){var b2=document.querySelector('[data-body]');if(b2){b2.scrollLeft=d.sl-(e.clientX-d.x0);b2.scrollTop=d.st-(e.clientY-d.y0);}return;}
+  if(d.k==='gain'||d.k==='fade'){var gp=bodyPos(e),gc=C(d.cid);if(!gc)return;if(!d.moved&&Math.abs(gp.x-d.x0)+Math.abs(gp.y-d.y0)<2)return;d.moved=true;
+    if(d.k==='gain'){var rw=ROWS.filter(function(z){return z.id===gc.tr;})[0],hh=Math.max(10,(rw?rw.h:40)-2),fine=e.shiftKey?.1:1;
+      gc.vol=Math.round(gainFromFrac(gainFrac(d.v0)+(gp.y-d.y0)*fine/hh)*10)/10;if(Math.abs(gc.vol)<.05)gc.vol=0;}
+    else{var dt=(gp.x-d.x0)/(S.pps||10),ff=fades(gc),L=cLen(gc);
+      if(d.side==='in')gc.fin=Math.round(Math.max(0,Math.min(L-ff[1],d.v0+dt))*100)/100;else gc.fout=Math.round(Math.max(0,Math.min(L-ff[0],d.v0-dt))*100)/100;}
+    drawTL();gainTip(e,d);if(E.playing)sync(S.t.edit,true);return;}
   var p=bodyPos(e),pps=S.pps||10;
   if(d.k==='marq'){if(!d.moved&&Math.abs(p.x-d.x0)+Math.abs(p.y-d.y0)<4)return;d.moved=true;var x1=Math.min(d.x0,p.x),x2=Math.max(d.x0,p.x),y1=Math.min(d.y0,p.y),y2=Math.max(d.y0,p.y),q=document.querySelector('[data-marq]');
     if(q){q.hidden=false;q.style.cssText='left:'+x1+'px;top:'+y1+'px;width:'+(x2-x1)+'px;height:'+(y2-y1)+'px';}
@@ -79,6 +95,7 @@ document.addEventListener('pointermove',function(e){if(!DRAG)return;var d=DRAG;
   drawTL();showSnap(sp);[].forEach.call(document.querySelectorAll('[data-c]'),function(el){if(skip[el.dataset.c])el.classList.add('mv');});});
 document.addEventListener('pointerup',function(e){var d=DRAG;DRAG=null;if(!d)return;showSnap(null);
   if(d.k==='hot'){if(!d.moved){HIST.pop();hotEdit(d.el);}else drawTL();return;}
+  if(d.k==='gain'||d.k==='fade'){gainTip(null);if(!d.moved){HIST.pop();return;}var gc=C(d.cid);if(gc){if(!gc.vol)delete gc.vol;if(!gc.fin)delete gc.fin;if(!gc.fout)delete gc.fout;}changed();sync(S.t.edit,E.playing);return;}
   if(d.k==='marq'){var q=document.querySelector('[data-marq]');if(q)q.hidden=true;if(!d.moved)S.sel=d.add?S.sel:[];draw();return;}
   if(d.k!=='move'&&d.k!=='trim')return;
   if(!d.moved){HIST.pop();if(d.k==='move'&&!(e.shiftKey||e.ctrlKey||e.metaKey))S.sel=d.clickIds;draw();return;}

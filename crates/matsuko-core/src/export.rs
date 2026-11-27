@@ -475,8 +475,8 @@ fn audio_step(p: &Project, st: &Settings, f0: u64, f1: u64, output: &Path) -> St
         let gain = 10f64.powf(c.vol.unwrap_or(0.0) / 20.0);
         let delay = ((a - t0) * 1000.0).round() as u64;
         parts.push(format!(
-            "[{n}:a]aresample={rate},aformat=sample_fmts=fltp:channel_layouts=stereo,volume={:.4},adelay={delay}:all=1[a{n}]",
-            gain
+            "[{n}:a]aresample={rate},aformat=sample_fmts=fltp:channel_layouts=stereo,{},adelay={delay}:all=1[a{n}]",
+            volume_filter(c, gain, a - c.start)
         ));
         n += 1;
     }
@@ -499,6 +499,23 @@ fn audio_step(p: &Project, st: &Settings, f0: u64, f1: u64, output: &Path) -> St
         seconds,
         output: output.to_path_buf(),
     }
+}
+
+/// 音量とフェード（直線）。off は、取り出した音声の頭がクリップの頭から何秒後か（範囲で頭を切ったとき）
+fn volume_filter(c: &Clip, gain: f64, off: f64) -> String {
+    let (fi, fo) = c.fades();
+    if fi <= 0.0 && fo <= 0.0 {
+        return format!("volume={gain:.4}");
+    }
+    let lt = format!("(t+{off:.4})");
+    let mut e = format!("{gain:.4}");
+    if fi > 0.0 {
+        e.push_str(&format!("*min(1,max(0,{lt}/{fi:.4}))"));
+    }
+    if fo > 0.0 {
+        e.push_str(&format!("*min(1,max(0,({:.4}-{lt})/{fo:.4}))", c.len()));
+    }
+    format!("volume='{e}':eval=frame")
 }
 
 #[cfg(test)]
@@ -864,5 +881,26 @@ mod tests {
         };
         assert_eq!(output, Path::new("/o.m4a"));
         assert!(args.join(" ").contains("anullsrc"));
+    }
+
+    #[test]
+    fn fades_become_a_volume_expression() {
+        let mut c = clip("a", "A1", Some("v"), ClipType::Media, 0.0, 0.0, 10.0);
+        assert_eq!(volume_filter(&c, 1.0, 0.0), "volume=1.0000");
+        c.fin = Some(2.0);
+        c.fout = Some(1.0);
+        let f = volume_filter(&c, 0.5, 3.0);
+        assert!(
+            f.starts_with("volume='0.5000*min(1,max(0,(t+3.0000)/2.0000))"),
+            "{f}"
+        );
+        assert!(
+            f.contains("*min(1,max(0,(10.0000-(t+3.0000))/1.0000))':eval=frame"),
+            "{f}"
+        );
+        // 足してクリップより長いフェードは縮める
+        c.fin = Some(8.0);
+        c.fout = Some(8.0);
+        assert_eq!(c.fades(), (5.0, 5.0));
     }
 }
