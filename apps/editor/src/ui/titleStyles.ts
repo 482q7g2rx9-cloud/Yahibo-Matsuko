@@ -127,3 +127,46 @@ export function presetThumb(p: TitlePreset): string {
 export function clearThumbs(): void {
   for (const k of Object.keys(thumbs)) delete thumbs[k];
 }
+
+/* ---------- フォント ----------
+   デスクトップ版は同梱（src/main.ts で Fontsource を読み込む）、ブラウザ版は Google Fonts（web.html）。
+   名前（family）はどちらも同じ。ゴシック（Noto Sans JP）だけは太さを変えられる */
+export interface TitleFont {
+  id: string;
+  name: string;
+  family: string;
+  /** 太さが決まっているフォントの太さ。ないもの（ゴシック）は選べる */
+  weight?: number;
+}
+export const TITLE_FONTS: TitleFont[] = [
+  { id: 'gothic', name: 'ゴシック（Noto Sans JP）', family: '"Noto Sans JP","Noto Sans JP Variable"' },
+  { id: 'mincho', name: '明朝（Noto Serif JP）', family: '"Noto Serif JP"', weight: 700 },
+  { id: 'maru', name: '丸ゴシック（M PLUS Rounded 1c）', family: '"M PLUS Rounded 1c"', weight: 800 },
+  { id: 'dela', name: '極太（Dela Gothic One）', family: '"Dela Gothic One"', weight: 400 },
+  { id: 'pop', name: 'ポップ（Mochiy Pop One）', family: '"Mochiy Pop One"', weight: 400 },
+  { id: 'hand', name: '手書き風（Yusei Magic）', family: '"Yusei Magic"', weight: 400 },
+  { id: 'dot', name: 'ドット（DotGothic16）', family: '"DotGothic16"', weight: 400 },
+];
+export function fontById(id: string | undefined): TitleFont {
+  return TITLE_FONTS.find((f) => f.id === id) || TITLE_FONTS[0];
+}
+/** canvas の font に入れる文字列 */
+export function titleFont(font: string | undefined, weight: number | undefined, px: number): string {
+  const f = fontById(font);
+  return (f.weight || weight || 700) + ' ' + px + 'px ' + f.family + ',sans-serif';
+}
+/* 使うフォントを読み込んでおく（読み込みが終わったら、描き直す関数を呼ぶ） */
+const requested: Record<string, Promise<unknown>> = {};
+export function loadFont(font: string | undefined, weight: number | undefined, done?: () => void): Promise<unknown> {
+  const key = (font || 'gothic') + '/' + (weight || '');
+  if (!requested[key]) {
+    let p: Promise<unknown> = Promise.resolve();
+    try {
+      if (document.fonts) p = document.fonts.load(titleFont(font, weight, 40), 'あア');
+    } catch (e) {
+      /* 読み込めなくても、ほかのフォントで描く */
+    }
+    requested[key] = p.then(() => done && done()).catch(() => undefined);
+  }
+  return requested[key];
+}

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { loadFont } from './titleStyles';
 import { ps } from './projectSettings';
 import { numberIn } from '../core/silence';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
@@ -53,14 +54,15 @@ export function deskEnqueue(j,run){var ext=j.n.match(/\.([a-z0-9]+)$/i)[1];
 /* テロップを、プレビューと同じ描き方で PNG にする。クレジット（流れる文字）は文字の部分だけ */
 export function titleImages(from,to,W,H){var out=[];P.clips.forEach(function(c){if(c.type!=='title'||cEnd(c)<=from||c.start>=to)return;
     var ti=titleInfo(c),cv=document.createElement('canvas'),scroll=c.st==='credit';cv.width=W;
-    if(scroll){var sz={'小':.042,'中':.055,'大':.075}[c.sz||'中']||.055,lh=(c.fsz?Math.max(4,Math.round(H*c.fsz/1080)):Math.round(H*sz))*1.35,bh=lh*String(c.label||'').split('\n').length;
+    if(scroll){var sz={'小':.042,'中':.055,'大':.075}[c.sz||'中']||.055,lh=(c.fsz?Math.max(4,Math.round(H*c.fsz/1080)):Math.round(H*sz))*((c.lh||135)/100),bh=lh*String(c.label||'').split('\n').length;
       cv.height=Math.max(2,Math.ceil(bh));drawTitle(cv.getContext('2d'),W,H,ti,ti.t+ti.d*H/(H+bh));}
     else{cv.height=H;drawTitleClip(cv.getContext('2d'),W,H,c,c.start);} /* 位置・拡大率・回転・不透明度も画像に入れる */
     out.push({clip:c.id,png:cv.toDataURL('image/png'),scroll:scroll});});return out;}
 export function deskStart(j){var set=j.set,wh=set.res.split('×'),W=+wh[0]||1920,H=+wh[1]||1080,to=set.to!=null?set.to:progDur();
-  var req={id:j.id,out:j.out,project:forDisk(),titles:set.audio?[]:titleImages(set.from||0,to,W,H),width:W,height:H,fps:String(set.fps),from:set.from||0,to:to,audioOnly:!!set.audio,videoBitrate:Math.round(set.v||8e6),audioBitrate:Math.round(set.a||192e3),audioRate:ps().ar};
+  var req={id:j.id,out:j.out,project:forDisk(),titles:[],width:W,height:H,fps:String(set.fps),from:set.from||0,to:to,audioOnly:!!set.audio,videoBitrate:Math.round(set.v||8e6),audioBitrate:Math.round(set.a||192e3),audioRate:ps().ar};
   j.st='run';j.p=0;j.t0=Date.now();X={j:j,run:true,desk:true};draw();
-  HOST.export.start(req).catch(function(e){j.st='err';j.msg=String(e);X=null;draw();xNext();});}
+  /* テロップのフォントを読み込んでから画像にする（読み込む前だと、ほかのフォントで描かれてしまう） */
+  Promise.all(P.clips.filter(function(c){return c.type==='title';}).map(function(c){return loadFont(c.font,c.weight);})).then(function(){req.titles=set.audio?[]:titleImages(set.from||0,to,W,H);return HOST.export.start(req);}).catch(function(e){j.st='err';j.msg=String(e);X=null;draw();xNext();});}
 /* 進み具合・結果（"export-job"） */
 export function deskEvent(e){var j=S.queue.filter(function(q){return q.id===e.id;})[0];if(!j)return;var d=e.data||{};
   if(e.state==='progress'){j.p=e.p*100;var f=document.querySelector('[data-q="'+j.id+'"]'),tx=document.querySelector('[data-qt="'+j.id+'"]'),el=(Date.now()-j.t0)/1000;

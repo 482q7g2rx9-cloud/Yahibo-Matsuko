@@ -1,5 +1,5 @@
 <title>Matsuko Editor</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300..700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300..900&family=Noto+Serif+JP:wght@700&family=M+PLUS+Rounded+1c:wght@800&family=Dela+Gothic+One&family=Mochiy+Pop+One&family=Yusei+Magic&family=DotGothic16&display=swap">
 <!-- 生成物：apps/editor の npm run build:web で作る。直接編集しない（元は apps/editor/src/ui/） -->
 <style>
 /* 画面の見た目（ブラウザ版とデスクトップ版で共通） */
@@ -1021,6 +1021,35 @@ function presetThumb(p) {
 function clearThumbs() {
   for (const k of Object.keys(thumbs)) delete thumbs[k];
 }
+const TITLE_FONTS = [
+  { id: "gothic", name: "ゴシック（Noto Sans JP）", family: '"Noto Sans JP","Noto Sans JP Variable"' },
+  { id: "mincho", name: "明朝（Noto Serif JP）", family: '"Noto Serif JP"', weight: 700 },
+  { id: "maru", name: "丸ゴシック（M PLUS Rounded 1c）", family: '"M PLUS Rounded 1c"', weight: 800 },
+  { id: "dela", name: "極太（Dela Gothic One）", family: '"Dela Gothic One"', weight: 400 },
+  { id: "pop", name: "ポップ（Mochiy Pop One）", family: '"Mochiy Pop One"', weight: 400 },
+  { id: "hand", name: "手書き風（Yusei Magic）", family: '"Yusei Magic"', weight: 400 },
+  { id: "dot", name: "ドット（DotGothic16）", family: '"DotGothic16"', weight: 400 }
+];
+function fontById(id) {
+  return TITLE_FONTS.find((f) => f.id === id) || TITLE_FONTS[0];
+}
+function titleFont(font, weight, px) {
+  const f = fontById(font);
+  return (f.weight || weight || 700) + " " + px + "px " + f.family + ",sans-serif";
+}
+const requested = {};
+function loadFont(font, weight, done) {
+  const key = (font || "gothic") + "/" + (weight || "");
+  if (!requested[key]) {
+    let p = Promise.resolve();
+    try {
+      if (document.fonts) p = document.fonts.load(titleFont(font, weight, 40), "あア");
+    } catch (e) {
+    }
+    requested[key] = p.then(() => done && done()).catch(() => void 0);
+  }
+  return requested[key];
+}
 var IDB;
 var saveTimer;
 function saveP() {
@@ -1918,7 +1947,7 @@ function titleImages(from, to, W, H) {
     var ti = titleInfo(c), cv = document.createElement("canvas"), scroll = c.st === "credit";
     cv.width = W;
     if (scroll) {
-      var sz = { "小": 0.042, "中": 0.055, "大": 0.075 }[c.sz || "中"] || 0.055, lh = (c.fsz ? Math.max(4, Math.round(H * c.fsz / 1080)) : Math.round(H * sz)) * 1.35, bh = lh * String(c.label || "").split("\n").length;
+      var sz = { "小": 0.042, "中": 0.055, "大": 0.075 }[c.sz || "中"] || 0.055, lh = (c.fsz ? Math.max(4, Math.round(H * c.fsz / 1080)) : Math.round(H * sz)) * ((c.lh || 135) / 100), bh = lh * String(c.label || "").split("\n").length;
       cv.height = Math.max(2, Math.ceil(bh));
       drawTitle(cv.getContext("2d"), W, H, ti, ti.t + ti.d * H / (H + bh));
     } else {
@@ -1931,13 +1960,20 @@ function titleImages(from, to, W, H) {
 }
 function deskStart(j) {
   var set = j.set, wh = set.res.split("×"), W = +wh[0] || 1920, H = +wh[1] || 1080, to = set.to != null ? set.to : progDur();
-  var req = { id: j.id, out: j.out, project: forDisk(), titles: set.audio ? [] : titleImages(set.from || 0, to, W, H), width: W, height: H, fps: String(set.fps), from: set.from || 0, to, audioOnly: !!set.audio, videoBitrate: Math.round(set.v || 8e6), audioBitrate: Math.round(set.a || 192e3), audioRate: ps().ar };
+  var req = { id: j.id, out: j.out, project: forDisk(), titles: [], width: W, height: H, fps: String(set.fps), from: set.from || 0, to, audioOnly: !!set.audio, videoBitrate: Math.round(set.v || 8e6), audioBitrate: Math.round(set.a || 192e3), audioRate: ps().ar };
   j.st = "run";
   j.p = 0;
   j.t0 = Date.now();
   X = { j, run: true, desk: true };
   draw();
-  HOST.export.start(req).catch(function(e) {
+  Promise.all(P.clips.filter(function(c) {
+    return c.type === "title";
+  }).map(function(c) {
+    return loadFont(c.font, c.weight);
+  })).then(function() {
+    req.titles = set.audio ? [] : titleImages(set.from || 0, to, W, H);
+    return HOST.export.start(req);
+  }).catch(function(e) {
     j.st = "err";
     j.msg = String(e);
     X = null;
@@ -2260,7 +2296,14 @@ function hotEdit(el) {
   });
 }
 function titleForm(c) {
-  return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0"><label for="ttext" class="t2">文字（改行できます）</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" style="width:100%;height:auto;padding:6px 8px;resize:vertical">' + h(c.label) + '</textarea><div class="fg"><span>スタイル</span><span class="row" style="gap:8px;min-width:0">' + (c.look ? '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h((presetById(c.lookId) || { name: "カスタム" }).name) + "</span>" + btn("外す", "tLookOff", "", "s") : '<span class="mu">なし（テロップタブで選べます）</span>') + '</span></div><div class="fg"><span>開始（秒）</span><input class="inp" type="number" step="0.1" min="0" data-in="tstart" value="' + c.start.toFixed(1) + '" aria-label="開始（秒）"></div><div class="fg"><span>長さ（秒）</span><input class="inp" type="number" step="0.1" min="0.5" data-in="tdur" value="' + cLen(c).toFixed(1) + '" aria-label="長さ（秒）"></div><div class="row" style="gap:8px">' + btn("再生ヘッドへ移動", "tToHead", "", "s") + btn("削除", "delSel", "", "s") + "</div></div>";
+  return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0"><label for="ttext" class="t2">文字（改行できます）</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" style="width:100%;height:auto;padding:6px 8px;resize:vertical">' + h(c.label) + '</textarea><div class="fg"><span>フォント</span><select class="inp" data-in="tfont" aria-label="フォント">' + TITLE_FONTS.map(function(f) {
+    return '<option value="' + f.id + '"' + ((c.font || "gothic") === f.id ? " selected" : "") + ">" + h(f.name) + "</option>";
+  }).join("") + '</select></div><div class="fg"><span>太さ</span>' + (fontById(c.font).weight ? '<span class="mu">このフォントは太さが決まっています</span>' : '<span class="seg">' + [[400, "細め"], [700, "標準"], [900, "極太"]].map(function(x) {
+    return btn(x[1], "tSet", "weight|" + x[0], "s" + ((c.weight || 700) === x[0] ? " on" : ""));
+  }).join("") + "</span>") + '</div><div class="fg"><span>揃え</span><span class="seg">' + [["left", "左"], ["center", "中央"], ["right", "右"]].map(function(x) {
+    var cur = c.align || (c.st === "credit" || c.st === "sub" ? "center" : "left");
+    return btn(x[1], "tSet", "align|" + x[0], "s" + (cur === x[0] ? " on" : ""));
+  }).join("") + "</span></div>" + numRow("行間", c, "lh") + numRow("文字の間隔", c, "ls") + '<div class="fg"><span>スタイル</span><span class="row" style="gap:8px;min-width:0">' + (c.look ? '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h((presetById(c.lookId) || { name: "カスタム" }).name) + "</span>" + btn("外す", "tLookOff", "", "s") : '<span class="mu">なし（テロップタブで選べます）</span>') + '</span></div><div class="fg"><span>開始（秒）</span><input class="inp" type="number" step="0.1" min="0" data-in="tstart" value="' + c.start.toFixed(1) + '" aria-label="開始（秒）"></div><div class="fg"><span>長さ（秒）</span><input class="inp" type="number" step="0.1" min="0.5" data-in="tdur" value="' + cLen(c).toFixed(1) + '" aria-label="長さ（秒）"></div><div class="row" style="gap:8px">' + btn("再生ヘッドへ移動", "tToHead", "", "s") + btn("削除", "delSel", "", "s") + "</div></div>";
 }
 function styleGallery() {
   var t = selTitle(), cur = t && t.lookId;
@@ -2287,7 +2330,7 @@ function inspector() {
       return x.link;
     }) ? "リンク解除" : "リンク", "lnk", "", "s") + btn("コピー", "copy", "", "s") + "</div>") };
   }
-  if (c.type === "title") return { name: "テロップ", html: fsec("clip", "テロップ", null, titleForm(c)) + fsec("motion", "モーション・不透明度", null, titleMotion(c), 1) };
+  if (c.type === "title") return { name: "テロップ", html: fsec("motion", "モーション・不透明度", null, titleMotion(c), 1) + fsec("clip", "テロップ", null, titleForm(c)) };
   var m = c.m ? M(c.m) : null, a = pair ? L.filter(function(x) {
     return T(x.tr).kind === "a";
   })[0] : T(c.tr).kind === "a" ? c : null, v = T(c.tr).kind === "v" ? c : null;
@@ -2336,6 +2379,8 @@ function init$j() {
   LOCK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0110 0v3h1v11H6V10zm2 0h6V7a3 3 0 00-6 0z"/></svg>';
   PROPS = {
     fsz: { min: 12, max: 300, step: 1, unit: "px", def: 59, dec: 0 },
+    lh: { min: 80, max: 300, step: 5, unit: "%", def: 135, dec: 0 },
+    ls: { min: -20, max: 100, step: 1, unit: "px", def: 0, dec: 0 },
     x: { min: -100, max: 100, step: 1, unit: "%", def: 0, dec: 1 },
     y: { min: -100, max: 100, step: 1, unit: "%", def: 0, dec: 1 },
     scale: { min: 10, max: 400, step: 1, unit: "%", def: 100, dec: 1 },
@@ -3529,6 +3574,17 @@ function init$e() {
         changed();
       }
     },
+    tSet: function(v) {
+      var i = v.indexOf("|"), k = v.slice(0, i), x = v.slice(i + 1), L = S.sel.map(C).filter(function(c) {
+        return c && c.type === "title" && !locked(c);
+      });
+      if (!L.length) return;
+      mark();
+      L.forEach(function(c) {
+        c[k] = k === "weight" ? +x : x;
+      });
+      changed();
+    },
     tLookOff: function() {
       var L = S.sel.map(C).filter(function(c) {
         return c && c.type === "title" && c.look;
@@ -4609,7 +4665,7 @@ function drawClip(cx, W, H, c) {
 }
 var TST;
 function titleInfo(c) {
-  return { label: c.label, st: c.st, sz: c.sz, fsz: c.fsz, look: c.look, t: c.start - c.in, d: Math.max(0.1, c.out) };
+  return { label: c.label, st: c.st, sz: c.sz, fsz: c.fsz, look: c.look, font: c.font, weight: c.weight, lh: c.lh, ls: c.ls, align: c.align, t: c.start - c.in, d: Math.max(0.1, c.out) };
 }
 function drawTitleClip(cx, W, H, c, t) {
   var sc = (c.scale == null ? 100 : c.scale) / 100, op = c.op == null ? 1 : Math.max(0, Math.min(1, c.op / 100));
@@ -4623,10 +4679,15 @@ function drawTitleClip(cx, W, H, c, t) {
   cx.restore();
 }
 function drawTitle(cx, W, H, ti, t) {
-  var sz = { "小": 0.042, "中": 0.055, "大": 0.075 }[ti.sz || "中"] || 0.055, fs = ti.fsz ? Math.max(4, Math.round(H * ti.fsz / 1080)) : Math.round(H * sz), lines = String(ti.label || "").split("\n"), lh = fs * 1.35, pad = fs * 0.6;
-  cx.font = "700 " + fs + 'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';
+  var sz = { "小": 0.042, "中": 0.055, "大": 0.075 }[ti.sz || "中"] || 0.055, fs = ti.fsz ? Math.max(4, Math.round(H * ti.fsz / 1080)) : Math.round(H * sz), lines = String(ti.label || "").split("\n"), lh = fs * ((ti.lh || 135) / 100), pad = fs * 0.6;
+  loadFont(ti.font, ti.weight, redrawProg);
+  cx.font = titleFont(ti.font, ti.weight, fs);
   cx.textBaseline = "middle";
   cx.lineJoin = "round";
+  if ("letterSpacing" in cx) cx.letterSpacing = (ti.ls || 0) * H / 1080 + "px";
+  var al = ti.align || "", ax = function(def) {
+    return al === "center" ? W / 2 : al === "right" ? W * 0.94 : al === "left" ? W * 0.06 : def;
+  };
   var lk = ti.look;
   var tw = Math.max.apply(null, lines.map(function(l) {
     return cx.measureText(l).width;
@@ -4661,16 +4722,16 @@ function drawTitle(cx, W, H, ti, t) {
       plain(l, W / 2, y0 + lh * (i + 0.5));
     });
   } else if (ti.st === "credit") {
-    cx.textAlign = "center";
+    cx.textAlign = al || "center";
     var pr = Math.max(0, Math.min(1, (t - ti.t) / ti.d)), y = H - (H + bh) * pr;
     lines.forEach(function(l, i) {
-      outl(l, W / 2, y + lh * (i + 0.5));
+      outl(l, ax(W / 2), y + lh * (i + 0.5));
     });
   } else {
-    cx.textAlign = "left";
+    cx.textAlign = al || "left";
     var yb = H * 0.9 - bh;
     lines.forEach(function(l, i) {
-      outl(l, W * 0.06, yb + lh * (i + 0.5));
+      outl(l, ax(W * 0.06), yb + lh * (i + 0.5));
     });
   }
 }
@@ -5996,7 +6057,15 @@ function init$1() {
       S.msort = e.target.value;
       draw();
     } else if (k === "countin") S.countin = e.target.checked;
-    else if (k === "tst" || k === "tsz" || k === "tstart" || k === "tdur") {
+    else if (k === "tfont") {
+      var tf = selTitle();
+      if (tf) {
+        mark();
+        tf.font = e.target.value;
+        if (fontById(tf.font).weight) delete tf.weight;
+        changed();
+      }
+    } else if (k === "tst" || k === "tsz" || k === "tstart" || k === "tdur") {
       var ti = selTitle();
       if (ti) {
         mark();

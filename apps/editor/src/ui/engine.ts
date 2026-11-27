@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { drawLookText } from './titleStyles';
+import { drawLookText, loadFont, titleFont } from './titleStyles';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { C, M, P, T, cEnd, progDur, vTracks } from './project';
 import { S } from './state';
@@ -61,21 +61,24 @@ export function drawClip(cx,W,H,c){var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='
 /* テロップ：name=店名（画面下・白文字縁取り） q=質問（画面上・黄色帯） sub=字幕（下中央・半透明帯） credit=クレジット（下から上へ流れる） */
 export var TST;
 /* テロップのクリップを描く：位置・拡大率・回転・不透明度は、動画のクリップと同じく画面の中心を基準にする */
-export function titleInfo(c){return {label:c.label,st:c.st,sz:c.sz,fsz:c.fsz,look:c.look,t:c.start-c.in,d:Math.max(0.1,c.out)};}
+export function titleInfo(c){return {label:c.label,st:c.st,sz:c.sz,fsz:c.fsz,look:c.look,font:c.font,weight:c.weight,lh:c.lh,ls:c.ls,align:c.align,t:c.start-c.in,d:Math.max(0.1,c.out)};}
 export function drawTitleClip(cx,W,H,c,t){var sc=(c.scale==null?100:c.scale)/100,op=c.op==null?1:Math.max(0,Math.min(1,c.op/100));
   cx.save();cx.globalAlpha*=op;cx.translate(W/2+(c.x||0)/100*W,H/2+(c.y||0)/100*H);cx.rotate((c.rot||0)*Math.PI/180);cx.scale(sc,sc);cx.translate(-W/2,-H/2);
   drawTitle(cx,W,H,titleInfo(c),t);cx.restore();}
 /* 文字の大きさ：fsz（1080p の画面での px）。なければ前の「小・中・大」 */
-export function drawTitle(cx,W,H,ti,t){var sz={'小':.042,'中':.055,'大':.075}[ti.sz||'中']||.055,fs=ti.fsz?Math.max(4,Math.round(H*ti.fsz/1080)):Math.round(H*sz),lines=String(ti.label||'').split('\n'),lh=fs*1.35,pad=fs*.6;
-  cx.font='700 '+fs+'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';cx.textBaseline='middle';cx.lineJoin='round';
+export function drawTitle(cx,W,H,ti,t){var sz={'小':.042,'中':.055,'大':.075}[ti.sz||'中']||.055,fs=ti.fsz?Math.max(4,Math.round(H*ti.fsz/1080)):Math.round(H*sz),lines=String(ti.label||'').split('\n'),lh=fs*((ti.lh||135)/100),pad=fs*.6;
+  /* フォント・太さ・文字の間隔（titleStyles.ts）。まだ読み込んでいないフォントは、読み込めたら描き直す */
+  loadFont(ti.font,ti.weight,redrawProg);cx.font=titleFont(ti.font,ti.weight,fs);cx.textBaseline='middle';cx.lineJoin='round';
+  if('letterSpacing' in cx)cx.letterSpacing=((ti.ls||0)*H/1080)+'px';
+  var al=ti.align||'',ax=function(def){return al==='center'?W/2:al==='right'?W*.94:al==='left'?W*.06:def;};
   var lk=ti.look; /* テロップのスタイル（titleStyles.ts）。あれば文字をそのスタイルで描く */
   var tw=Math.max.apply(null,lines.map(function(l){return cx.measureText(l).width;}).concat([0])),bh=lh*lines.length;
   function outl(l,x,y){if(lk)return drawLookText(cx,l,x,y,fs,lk);cx.lineWidth=fs*.18;cx.strokeStyle='rgba(0,0,0,.85)';cx.strokeText(l,x,y);cx.fillStyle='#fff';cx.fillText(l,x,y);}
   function plain(l,x,y){if(lk)drawLookText(cx,l,x,y,fs,lk);else cx.fillText(l,x,y);}
   if(ti.st==='q'){cx.textAlign='left';cx.fillStyle='rgba(255,210,60,.92)';cx.fillRect(W*.06,H*.07,tw+pad*2,bh+pad*.8);cx.fillStyle='#1a1400';lines.forEach(function(l,i){plain(l,W*.06+pad,H*.07+pad*.4+lh*(i+.5));});}
   else if(ti.st==='sub'){cx.textAlign='center';var y0=H*.92-bh;cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect((W-tw)/2-pad,y0-pad*.4,tw+pad*2,bh+pad*.8);cx.fillStyle='#fff';lines.forEach(function(l,i){plain(l,W/2,y0+lh*(i+.5));});}
-  else if(ti.st==='credit'){cx.textAlign='center';var pr=Math.max(0,Math.min(1,(t-ti.t)/ti.d)),y=H-(H+bh)*pr;lines.forEach(function(l,i){outl(l,W/2,y+lh*(i+.5));});}
-  else{cx.textAlign='left';var yb=H*.9-bh;lines.forEach(function(l,i){outl(l,W*.06,yb+lh*(i+.5));});}}
+  else if(ti.st==='credit'){cx.textAlign=al||'center';var pr=Math.max(0,Math.min(1,(t-ti.t)/ti.d)),y=H-(H+bh)*pr;lines.forEach(function(l,i){outl(l,ax(W/2),y+lh*(i+.5));});}
+  else{cx.textAlign=al||'left';var yb=H*.9-bh;lines.forEach(function(l,i){outl(l,ax(W*.06),yb+lh*(i+.5));});}}
 /* 止まっているときだけ描き直す（再生中は毎フレーム描くので、素材の読み込みのたびに描くと重くなる） */
 export function idleRedraw(){if(!E.playing)redrawProg();}
 export function redrawProg(){if(X&&X.run&&!X.desk)return;[].forEach.call(document.querySelectorAll('canvas[data-prog]'),function(c){drawFrame(c.getContext('2d'),c.width,c.height,S.t.edit);});}

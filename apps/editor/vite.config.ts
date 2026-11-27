@@ -3,7 +3,18 @@ import { defineConfig } from 'vite';
 // Tauri から使う設定（https://v2.tauri.app/start/frontend/vite/）
 const host = process.env.TAURI_DEV_HOST;
 
+// フォント（Fontsource）は woff2 だけを使う（どの WebView も woff2 を読めるので、古い woff を同梱しない）
+const woff2Only = {
+  name: 'woff2-only',
+  enforce: 'pre' as const,
+  transform(code: string, id: string) {
+    if (id.includes('@fontsource') && id.endsWith('.css')) return code.replace(/,\s*url\([^)]*\.woff\)\s*format\(['"]woff['"]\)/g, '');
+    return null;
+  },
+};
+
 export default defineConfig({
+  plugins: [woff2Only],
   clearScreen: false,
   server: {
     port: 1420,
