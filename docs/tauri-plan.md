@@ -162,6 +162,13 @@ Yahibo-Matsuko/
   - プロジェクト設定の「台本連携」：連携ファイル、更新の見張り（デスクトップ版）、反映のしかた（自動／すべて確認）。
   - デスクトップ版は `src-tauri/src/script.rs`（選ぶ・読む・1.5 秒ごとに更新を調べて知らせる）。ブラウザ版はファイルをその都度選ぶ（見張りなし）。
   - 台本側への書き戻し、絵コンテ画像の受け渡しは、仕様書の「後回しにする項目」のとおり未対応。
+- M5：仕組みは実装済み。証明書と鍵を設定すれば、署名つきで配れる（手順は `docs/release.md`、学校向けの導入手順は `docs/install-guide.md`）。
+  - インストーラー：Windows は NSIS の「このユーザーだけ」に入れる形式（管理者の権限は要らない）、macOS は dmg、Linux は AppImage と deb。
+  - リリース：`v` で始まるタグを push すると、CI がその版でビルドし、Releases にインストーラーと自動更新の `latest.json` を置く（`apps/editor/scripts/make-release.py`）。
+  - 署名：Windows（.pfx を取り込んで Authenticode）、macOS（Developer ID と公証）、自動更新の署名は、Secrets / Variables があるときだけ行う。ないときは署名のないビルドになる。
+  - 自動更新：`tauri-plugin-updater`（`src-tauri/src/update.rs`）。公開鍵はビルドのときに埋め込み、鍵のないビルドでは更新の機能を出さない。起動して少ししたら確かめ（環境設定で止められる）、「ヘルプ → 更新を確認…」から入れて起動し直す。
+  - ログ：`tauri-plugin-log` でアプリのログフォルダーの `matsuko.log` に残す（5MB で切り替え、5 つまで）。画面のエラーも書く。「ヘルプ → ログのフォルダーを開く／ログを保存…」。
+  - まだのこと：証明書（Windows のコード署名、Apple Developer Program）と更新の鍵の登録、実際のリリースでの更新の確認、学校の PC での確認。
 
 ## 6. テストの方針
 

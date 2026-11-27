@@ -127,7 +127,7 @@ document.addEventListener('change',function(e){var k=e.target.dataset&&e.target.
   else if(k==='tfontname'){var tn=selTitle(),fn=e.target.value.replace(/["\\]/g,'').trim();if(tn&&fn){mark();tn.font=SYS_PREFIX+fn;changed();}}
   else if(k==='tst'||k==='tsz'||k==='tstart'||k==='tdur'){var ti=selTitle();if(ti){mark();if(k==='tst')ti.st=e.target.value;else if(k==='tsz')ti.sz=e.target.value;else if(k==='tstart')ti.start=Math.max(0,+e.target.value||0);else ti.out=ti.in+Math.max(0.5,+e.target.value||0.5);var sk={};sk[ti.id]=1;carve(ti.tr,ti.start,cEnd(ti),sk);changed();}}
   else if(k==='ttext'||k==='cp'){drawTL();}
-  else if(k==='pSnap'){PREF.snap=e.target.checked;S.snap=PREF.snap;savePref();}else if(k==='pFollow'){PREF.follow=e.target.checked;savePref();}
+  else if(k==='pSnap'){PREF.snap=e.target.checked;S.snap=PREF.snap;savePref();}else if(k==='pFollow'){PREF.follow=e.target.checked;savePref();}else if(k==='pAutoUpd'){PREF.autoUpdate=e.target.checked;savePref();}
   else if(k==='silthr'||k==='silmin'){S.sil[k==='silthr'?'thr':'min']=e.target.value;draw();}
   else if(k==='rights'){var m=M(S.media);if(m){mark();m.r=e.target.value;saveP();draw();}}
   else if(k.charAt(0)==='x'&&k!=='xfile'){S.x[k.slice(1)]=e.target.value;draw();}});

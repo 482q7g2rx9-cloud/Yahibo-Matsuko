@@ -5,6 +5,7 @@
 //!     ffprobe の解析、サムネイル・波形・プロキシの作業キュー、素材のリンクし直し。
 //! M2：変更履歴（history.sqlite）。
 //! M3：書き出し（export.rs。組み立てと実行は matsuko-core）。
+//! M4：台本連携（script.rs）。M5：自動更新とログ（update.rs）。
 //! 計画は docs/tauri-plan.md。
 
 mod commands;
@@ -19,6 +20,7 @@ mod script;
 mod server;
 mod state;
 mod tools;
+mod update;
 
 use tauri::{DragDropEvent, Manager, RunEvent, WindowEvent};
 
@@ -26,6 +28,13 @@ use tauri::{DragDropEvent, Manager, RunEvent, WindowEvent};
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(update::log_plugin())
+        .plugin(
+            tauri_plugin_updater::Builder::new()
+                .pubkey(update::PUBKEY)
+                .build(),
+        )
+        .manage(update::Updates::default())
         .manage(state::AppState::default())
         .manage(history::History::default())
         .manage(export::Exports::default())
@@ -39,6 +48,12 @@ pub fn run() {
             }
             #[cfg(target_os = "linux")]
             server::start(app.handle().clone());
+            log::info!(
+                "起動：Matsuko Editor {}（{} / {}）",
+                app.package_info().version,
+                std::env::consts::OS,
+                std::env::consts::ARCH
+            );
             let _ = app;
             Ok(())
         })
@@ -80,6 +95,12 @@ pub fn run() {
             script::script_pick,
             script::script_read,
             script::script_watch,
+            update::update_info,
+            update::update_check,
+            update::update_install,
+            update::log_write,
+            update::log_open,
+            update::log_save,
         ])
         .build(tauri::generate_context!())
         .expect("Matsuko Editor を起動できませんでした");

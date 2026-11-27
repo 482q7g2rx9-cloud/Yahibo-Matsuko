@@ -24,3 +24,6 @@ base64 = "0.22"
 tokio = { version = "1", features = ["process", "io-util", "sync", "time", "macros", "rt", "net", "fs"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 fontdb = { version = "0.23", default-features = false, features = ["fs", "memmap"] }
+tauri-plugin-updater = "2"
+tauri-plugin-log = "2"
+log = "0.4"

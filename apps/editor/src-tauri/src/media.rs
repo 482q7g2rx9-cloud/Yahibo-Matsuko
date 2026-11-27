@@ -280,7 +280,7 @@ pub fn media_cancel(app: AppHandle, ids: Vec<String>) {
 async fn make_thumb(it: &JobReq, src: &Path, dir: &Path) -> Result<Value, String> {
     let out = dir.join(format!("{}.jpg", it.id));
     let at = if it.kind == probe::KIND_VIDEO {
-        (it.duration / 3.0).min(1.0).max(0.0)
+        (it.duration / 3.0).clamp(0.0, 1.0)
     } else {
         0.0
     };

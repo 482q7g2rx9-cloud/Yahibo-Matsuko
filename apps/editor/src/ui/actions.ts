@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { presetById } from './titleStyles';
 import { applyTransition } from './transPreview';
+import { checkUpdate, installUpdate } from './updater';
 import { assignScene, sceneMedia, applyImport, closeImport, confirmLink, gotoClip, gotoRow, importScript, linkClips, pickScriptFile, setScriptSetting, syncScriptWatch, undoImport, unlink } from './scriptLink';
 import { addBin, deleteBin, focusBinName } from './bins';
 import { frameSec, openProjectSettings, rebuildProxies, renderProjectSettings, setPs } from './projectSettings';
@@ -122,6 +123,7 @@ ACT={
     var L=S.sel.map(C).filter(function(c){return c&&c.type==='title'&&!locked(c);});
     if(L.length){mark();L.forEach(function(c){c.look=lk();c.lookId=pr.id;});changed();return toast('スタイルを「'+pr.name+'」にしました');}
     addTitle('center',S.t.edit);var c=C(S.sel[0]);if(c&&c.type==='title'){c.look=lk();c.lookId=pr.id;changed();}},
+  updCheck:function(){checkUpdate(false);},updInstall:function(){installUpdate();},logOpen:function(){if(HOST)HOST.log.open().catch(function(e){toast(String(e));});},logSave:function(){if(HOST)HOST.log.save().then(function(p){if(p)toast('ログを保存しました');}).catch(function(e){toast(String(e));});},
   insToggle:function(){toggleInspector();},
   binAdd:function(){addBin();},binRen:function(v){S.binEdit=v;S.bin='b:'+v;draw();focusBinName();},binDel:function(v){deleteBin(v);},
   aview:function(v){S.aview=v;saveAview();draw();},

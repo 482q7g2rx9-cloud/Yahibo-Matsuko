@@ -14,7 +14,8 @@ export function renderPrefs(){var d=document.getElementById('dlg'),t=S.ptab,body
   if(t==='general')body='<h3>一般</h3>'+
     prefRow('テーマ','<span class="seg">'+[['light','ライト'],['dark','ダーク'],['system','システムに合わせる']].map(function(x){return btn(x[1],'pTheme',x[0],'s'+(S.theme===x[0]?' on':''));}).join('')+'</span>')+
     prefRow('表示サイズ','<span class="seg">'+[[0.9,'大'],[0.75,'デフォルト'],[0.65,'小']].map(function(x){return btn(x[1],'pUi',x[0],'s'+(PREF.ui===x[0]?' on':''));}).join('')+'</span>')+
-    prefRow('アクセントカラー','<span class="row" style="gap:8px">'+[['blue','青','#378ef0'],['green','緑','#2d9d78'],['orange','オレンジ','#e68619'],['purple','紫','#9256d9']].map(function(x){return '<button class="sw'+(S.accent===x[0]?' on':'')+'" aria-label="'+x[1]+'" aria-pressed="'+(S.accent===x[0])+'" title="'+x[1]+'"'+A('pAcc',x[0])+' style="background:'+x[2]+'"></button>';}).join('')+'</span>');
+    prefRow('アクセントカラー','<span class="row" style="gap:8px">'+[['blue','青','#378ef0'],['green','緑','#2d9d78'],['orange','オレンジ','#e68619'],['purple','紫','#9256d9']].map(function(x){return '<button class="sw'+(S.accent===x[0]?' on':'')+'" aria-label="'+x[1]+'" aria-pressed="'+(S.accent===x[0])+'" title="'+x[1]+'"'+A('pAcc',x[0])+' style="background:'+x[2]+'"></button>';}).join('')+'</span>')+
+    (window.MatsukoHost&&window.MatsukoHost.desktop?prefRow('更新','<span class="row" style="gap:10px"><label class="row" style="gap:6px"><input type="checkbox" data-in="pAutoUpd"'+(PREF.autoUpdate?' checked':'')+'>起動したときに確認する</label>'+btn('今すぐ確認','updCheck','','s')+'</span>'):'');
   else if(t==='timeline')body='<h3>タイムライン</h3>'+
     prefRow('スナップ','<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"'+(PREF.snap?' checked':'')+'>最初から入れておく</label>')+
     prefRow('再生中の表示','<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"'+(PREF.follow?' checked':'')+'>再生ヘッドを追いかける</label>');
@@ -34,8 +35,8 @@ export function assignKey(id,c){KB.forEach(function(k){if(k[0]!==id){var i=KEYMA
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
-PREF={snap:true,follow:true,ui:0.75,uiv:2};
-try{var pf=JSON.parse(localStorage.getItem('matsuko.pref')||'{}');if(typeof pf.snap==='boolean')PREF.snap=pf.snap;if(typeof pf.follow==='boolean')PREF.follow=pf.follow;if(pf.uiv===2){if([0.65,0.75,0.9].indexOf(pf.ui)>=0)PREF.ui=pf.ui;else if(pf.ui===1)PREF.ui=0.9; /* 前の「大」（100%） */}
+PREF={snap:true,follow:true,ui:0.75,uiv:2,autoUpdate:true};
+try{var pf=JSON.parse(localStorage.getItem('matsuko.pref')||'{}');if(typeof pf.snap==='boolean')PREF.snap=pf.snap;if(typeof pf.follow==='boolean')PREF.follow=pf.follow;if(typeof pf.autoUpdate==='boolean')PREF.autoUpdate=pf.autoUpdate;if(pf.uiv===2){if([0.65,0.75,0.9].indexOf(pf.ui)>=0)PREF.ui=pf.ui;else if(pf.ui===1)PREF.ui=0.9; /* 前の「大」（100%） */}
   /* 前の倍率（大 125%・デフォルト 100%・小 85% など）は、同じ名前の新しい倍率にする */
   else if(typeof pf.ui==='number')PREF.ui=pf.ui>=1.2?0.9:pf.ui>=0.95?0.75:0.65;}catch(e){}
 S.snap=PREF.snap;

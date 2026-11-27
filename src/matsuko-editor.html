@@ -497,6 +497,8 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .crw:hover{background:var(--bg2)}.crw.on{border-color:var(--ac);background:var(--sel)}
 .crw .grow{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+.dlg.upd{width:min(520px,92vw)}.dlg.upd .ph2{display:flex;align-items:center;margin-bottom:8px}.dlg.upd .ph2 h2{margin:0;flex:1}
+
 </style>
 <div id="app">
 <header id="top"></header>
@@ -515,7 +517,7 @@ var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var D;
-function init$t() {
+function init$u() {
   D = {
     title: "地元商店街 密着ドキュメント（8分）",
     people: [["佐", "var(--ac)", "#0b1220"], ["田", "#ffb454", "#1b1204"], ["山", "var(--ok)", "#0b1a10"]],
@@ -917,7 +919,7 @@ var hasFx = hasFx$1;
 function setP(v) {
   P = v;
 }
-function init$s() {
+function init$t() {
   P = sampleProject();
   uid = uid$1;
 }
@@ -953,7 +955,7 @@ function persist() {
   } catch (e) {
   }
 }
-function init$r() {
+function init$s() {
   S = {
     page: "edit",
     theme: "system",
@@ -1686,7 +1688,7 @@ function setHIST(v) {
 function setREDO(v) {
   REDO = v;
 }
-function init$q() {
+function init$r() {
   IDB = {
     db: null,
     open: function() {
@@ -2068,7 +2070,7 @@ function rec() {
 function setREC(v) {
   REC = v;
 }
-function init$p() {
+function init$q() {
   SRC = { el: null, id: null, playing: false, raf: 0 };
   SIM = null;
   FXP = null;
@@ -2393,7 +2395,7 @@ function openPicker() {
   i.value = "";
   i.click();
 }
-function init$o() {
+function init$p() {
   IMP = { total: 0, done: 0, cur: "" };
 }
 var PREF;
@@ -2420,7 +2422,7 @@ function renderPrefs() {
     return btn(x[1], "pUi", x[0], "s" + (PREF.ui === x[0] ? " on" : ""));
   }).join("") + "</span>") + prefRow("アクセントカラー", '<span class="row" style="gap:8px">' + [["blue", "青", "#378ef0"], ["green", "緑", "#2d9d78"], ["orange", "オレンジ", "#e68619"], ["purple", "紫", "#9256d9"]].map(function(x) {
     return '<button class="sw' + (S.accent === x[0] ? " on" : "") + '" aria-label="' + x[1] + '" aria-pressed="' + (S.accent === x[0]) + '" title="' + x[1] + '"' + A("pAcc", x[0]) + ' style="background:' + x[2] + '"></button>';
-  }).join("") + "</span>");
+  }).join("") + "</span>") + (window.MatsukoHost && window.MatsukoHost.desktop ? prefRow("更新", '<span class="row" style="gap:10px"><label class="row" style="gap:6px"><input type="checkbox" data-in="pAutoUpd"' + (PREF.autoUpdate ? " checked" : "") + ">起動したときに確認する</label>" + btn("今すぐ確認", "updCheck", "", "s") + "</span>") : "");
   else if (t === "timeline") body = "<h3>タイムライン</h3>" + prefRow("スナップ", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"' + (PREF.snap ? " checked" : "") + ">最初から入れておく</label>") + prefRow("再生中の表示", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"' + (PREF.follow ? " checked" : "") + ">再生ヘッドを追いかける</label>");
   else {
     var groups = [];
@@ -2466,12 +2468,13 @@ function assignKey(id, c) {
   KEYMAP[id] = [c];
   saveKeys();
 }
-function init$n() {
-  PREF = { snap: true, follow: true, ui: 0.75, uiv: 2 };
+function init$o() {
+  PREF = { snap: true, follow: true, ui: 0.75, uiv: 2, autoUpdate: true };
   try {
     var pf = JSON.parse(localStorage.getItem("matsuko.pref") || "{}");
     if (typeof pf.snap === "boolean") PREF.snap = pf.snap;
     if (typeof pf.follow === "boolean") PREF.follow = pf.follow;
+    if (typeof pf.autoUpdate === "boolean") PREF.autoUpdate = pf.autoUpdate;
     if (pf.uiv === 2) {
       if ([0.65, 0.75, 0.9].indexOf(pf.ui) >= 0) PREF.ui = pf.ui;
       else if (pf.ui === 1) PREF.ui = 0.9;
@@ -2511,7 +2514,7 @@ function fit() {
   }
 }
 var ZOOM;
-function init$m() {
+function init$n() {
   SCALE = 1;
   ZOOM = null;
   BASE_W = 1180;
@@ -2652,7 +2655,7 @@ function startPreview(id) {
     })();
   })();
 }
-function init$l() {
+function init$m() {
   PV = null;
   document.addEventListener("mouseover", function(e) {
     var el = e.target.closest && e.target.closest("[data-trn]");
@@ -2757,6 +2760,86 @@ function focusBinName() {
     el.focus();
     el.select();
   }
+}
+var U = null;
+var AV = null;
+var BUSY = false;
+function dlgHtml(inner) {
+  var d = document.getElementById("dlg");
+  d.innerHTML = '<div class="dlg upd" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">更新</h2>' + (BUSY ? "" : btn("閉じる", "dlgNo", "", "s")) + "</div>" + inner + "</div>";
+  d.hidden = false;
+}
+function render(state, extra) {
+  var cur = U ? U.current : "";
+  if (state === "checking") return dlgHtml("<p>確認しています…</p>");
+  if (state === "none") return dlgHtml("<p>お使いの版（" + h(cur) + '）が最新です。</p><div class="row" style="justify-content:flex-end">' + btn("閉じる", "dlgNo", "", "pri") + "</div>");
+  if (state === "error") return dlgHtml('<p class="t-er">' + h(extra || "") + '</p><div class="row" style="justify-content:flex-end">' + btn("閉じる", "dlgNo", "", "pri") + "</div>");
+  if (state === "off") return dlgHtml('<p>このビルドには、更新の機能が入っていません。</p><div class="row" style="justify-content:flex-end">' + btn("閉じる", "dlgNo", "", "pri") + "</div>");
+  if (state === "found") return dlgHtml("<p>新しい版 <b>" + h(AV.version) + "</b> があります（いまの版 " + h(cur) + "）。</p>" + (AV.notes ? '<div class="box" style="max-height:220px;overflow:auto;white-space:pre-wrap;margin:10px 0">' + h(AV.notes) + "</div>" : "") + '<div class="row" style="justify-content:flex-end;gap:8px">' + btn("あとで", "dlgNo") + btn("更新して起動し直す", "updInstall", "", "pri") + "</div>");
+  if (state === "installing") return dlgHtml("<p>" + h(AV.version) + ' を入れています…</p><div class="prog" style="width:100%"><i data-updp style="width:' + Math.round((extra || 0) * 100) + '%"></i></div>');
+}
+function checkUpdate(quiet) {
+  if (!HOST || !HOST.update || BUSY) return;
+  var go2 = function() {
+    if (!U.enabled) {
+      if (!quiet) render("off");
+      return;
+    }
+    if (!quiet) render("checking");
+    HOST.update.check().then(function(a) {
+      AV = a;
+      if (a) {
+        if (quiet) toast("新しい版 " + a.version + " があります（ヘルプ → 更新を確認…）");
+        else render("found");
+      } else if (!quiet) render("none");
+    }).catch(function(e) {
+      if (!quiet) render("error", String(e));
+    });
+  };
+  if (U) go2();
+  else HOST.update.info().then(function(i) {
+    U = i;
+    go2();
+  }).catch(function() {
+  });
+}
+function installUpdate() {
+  if (!AV || BUSY) return;
+  BUSY = true;
+  render("installing", 0);
+  HOST.update.install().catch(function(e) {
+    BUSY = false;
+    render("error", String(e));
+  });
+}
+function init$l() {
+  if (!HOST || !HOST.update) return;
+  HOST.update.onProgress(function(e) {
+    var i = document.querySelector("[data-updp]");
+    if (i) i.style.width = Math.round(e.p * 100) + "%";
+  });
+  HOST.update.info().then(function(i) {
+    U = i;
+    if (i.enabled && PREF.autoUpdate) setTimeout(function() {
+      checkUpdate(true);
+    }, 8e3);
+  }).catch(function() {
+  });
+  var last2 = "", n = 0;
+  var put = function(lv, msg) {
+    if (msg === last2 || n > 200) return;
+    last2 = msg;
+    n++;
+    HOST.log.write(lv, msg).catch(function() {
+    });
+  };
+  addEventListener("error", function(e) {
+    put("error", (e.message || "") + (e.filename ? " @" + e.filename.split("/").pop() + ":" + e.lineno : "") + (e.error && e.error.stack ? "\n" + e.error.stack : ""));
+  });
+  addEventListener("unhandledrejection", function(e) {
+    var r = e.reason;
+    put("error", "Promise: " + (r && r.stack ? r.stack : String(r)));
+  });
 }
 var VM;
 var AM;
@@ -4025,6 +4108,24 @@ function init$h() {
         c.lookId = pr.id;
         changed();
       }
+    },
+    updCheck: function() {
+      checkUpdate(false);
+    },
+    updInstall: function() {
+      installUpdate();
+    },
+    logOpen: function() {
+      if (HOST) HOST.log.open().catch(function(e) {
+        toast(String(e));
+      });
+    },
+    logSave: function() {
+      if (HOST) HOST.log.save().then(function(p) {
+        if (p) toast("ログを保存しました");
+      }).catch(function(e) {
+        toast(String(e));
+      });
     },
     insToggle: function() {
       toggleInspector();
@@ -5694,7 +5795,7 @@ function init$c() {
     { n: "編集", i: [["元に戻す", "undo", "Ctrl+Z"], ["やり直し", "redo", "Ctrl+Y"], "-", ["切り取り", "cut2", "Ctrl+X"], ["コピー", "copy", "Ctrl+C"], ["貼り付け", "paste", "Ctrl+V"], ["複製", "dup", "Ctrl+D"], "-", ["再生ヘッドで分割", "split", "S"], ["削除", "delSel", "Delete"], ["削除して詰める", "rdel", "Shift+Delete"], "-", ["すべて選択", "selAll", "Ctrl+A"], ["リンク／リンク解除", "lnk", "Ctrl+L"], "-", ["映像トラックを追加", "addV"], ["音声トラックを追加", "addA"]] },
     { n: "表示", i: "view" },
     { n: "プロジェクト", i: [["プロジェクト設定…", "psOpen"], ["メンバーと権限…"], ["変更履歴・復元…", "hist"], "-", ["台本アプリと紐づけ…", "go:script"]] },
-    { n: "ヘルプ", i: [["使い方", "help"], ["キーボードショートカット…", "keys"], ["バージョン情報", "about"]] }
+    { n: "ヘルプ", i: [["使い方", "help"], ["キーボードショートカット…", "keys"], ["バージョン情報", "about"]].concat(window.MatsukoHost && window.MatsukoHost.desktop ? ["-", ["更新を確認…", "updCheck"], "-", ["ログのフォルダーを開く", "logOpen"], ["ログを保存…", "logSave"]] : []) }
   ];
   mbOpen = null;
   nativeLast = "";
@@ -6013,7 +6114,7 @@ function relink(m) {
 }
 function newProjectDlg() {
   var d = document.getElementById("dlg"), loc = null;
-  function render(def) {
+  function render2(def) {
     d.innerHTML = '<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT" style="width:480px"><h2 id="dlgT">新規プロジェクト</h2><div class="fg" style="grid-template-columns:72px 1fr"><span class="t2">名前</span><input class="inp" id="npName" value="無題のプロジェクト" aria-label="プロジェクトの名前"></div><div class="fg" style="grid-template-columns:72px 1fr auto"><span class="t2">場所</span><span class="mu" id="npLoc" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + h(loc || def) + '">' + h(loc || def) + "</span>" + btn("変更…", "npLoc", "", "s") + '</div><div class="row" style="gap:8px;justify-content:flex-end">' + btn("キャンセル", "dlgNo", "", "sec") + btn("作成", "npOk", "", "pri") + "</div></div>";
     d.hidden = false;
     var i = d.querySelector("#npName");
@@ -6028,7 +6129,7 @@ function newProjectDlg() {
   }
   HOST.project.defaultLocation().then(function(def) {
     newProjectDlg.def = def;
-    render(def);
+    render2(def);
   });
   newProjectDlg.pick = function() {
     var name = d.querySelector("#npName").value;
@@ -6036,7 +6137,7 @@ function newProjectDlg() {
       if (p) {
         loc = p;
         newProjectDlg.loc = p;
-        render(newProjectDlg.def);
+        render2(newProjectDlg.def);
         d.querySelector("#npName").value = name;
       }
     });
@@ -8423,6 +8524,9 @@ function init$1() {
     } else if (k === "pFollow") {
       PREF.follow = e.target.checked;
       savePref();
+    } else if (k === "pAutoUpd") {
+      PREF.autoUpdate = e.target.checked;
+      savePref();
     } else if (k === "silthr" || k === "silmin") {
       S.sil[k === "silthr" ? "thr" : "min"] = e.target.value;
       draw();
@@ -8610,15 +8714,15 @@ function init() {
   });
 }
 init$7();
+init$u();
 init$t();
 init$s();
-init$r();
 init$9();
-init$q();
-init$o();
+init$r();
+init$p();
 init$b();
 init$a();
-init$p();
+init$q();
 init$e();
 init$k();
 init$j();
@@ -8631,12 +8735,13 @@ init$i();
 init$8();
 init$c();
 init$d();
-init$n();
+init$o();
 init$h();
 init$2();
 init$1();
+init$n();
 init$m();
-init$l();
 init$g();
+init$l();
 init();
 </script>

@@ -126,6 +126,19 @@ export interface Host {
     watch(path: string | null): Promise<void>;
     onChanged(fn: (path: string) => void): Promise<UnlistenFn>;
   };
+  /** 自動更新（M5）。enabled は、更新の署名の公開鍵を埋め込んだビルドか */
+  update: {
+    info(): Promise<{ enabled: boolean; current: string }>;
+    check(): Promise<{ version: string; notes?: string | null; date?: string | null } | null>;
+    install(): Promise<void>;
+    onProgress(fn: (e: { p: number; done?: boolean }) => void): Promise<UnlistenFn>;
+  };
+  /** ログ（M5） */
+  log: {
+    write(level: 'info' | 'warn' | 'error', message: string): Promise<void>;
+    open(): Promise<void>;
+    save(): Promise<string | null>;
+  };
   /** 書き出したファイルを、ダイアログで選んだ場所に保存する。やめたら false */
   saveFile(name: string, ext: string, data: Blob): Promise<boolean>;
   /** OS からのドラッグ：入った・動いた・離れた・落とした */
@@ -189,6 +202,17 @@ const host: Host = {
     read: (path) => invoke('script_read', { path }),
     watch: (path) => invoke('script_watch', { path }),
     onChanged: (fn) => listen<{ path: string }>('script-changed', (e) => fn(e.payload.path)),
+  },
+  update: {
+    info: () => invoke('update_info'),
+    check: () => invoke('update_check'),
+    install: () => invoke('update_install'),
+    onProgress: (fn) => listen<{ p: number; done?: boolean }>('update-progress', (e) => fn(e.payload)),
+  },
+  log: {
+    write: (level, message) => invoke('log_write', { level, message }),
+    open: () => invoke('log_open'),
+    save: () => invoke('log_save'),
   },
   async saveFile(name, ext, data) {
     const path = await invoke<string | null>('save_pick', { name, ext });

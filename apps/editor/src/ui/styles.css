@@ -492,3 +492,5 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .crw{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:1px solid transparent;border-radius:4px;background:none;color:var(--tx);cursor:pointer;margin-bottom:2px;min-width:0}
 .crw:hover{background:var(--bg2)}.crw.on{border-color:var(--ac);background:var(--sel)}
 .crw .grow{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.dlg.upd{width:min(520px,92vw)}.dlg.upd .ph2{display:flex;align-items:center;margin-bottom:8px}.dlg.upd .ph2 h2{margin:0;flex:1}
