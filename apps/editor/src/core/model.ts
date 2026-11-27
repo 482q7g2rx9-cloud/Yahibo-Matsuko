@@ -17,6 +17,8 @@ export interface Mark {
 
 /** 素材 */
 export interface Media {
+  /** 入れてあるビンの id */
+  bin?: string;
   id: string;
   /** 表示名 */
   n: string;
@@ -135,6 +137,14 @@ export interface Project {
   pin?: number | null;
   pout?: number | null;
   settings?: ProjectSettings;
+  /** 自分で作るビン（素材を分けておくフォルダー）。素材は bin にその id を持つ */
+  bins?: Bin[];
+}
+
+/** ビン */
+export interface Bin {
+  id: string;
+  name: string;
 }
 
 /** 新しい id を作る関数（接頭辞を受け取る）。テストでは決まった順の id を返すものに差し替える */

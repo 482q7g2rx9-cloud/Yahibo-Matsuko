@@ -444,3 +444,14 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 /* トランジションの一覧の見出し */
 .tsh{font-weight:500;color:var(--tx2);margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--dv)}
 .tsh:first-child{margin-top:0}
+
+/* アセットタブ：リストと大きいグリッド */
+.asl{display:flex;flex-direction:column;padding:0 8px 14px}
+.asl .ali{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px;min-width:0}
+.asl .ali:hover{background:var(--bg2)}
+.asl .tb{width:64px;height:36px;flex:none;border-radius:3px}
+.asl .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
+.asl .mu{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.asg.lg{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.seg .b.ico{width:28px;height:28px;padding:0}
+.bin.dropon{background:var(--sel);box-shadow:inset 0 0 0 1px var(--ac)}

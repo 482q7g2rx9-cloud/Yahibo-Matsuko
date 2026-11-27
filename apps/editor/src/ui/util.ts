@@ -99,6 +99,7 @@ export function playing(){return S.page==='cut'?SRC.playing:S.page==='fx'?!!SIM:
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
 I={
+  list:'<path d="M4 6h2v2H4zm4 0h12v2H8zM4 11h2v2H4zm4 0h12v2H8zM4 16h2v2H4zm4 0h12v2H8z"/>',grid:'<path d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/>',gridL:'<path d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"/>',
   play:'<path d="M8 5v14l11-7z"/>',pause:'<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>',stop:'<rect x="6" y="6" width="12" height="12"/>',rec:'<circle cx="12" cy="12" r="7"/>',
   prevCut:'<path d="M5 5h2v14H5zM19 5v14L9 12z"/>',nextCut:'<path d="M17 5h2v14h-2zM5 5v14l10-7z"/>',
   back:'<path d="M15 6v12l-8-6z"/>',fwd:'<path d="M9 6v12l8-6z"/>',toStart:'<path d="M6 5h2v14H6zM20 5v14L9 12z"/>',

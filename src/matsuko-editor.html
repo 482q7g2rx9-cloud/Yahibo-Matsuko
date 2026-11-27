@@ -449,6 +449,17 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .tsh{font-weight:500;color:var(--tx2);margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--dv)}
 .tsh:first-child{margin-top:0}
 
+/* アセットタブ：リストと大きいグリッド */
+.asl{display:flex;flex-direction:column;padding:0 8px 14px}
+.asl .ali{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px;min-width:0}
+.asl .ali:hover{background:var(--bg2)}
+.asl .tb{width:64px;height:36px;flex:none;border-radius:3px}
+.asl .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
+.asl .mu{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.asg.lg{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.seg .b.ico{width:28px;height:28px;padding:0}
+.bin.dropon{background:var(--sel);box-shadow:inset 0 0 0 1px var(--ac)}
+
 </style>
 <div id="app">
 <header id="top"></header>
@@ -1581,8 +1592,8 @@ function saveP() {
 }
 var HIST, REDO;
 function snap() {
-  return JSON.stringify({ tracks: P.tracks, clips: P.clips, pin: P.pin, pout: P.pout, media: P.media.map(function(m) {
-    return [m.id, m.inP, m.outP, m.rate, m.r, m.marks];
+  return JSON.stringify({ tracks: P.tracks, clips: P.clips, pin: P.pin, pout: P.pout, bins: P.bins || [], media: P.media.map(function(m) {
+    return [m.id, m.inP, m.outP, m.rate, m.r, m.marks, m.bin];
   }) });
 }
 function mark() {
@@ -1596,6 +1607,7 @@ function restore(s) {
   P.clips = o.clips;
   P.pin = o.pin;
   P.pout = o.pout;
+  P.bins = o.bins || [];
   o.media.forEach(function(a) {
     var m = M(a[0]);
     if (m) {
@@ -1604,6 +1616,8 @@ function restore(s) {
       m.rate = a[3];
       m.r = a[4];
       m.marks = a[5];
+      if (a[6]) m.bin = a[6];
+      else delete m.bin;
     }
   });
   S.sel = S.sel.filter(function(id) {
@@ -2484,6 +2498,96 @@ function init$m() {
     if (PV && !(e.target.closest && e.target.closest("[data-trn]"))) stopPreview();
   }, true);
 }
+function bins() {
+  return P.bins || (P.bins = []);
+}
+function binById(id) {
+  return bins().filter(function(b) {
+    return b.id === id;
+  })[0];
+}
+function inBin(m, sel2) {
+  if (!sel2 || sel2 === "all") return true;
+  if (sel2.indexOf("b:") === 0) return m.bin === sel2.slice(2);
+  if (sel2 === "used") return isUsed(m);
+  if (sel2 === "unused") return !isUsed(m) && m.k !== "台本";
+  if (sel2 === "wn") return m.r === "wn";
+  return m.k === sel2;
+}
+function binOptions(cur, kinds) {
+  var o = function(v, t) {
+    return '<option value="' + h(v) + '"' + (cur === v ? " selected" : "") + ">" + h(t) + "</option>";
+  };
+  var base = D.bins.filter(function(b) {
+    return !kinds || b[0] === "all" || kinds.indexOf(b[0]) >= 0;
+  });
+  return base.map(function(b) {
+    return o(b[0], b[1]);
+  }).join("") + (bins().length ? '<optgroup label="ビン">' + bins().map(function(b) {
+    return o("b:" + b.id, b.name);
+  }).join("") + "</optgroup>" : "") + '<optgroup label="スマートビン">' + D.smart.map(function(b) {
+    return o(b[0], b[1]);
+  }).join("") + "</optgroup>";
+}
+function addBin() {
+  mark();
+  var n = 1, name;
+  do {
+    name = "新しいビン" + (n > 1 ? " " + n : "");
+    n++;
+  } while (bins().some(function(b2) {
+    return b2.name === name;
+  }));
+  var b = { id: uid("bin"), name };
+  bins().push(b);
+  S.bin = "b:" + b.id;
+  S.binEdit = b.id;
+  changed();
+  focusBinName();
+}
+function renameBin(id, name) {
+  var b = binById(id);
+  S.binEdit = null;
+  name = String(name || "").trim();
+  if (!b || !name || name === b.name) {
+    changed();
+    return;
+  }
+  mark();
+  b.name = name;
+  changed();
+}
+function deleteBin(id) {
+  var b = binById(id);
+  if (!b) return;
+  mark();
+  P.bins = bins().filter(function(x) {
+    return x !== b;
+  });
+  P.media.forEach(function(m) {
+    if (m.bin === id) delete m.bin;
+  });
+  if (S.bin === "b:" + id) S.bin = "all";
+  if (S.ebin === "b:" + id) S.ebin = "all";
+  changed();
+  toast("ビン「" + b.name + "」を削除しました");
+}
+function moveToBin(mid, id) {
+  var m = M(mid), b = id && binById(id);
+  if (!m || id && !b || (m.bin || "") === (id || "")) return;
+  mark();
+  if (b) m.bin = b.id;
+  else delete m.bin;
+  changed();
+  toast(b ? "「" + m.n + "」をビン「" + b.name + "」に入れました" : "「" + m.n + "」をビンから出しました");
+}
+function focusBinName() {
+  var el = document.querySelector('[data-in="binname"]');
+  if (el) {
+    el.focus();
+    el.select();
+  }
+}
 var VM;
 var AM;
 function supported(list) {
@@ -2796,10 +2900,7 @@ function init$l() {
 var R;
 function mediaList() {
   var q = S.mq.trim(), L = P.media.filter(function(m) {
-    if (S.bin === "used") return isUsed(m);
-    if (S.bin === "unused") return !isUsed(m) && m.k !== "台本";
-    if (S.bin === "wn") return m.r === "wn";
-    if (S.bin !== "all" && m.k !== S.bin) return false;
+    if (!inBin(m, S.bin)) return false;
     if (S.mtype && m.k !== S.mtype) return false;
     return !q || m.n.indexOf(q) >= 0 || m.c.indexOf(q) >= 0;
   });
@@ -2812,16 +2913,9 @@ function mediaList() {
   return L;
 }
 function binCount(id) {
-  var f = { all: function() {
-    return true;
-  }, used: isUsed, unused: function(m) {
-    return !isUsed(m) && m.k !== "台本";
-  }, wn: function(m) {
-    return m.r === "wn";
-  } }[id] || function(m) {
-    return m.k === id;
-  };
-  return P.media.filter(f).length;
+  return P.media.filter(function(m) {
+    return inBin(m, id);
+  }).length;
 }
 function mthumb(m, w, hh) {
   var sz = w === "fill" ? "width:100%;aspect-ratio:16/9" : "width:" + w + "px;height:" + hh + "px";
@@ -2850,9 +2944,13 @@ function tlText(m) {
 function init$k() {
   R = {};
   R.media = function() {
-    var bins = D.bins.map(binRow).join("") + '<div style="padding:12px 16px 6px" class="mu">スマートビン</div>' + D.smart.map(binRow).join("");
+    var ub = bins(), bins$1 = D.bins.map(binRow).join("") + '<div class="row" style="padding:12px 8px 6px 16px"><span class="mu grow">ビン</span><button class="ib" aria-label="ビンを作る" title="ビンを作る"' + A("binAdd") + ">" + ic("plus", 14) + "</button></div>" + ub.map(function(b) {
+      var id = "b:" + b.id;
+      if (S.binEdit === b.id) return '<div class="bin selr"><input class="inp grow" data-in="binname" data-bid="' + b.id + '" value="' + h(b.name) + '" aria-label="ビンの名前" style="height:24px"></div>';
+      return '<div class="bin li' + (S.bin === id ? " selr" : "") + '" role="button" tabindex="0" data-binid="' + b.id + '"' + A("bin", id) + '><span class="grow" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h(b.name) + '</span><span class="mu">' + binCount(id) + "</span></div>";
+    }).join("") + '<div style="padding:12px 16px 6px" class="mu">スマートビン</div>' + D.smart.map(binRow).join("");
     function binRow(b) {
-      return '<div class="bin li' + (S.bin === b[0] ? " selr" : "") + '" role="button" tabindex="0"' + A("bin", b[0]) + '><span class="grow">' + h(b[1]) + '</span><span class="mu">' + binCount(b[0]) + "</span></div>";
+      return '<div class="bin li' + (S.bin === b[0] ? " selr" : "") + '" role="button" tabindex="0"' + (b[0] === "all" ? ' data-binid=""' : "") + A("bin", b[0]) + '><span class="grow">' + h(b[1]) + '</span><span class="mu">' + binCount(b[0]) + "</span></div>";
     }
     var L = mediaList(), m = M(S.media) || L[0] || P.media[0], body, tag = function(x) {
       return x.sample ? ' <span class="chip c-mu" style="margin-left:6px">見本</span>' : "";
@@ -2873,11 +2971,13 @@ function init$k() {
       var prev = m.thumb ? '<img src="' + m.thumb + '" alt="" style="width:240px;height:135px;object-fit:contain;display:block">' : m.k === "映像" ? '<div class="th" style="width:240px;height:135px;background:' + m.col[0] + '"></div>' : mthumb(m, 240, 135);
       var miss = m.missing ? '<div class="box" style="margin:10px 12px;border-color:var(--wn)"><div class="t-wn" style="margin-bottom:6px">ファイルが見つかりません</div><div class="mu" style="margin-bottom:10px;word-break:break-all">' + h(m.path || m.f) + "</div>" + btn("リンクし直す…", "relink", m.id, "pri") + "</div>" : "";
       var canAdd = (m.url || m.sample || HOST && m.file && !m.missing) && (m.k === "映像" || m.k === "画像" || m.k === "音声" && m.url);
-      right = ph("素材の詳細", '<span class="x">' + h(m.n) + "</span>") + '<div class="scroll"><div class="mon" style="height:150px">' + prev + "</div>" + miss + (canAdd ? '<div class="row" style="gap:8px;padding:10px 12px;border-bottom:1px solid var(--dv)">' + btn(ic("plus", 14) + "タイムラインに追加", "addtl", m.id, "on", "", "flex:1") + (m.file ? btn("削除", "mdel", m.id) : "") + "</div>" : m.file ? '<div class="row" style="padding:10px 12px;border-bottom:1px solid var(--dv)">' + btn("削除", "mdel", m.id) + "</div>" : "") + '<div style="padding:6px 0;border-bottom:1px solid var(--dv)">' + kv("ファイル", h(m.f)) + (HOST && m.path ? kv("場所", '<span title="' + h(m.path) + '" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">' + h(m.path) + "</span>") : "") + kv(m.k === "映像" || m.k === "画像" ? "解像度" : "形式", h(m.res || "—")) + kv("長さ", m.d ? hms(m.d) : "—") + (m.size ? kv("サイズ", mb(m.size)) : "") + (m.px !== -1 || m.file ? kv("プロキシ", px) : "") + "</div>" + ph("権利情報", r ? '<span style="font-weight:400">' + stl(r[0], r[1]) + "</span>" : "") + '<div style="padding:6px 0;border-bottom:1px solid var(--dv)">' + kv("状態", '<select class="inp" aria-label="権利の状態" data-in="rights" style="height:26px;width:100%">' + [["ok", "許可済み"], ["wn", "要確認"], ["free", "フリー素材"], ["own", "自社収録"]].map(function(o) {
+      right = ph("素材の詳細", '<span class="x">' + h(m.n) + "</span>") + '<div class="scroll"><div class="mon" style="height:150px">' + prev + "</div>" + miss + (canAdd ? '<div class="row" style="gap:8px;padding:10px 12px;border-bottom:1px solid var(--dv)">' + btn(ic("plus", 14) + "タイムラインに追加", "addtl", m.id, "on", "", "flex:1") + (m.file ? btn("削除", "mdel", m.id) : "") + "</div>" : m.file ? '<div class="row" style="padding:10px 12px;border-bottom:1px solid var(--dv)">' + btn("削除", "mdel", m.id) + "</div>" : "") + '<div style="padding:6px 0;border-bottom:1px solid var(--dv)">' + kv("ファイル", h(m.f)) + (HOST && m.path ? kv("場所", '<span title="' + h(m.path) + '" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">' + h(m.path) + "</span>") : "") + kv(m.k === "映像" || m.k === "画像" ? "解像度" : "形式", h(m.res || "—")) + kv("長さ", m.d ? hms(m.d) : "—") + kv("ビン", '<select class="inp" aria-label="ビン" data-in="mbin" data-mid="' + m.id + '" style="height:26px;width:100%"><option value="">なし</option>' + bins().map(function(b) {
+        return '<option value="' + b.id + '"' + (m.bin === b.id ? " selected" : "") + ">" + h(b.name) + "</option>";
+      }).join("") + "</select>") + (m.size ? kv("サイズ", mb(m.size)) : "") + (m.px !== -1 || m.file ? kv("プロキシ", px) : "") + "</div>" + ph("権利情報", r ? '<span style="font-weight:400">' + stl(r[0], r[1]) + "</span>" : "") + '<div style="padding:6px 0;border-bottom:1px solid var(--dv)">' + kv("状態", '<select class="inp" aria-label="権利の状態" data-in="rights" style="height:26px;width:100%">' + [["ok", "許可済み"], ["wn", "要確認"], ["free", "フリー素材"], ["own", "自社収録"]].map(function(o) {
         return '<option value="' + o[0] + '"' + (m.r === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
       }).join("") + "</select>") + kv("権利者", h(m.ho)) + kv("出典", h(m.src)) + kv("許諾", h(m.pm)) + kv("期限", h(m.ex)) + "</div>" + ph("関連") + '<div style="padding:6px 0">' + kv("台本行", h(m.line)) + kv("タイムライン", h(tlText(m))) + "</div></div>";
     }
-    return '<div class="pn l" style="width:240px">' + ph("ビン") + '<div class="scroll">' + bins + '</div></div><div class="pc" data-drop><div class="row" style="height:50px;flex:none;gap:10px;padding:0 12px;border-bottom:1px solid var(--dv)"><input class="inp" type="search" placeholder="素材を検索" aria-label="素材を検索" value="' + h(S.mq) + '" data-in="mq" style="width:150px"><select class="inp" aria-label="種別で絞り込み" data-in="mtype">' + [["", "すべての種別"], ["映像", "映像"], ["音声", "音声"], ["テイク", "テイク"], ["画像", "画像"], ["台本", "台本"]].map(function(o) {
+    return '<div class="pn l" style="width:240px">' + ph("ビン") + '<div class="scroll">' + bins$1 + '</div></div><div class="pc" data-drop><div class="row" style="height:50px;flex:none;gap:10px;padding:0 12px;border-bottom:1px solid var(--dv)"><input class="inp" type="search" placeholder="素材を検索" aria-label="素材を検索" value="' + h(S.mq) + '" data-in="mq" style="width:150px"><select class="inp" aria-label="種別で絞り込み" data-in="mtype">' + [["", "すべての種別"], ["映像", "映像"], ["音声", "音声"], ["テイク", "テイク"], ["画像", "画像"], ["台本", "台本"]].map(function(o) {
       return '<option value="' + o[0] + '"' + (S.mtype === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
     }).join("") + '</select><select class="inp" aria-label="並び順" data-in="msort">' + [["name", "名前順"], ["len", "長い順"], ["code", "記号順"]].map(function(o) {
       return '<option value="' + o[0] + '"' + (S.msort === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
@@ -3160,6 +3260,7 @@ function xRange() {
   return [0, d];
 }
 function init$j() {
+  loadAview();
   ROWS = [];
   EYE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8z"/></svg>';
   LOCK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0110 0v3h1v11H6V10zm2 0h6V7a3 3 0 00-6 0z"/></svg>';
@@ -3181,13 +3282,12 @@ function init$j() {
     var left;
     if (S.etab !== "text" && S.etab !== "trans") {
       var L = P.media.filter(function(m) {
-        return m.k === "映像" || m.k === "音声" || m.k === "画像" || m.k === "テイク";
-      });
-      left = '<div class="row" style="padding:12px 16px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="' + h(S.eq || "") + '" style="height:28px">' + btn("＋ 読込", "imp") + '</div><div class="scroll"><div class="asg">' + L.filter(function(m) {
-        return !S.eq || m.n.indexOf(S.eq) >= 0;
-      }).map(function(m) {
-        var r = D.rights[m.r] || ["—", ""], can = m.url && !m.loading || m.sample && m.k !== "音声" && m.k !== "テイク";
-        return '<div style="position:relative"' + (can ? ' data-am="' + m.id + '"' : "") + '><div class="tb" style="cursor:' + (can ? "grab" : "default") + ";background:" + (m.thumb ? "#000 url(" + m.thumb + ") center / cover" : m.k === "音声" ? "#2f6b45" : m.k === "テイク" ? "#5a4a8a" : (m.col || ["#555"])[0]) + '"><span>' + m.k + "</span><span>" + (m.k === "画像" ? "" : mmss(m.d)) + "</span></div>" + (can ? '<button class="b s" aria-label="「' + h(m.n) + '」をタイムラインに追加" title="タイムラインに追加"' + A("addtl", m.id) + ' style="position:absolute;right:4px;top:4px;width:24px;height:24px;padding:0;border-radius:50%">' + ic("plus", 14) + "</button>" : "") + '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (m.k === "音声" ? h(m.c) + " " : "") + h(m.n) + '</div><div class="' + (m.r === "wn" ? "t-wn" : "t-ok") + '">' + r[0] + "</div></div>";
+        return (m.k === "映像" || m.k === "音声" || m.k === "画像" || m.k === "テイク") && inBin(m, S.ebin || "all") && (!S.eq || m.n.indexOf(S.eq) >= 0);
+      }), av = S.aview || "grid";
+      left = '<div class="row" style="padding:12px 16px 8px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="' + h(S.eq || "") + '" style="height:28px">' + btn("＋ 読込", "imp") + '</div><div class="row" style="padding:0 16px 10px;gap:6px"><select class="inp grow" data-in="ebin" aria-label="ビン" style="height:28px;min-width:0">' + binOptions(S.ebin || "all", ["映像", "音声", "テイク", "画像"]) + '</select><span class="seg">' + [["list", "リスト", "list"], ["grid", "グリッド", "grid"], ["large", "大きいグリッド", "gridL"]].map(function(x) {
+        return '<button class="b s ico' + (av === x[0] ? " on" : "") + '" aria-label="' + x[1] + '" title="' + x[1] + '" aria-pressed="' + (av === x[0]) + '"' + A("aview", x[0]) + ">" + ic(x[2], 14) + "</button>";
+      }).join("") + '</span></div><div class="scroll"><div class="' + (av === "list" ? "asl" : av === "large" ? "asg lg" : "asg") + '">' + L.map(function(m) {
+        return assetItem(m, av);
       }).join("") + "</div></div>";
     } else if (S.etab === "trans") left = '<div class="scroll" style="padding:14px">' + transGallery() + "</div>";
     else left = '<div class="scroll" style="padding:14px">' + styleGallery() + "</div>";
@@ -3197,6 +3297,28 @@ function init$j() {
       return '<button aria-label="' + t[1] + '" title="' + t[1] + (t[2] ? "（" + t[2] + " キー）" : "") + '" aria-pressed="' + on + '"' + A("tool", t[0]) + ' style="width:38px;height:44px;padding:0;border:0;border-radius:4px;background:' + (on ? "var(--bg4)" : "transparent") + ";color:" + (on ? "var(--ac)" : "var(--tx2)") + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">' + ic(t[0], 16) + '<span style="font-size:10px;color:var(--tx2)">' + t[1] + "</span></button>";
     }).join("") + '</div><div style="flex:1;min-width:0;display:flex;flex-direction:column"><div class="row tlbar"><button class="b s' + (S.snap ? " on" : "") + '" aria-pressed="' + S.snap + '"' + A("snapT") + ' title="スナップ（N キー）">スナップ</button>' + btn("＋ トラック", "addTrk", "", "s", "トラックを追加") + (rngOn ? '<span class="t-ac" style="margin-left:6px">書き出し範囲 ' + tc(P.pin || 0) + " – " + tc(P.pout != null ? P.pout : progDur()) + "</span>" + btn("範囲を消去", "pclear", "", "s") : "") + '</div><div class="tl tl2" data-tlwrap>' + tlInner() + '</div><div class="tlfoot"><button aria-label="縮小" title="縮小（' + keyOf("zout") + '）"' + A("zout") + '>−</button><input type="range" min="0" max="100" value="' + zoomVal() + '" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（' + keyOf("zin") + '）"' + A("zin") + '>＋</button></div></div></div></div><div class="pn r" style="width:' + pw("editR") + 'px">' + splitter("editR", "r") + ph("インスペクタ", '<span class="x">' + h(ins.name) + "</span>") + '<div class="scroll">' + ins.html + (P.sample ? '<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>' : "") + "</div></div>";
   };
+}
+function assetItem(m, av) {
+  var r = D.rights[m.r] || ["—", ""], can = m.url && !m.loading || m.sample && m.k !== "音声" && m.k !== "テイク";
+  var bg = m.thumb ? "#000 url(" + m.thumb + ") center / cover" : m.k === "音声" ? "#2f6b45" : m.k === "テイク" ? "#5a4a8a" : (m.col || ["#555"])[0];
+  var add = can ? '<button class="b s" aria-label="「' + h(m.n) + '」をタイムラインに追加" title="タイムラインに追加"' + A("addtl", m.id) + ' style="' + (av === "list" ? "" : "position:absolute;right:4px;top:4px;") + 'width:24px;height:24px;padding:0;border-radius:50%;flex:none">' + ic("plus", 14) + "</button>" : "";
+  var nm = (m.k === "音声" ? h(m.c) + " " : "") + h(m.n);
+  if (av === "list") return '<div class="ali"' + (can ? ' data-am="' + m.id + '" style="cursor:grab"' : "") + '><div class="tb" style="background:' + bg + '"></div><div class="grow" style="min-width:0"><div class="nm">' + nm + '</div><div class="mu">' + h(m.k) + (m.k === "画像" ? "" : "　" + mmss(m.d)) + '　<span class="' + (m.r === "wn" ? "t-wn" : "t-ok") + '">' + r[0] + "</span></div></div>" + add + "</div>";
+  return '<div style="position:relative"' + (can ? ' data-am="' + m.id + '"' : "") + '><div class="tb" style="cursor:' + (can ? "grab" : "default") + ";background:" + bg + '"><span>' + m.k + "</span><span>" + (m.k === "画像" ? "" : mmss(m.d)) + "</span></div>" + add + '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nm + '</div><div class="' + (m.r === "wn" ? "t-wn" : "t-ok") + '">' + r[0] + "</div></div>";
+}
+function saveAview() {
+  try {
+    localStorage.setItem("matsuko.assets", JSON.stringify({ v: S.aview || "grid", b: S.ebin || "all" }));
+  } catch (e) {
+  }
+}
+function loadAview() {
+  try {
+    var o = JSON.parse(localStorage.getItem("matsuko.assets") || "{}");
+    if (["list", "grid", "large"].indexOf(o.v) >= 0) S.aview = o.v;
+    if (typeof o.b === "string") S.ebin = o.b;
+  } catch (e) {
+  }
 }
 var EPS;
 function rm(c) {
@@ -4363,6 +4485,23 @@ function init$e() {
         changed();
       }
     },
+    binAdd: function() {
+      addBin();
+    },
+    binRen: function(v) {
+      S.binEdit = v;
+      S.bin = "b:" + v;
+      draw();
+      focusBinName();
+    },
+    binDel: function(v) {
+      deleteBin(v);
+    },
+    aview: function(v) {
+      S.aview = v;
+      saveAview();
+      draw();
+    },
     trApply: function(v) {
       applyTransition(v);
     },
@@ -4685,7 +4824,8 @@ function menuAct(a) {
     if (r) openProject(function() {
       return HOST.project.openRecent(r.dir);
     });
-  } else if (ACT[a]) ACT[a]();
+  } else if (a.indexOf("@") > 0 && ACT[a.split("@")[0]]) ACT[a.split("@")[0]](a.slice(a.indexOf("@") + 1));
+  else if (ACT[a]) ACT[a]();
   else toast("この機能は、まだ使えません");
 }
 var mq;
@@ -6048,6 +6188,9 @@ function playBtn(on) {
 }
 function init$9() {
   I = {
+    list: '<path d="M4 6h2v2H4zm4 0h12v2H8zM4 11h2v2H4zm4 0h12v2H8zM4 16h2v2H4zm4 0h12v2H8z"/>',
+    grid: '<path d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/>',
+    gridL: '<path d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"/>',
     play: '<path d="M8 5v14l11-7z"/>',
     pause: '<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>',
     stop: '<rect x="6" y="6" width="12" height="12"/>',
@@ -7072,7 +7215,13 @@ function pdEnd(e, ok) {
   setTimeout(function() {
     document.removeEventListener("click", stop, true);
   }, 0);
-  if (ok && d.kind === "cut") {
+  [].forEach.call(document.querySelectorAll(".bin.dropon"), function(x) {
+    x.classList.remove("dropon");
+  });
+  if (ok && d.kind === "tobin") {
+    var bt = pdUnder(e, "[data-binid]");
+    if (bt) moveToBin(d.id, bt.dataset.binid);
+  } else if (ok && d.kind === "cut") {
     var t = pdUnder(e, "[data-rc]");
     if (t && t.dataset.rc !== d.id) {
       var rc = t.getBoundingClientRect();
@@ -7115,6 +7264,12 @@ function init$1() {
       PD = { kind: tl ? "title" : "trans", id: tl ? pr.id : df.id, x: e.clientX, y: e.clientY, on: false, label: tl ? pr.name : df.name };
       return;
     }
+    var mr = S.page === "media" && e.target.closest('[data-a="mrow"]');
+    if (mr) {
+      var mm0 = M(mr.dataset.v);
+      if (mm0) PD = { kind: "tobin", id: mm0.id, x: e.clientX, y: e.clientY, on: false, label: mm0.n };
+      return;
+    }
     var r = e.target.closest("[data-rc]"), a = !r && e.target.closest("[data-am]");
     if (!r && !a) return;
     var id = r ? r.dataset.rc : a.dataset.am, c = r && C(id), mm = r ? c && c.m && M(c.m) : M(id);
@@ -7138,6 +7293,14 @@ function init$1() {
     if (f) {
       f.style.left = (e.clientX - ar.left) / SCALE + 12 + "px";
       f.style.top = (e.clientY - ar.top) / SCALE + 12 + "px";
+    }
+    if (PD.kind === "tobin") {
+      [].forEach.call(document.querySelectorAll(".bin.dropon"), function(x) {
+        x.classList.remove("dropon");
+      });
+      var bt = pdUnder(e, "[data-binid]");
+      if (bt) bt.classList.add("dropon");
+      return;
     }
     if (PD.kind === "cut") {
       pdMarks();
@@ -7222,6 +7385,25 @@ function init$1() {
     var b = e.target.closest("button");
     if (b && !b.closest("#mb") && !b.disabled && b.closest("#page")) toast("この機能は、まだ使えません");
   });
+  var BINCLK = { id: null, t: 0 };
+  document.addEventListener("click", function(e) {
+    var bn = e.target.closest && e.target.closest("[data-binid]"), id = bn && bn.dataset.binid;
+    if (!id) {
+      BINCLK.id = null;
+      return;
+    }
+    var now = Date.now();
+    if (BINCLK.id === id && now - BINCLK.t < 450) {
+      BINCLK.id = null;
+      e.stopPropagation();
+      e.preventDefault();
+      S.binEdit = id;
+      draw();
+      focusBinName();
+      return;
+    }
+    BINCLK = { id, t: now };
+  }, true);
   document.addEventListener("dblclick", function(e) {
     var r = e.target.closest('[data-a="mrow"]');
     if (r) {
@@ -7234,6 +7416,13 @@ function init$1() {
     if (m && mbOpen !== null && mbOpen !== m.dataset.menu) openMenu(m);
   });
   document.addEventListener("contextmenu", function(e) {
+    var bn = e.target.closest("[data-binid]");
+    if (bn && bn.dataset.binid) {
+      e.preventDefault();
+      closeMenu();
+      openCx(e.clientX, e.clientY, [["名前を変更", "binRen@" + bn.dataset.binid], ["削除", "binDel@" + bn.dataset.binid]]);
+      return;
+    }
     if (e.target.closest("[data-kfarea]")) {
       e.preventDefault();
       closeMenu();
@@ -7324,6 +7513,14 @@ function init$1() {
         if (fontById(tf.font).weight) delete tf.weight;
         changed();
       }
+    } else if (k === "mbin") {
+      moveToBin(e.target.dataset.mid, e.target.value);
+    } else if (k === "ebin") {
+      S.ebin = e.target.value;
+      saveAview();
+      draw();
+    } else if (k === "binname") {
+      renameBin(e.target.dataset.bid, e.target.value);
     } else if (k === "trk") {
       var tc2 = selClipXin();
       if (tc2) {
@@ -7453,6 +7650,24 @@ function selClipXin() {
   })[0];
   return c || null;
 }
+addEventListener("keydown", function(e) {
+  var t = e.target;
+  if (!t || !t.dataset || t.dataset.in !== "binname") return;
+  if (e.key === "Enter") {
+    e.preventDefault();
+    e.stopPropagation();
+    t.blur();
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopPropagation();
+    S.binEdit = null;
+    draw();
+  }
+}, true);
+document.addEventListener("focusout", function(e) {
+  var t = e.target;
+  if (t && t.dataset && t.dataset.in === "binname" && S.binEdit) renameBin(t.dataset.bid, t.value);
+});
 function init() {
   window.__matsuko = { E, P: function() {
     return P;

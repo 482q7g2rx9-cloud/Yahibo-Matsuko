@@ -20,9 +20,9 @@ export function saveP(){historyTick();clearTimeout(saveTimer);if(HOST){if(HOST.p
 
 /* 元に戻す／やり直し（タイムラインと素材の評価・権利） */
 export var HIST, REDO;
-export function snap(){return JSON.stringify({tracks:P.tracks,clips:P.clips,pin:P.pin,pout:P.pout,media:P.media.map(function(m){return [m.id,m.inP,m.outP,m.rate,m.r,m.marks];})});}
+export function snap(){return JSON.stringify({tracks:P.tracks,clips:P.clips,pin:P.pin,pout:P.pout,bins:P.bins||[],media:P.media.map(function(m){return [m.id,m.inP,m.outP,m.rate,m.r,m.marks,m.bin];})});}
 export function mark(){HIST.push(snap());if(HIST.length>100)HIST.shift();REDO=[];}
-export function restore(s){var o=JSON.parse(s);P.tracks=o.tracks;P.clips=o.clips;P.pin=o.pin;P.pout=o.pout;o.media.forEach(function(a){var m=M(a[0]);if(m){m.inP=a[1];m.outP=a[2];m.rate=a[3];m.r=a[4];m.marks=a[5];}});S.sel=S.sel.filter(function(id){return !!C(id);});}
+export function restore(s){var o=JSON.parse(s);P.tracks=o.tracks;P.clips=o.clips;P.pin=o.pin;P.pout=o.pout;P.bins=o.bins||[];o.media.forEach(function(a){var m=M(a[0]);if(m){m.inP=a[1];m.outP=a[2];m.rate=a[3];m.r=a[4];m.marks=a[5];if(a[6])m.bin=a[6];else delete m.bin;}});S.sel=S.sel.filter(function(id){return !!C(id);});}
 export function undo(){if(!HIST.length)return toast('元に戻せる操作はありません');REDO.push(snap());restore(HIST.pop());changed();toast('元に戻しました');}
 export function redo(){if(!REDO.length)return toast('やり直せる操作はありません');HIST.push(snap());restore(REDO.pop());changed();toast('やり直しました');}
 export function changed(){clampProg();saveP();draw();}

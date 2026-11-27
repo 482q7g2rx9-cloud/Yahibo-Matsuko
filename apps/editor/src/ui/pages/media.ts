@@ -6,6 +6,7 @@ import { S } from '../state';
 import { A, btn, h, hms, ic, kv, mb, mmss, ph, stl, waveOf } from '../util';
 import { IMP } from '../importWeb';
 import { HOST, jobText, jobsFoot } from '../desktop';
+import { bins as userBins, inBin } from '../bins';
 
 /* ================================================================
    各ページ
@@ -14,12 +15,11 @@ export var R;
 
 /* ---- メディア ---- */
 export function mediaList(){var q=S.mq.trim(),L=P.media.filter(function(m){
-    if(S.bin==='used')return isUsed(m);if(S.bin==='unused')return !isUsed(m)&&m.k!=='台本';if(S.bin==='wn')return m.r==='wn';
-    if(S.bin!=='all'&&m.k!==S.bin)return false;if(S.mtype&&m.k!==S.mtype)return false;
+    if(!inBin(m,S.bin))return false;if(S.mtype&&m.k!==S.mtype)return false;
     return !q||m.n.indexOf(q)>=0||m.c.indexOf(q)>=0;});
   if(S.msort==='len')L=L.slice().sort(function(a,b){return b.d-a.d;});else if(S.msort==='code')L=L.slice().sort(function(a,b){return a.c<b.c?-1:1;});
   return L;}
-export function binCount(id){var f={all:function(){return true;},used:isUsed,unused:function(m){return !isUsed(m)&&m.k!=='台本';},wn:function(m){return m.r==='wn';}}[id]||function(m){return m.k===id;};return P.media.filter(f).length;}
+export function binCount(id){return P.media.filter(function(m){return inBin(m,id);}).length;}
 export function mthumb(m,w,hh){var sz=w==='fill'?'width:100%;aspect-ratio:16/9':'width:'+w+'px;height:'+hh+'px';
   if(m.loading)return '<div class="th" style="'+sz+';background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:10px">読込中</div>';
   if(m.thumb)return '<div class="th" style="'+sz+';background:#000 url('+m.thumb+') center / cover"></div>';
@@ -34,8 +34,13 @@ export function tlText(m){var o=[];P.clips.slice().sort(function(a,b){return a.s
 export function init(){
 R={};
 R.media=function(){
-  var bins=D.bins.map(binRow).join('')+'<div style="padding:12px 16px 6px" class="mu">スマートビン</div>'+D.smart.map(binRow).join('');
-  function binRow(b){return '<div class="bin li'+(S.bin===b[0]?' selr':'')+'" role="button" tabindex="0"'+A('bin',b[0])+'><span class="grow">'+h(b[1])+'</span><span class="mu">'+binCount(b[0])+'</span></div>';}
+  /* 全素材・種別、自分のビン（＋で作る。ダブルクリックか右クリックで名前を変える・消す）、スマートビン。素材はビンへドラッグして入れる */
+  var ub=userBins(),bins=D.bins.map(binRow).join('')+
+    '<div class="row" style="padding:12px 8px 6px 16px"><span class="mu grow">ビン</span><button class="ib" aria-label="ビンを作る" title="ビンを作る"'+A('binAdd')+'>'+ic('plus',14)+'</button></div>'+
+    ub.map(function(b){var id='b:'+b.id;if(S.binEdit===b.id)return '<div class="bin selr"><input class="inp grow" data-in="binname" data-bid="'+b.id+'" value="'+h(b.name)+'" aria-label="ビンの名前" style="height:24px"></div>';
+      return '<div class="bin li'+(S.bin===id?' selr':'')+'" role="button" tabindex="0" data-binid="'+b.id+'"'+A('bin',id)+'><span class="grow" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+h(b.name)+'</span><span class="mu">'+binCount(id)+'</span></div>';}).join('')+
+    '<div style="padding:12px 16px 6px" class="mu">スマートビン</div>'+D.smart.map(binRow).join('');
+  function binRow(b){return '<div class="bin li'+(S.bin===b[0]?' selr':'')+'" role="button" tabindex="0"'+(b[0]==='all'?' data-binid=""':'')+A('bin',b[0])+'><span class="grow">'+h(b[1])+'</span><span class="mu">'+binCount(b[0])+'</span></div>';}
   var L=mediaList(),m=M(S.media)||L[0]||P.media[0],body,tag=function(x){return x.sample?' <span class="chip c-mu" style="margin-left:6px">見本</span>':'';};
   if(!P.media.length)body='<div class="scroll" style="display:flex;align-items:center;justify-content:center"><div style="text-align:center;line-height:2"><div style="font-size:15px;font-weight:500">素材がまだありません</div><div style="margin-top:10px">'+btn('＋ 読み込み','imp','','pri')+'</div></div></div>';
   else if(S.mview==='list')body='<div class="mt h"><span></span><span>名前</span><span>種別</span><span>長さ</span><span>記号</span><span>権利</span><span>台本行</span><span>状態</span></div><div class="scroll">'+
@@ -52,7 +57,7 @@ R.media=function(){
     right=ph('素材の詳細','<span class="x">'+h(m.n)+'</span>')+'<div class="scroll">'+
     '<div class="mon" style="height:150px">'+prev+'</div>'+miss+
     (canAdd?'<div class="row" style="gap:8px;padding:10px 12px;border-bottom:1px solid var(--dv)">'+btn(ic('plus',14)+'タイムラインに追加','addtl',m.id,'on','','flex:1')+(m.file?btn('削除','mdel',m.id):'')+'</div>':m.file?'<div class="row" style="padding:10px 12px;border-bottom:1px solid var(--dv)">'+btn('削除','mdel',m.id)+'</div>':'')+
-    '<div style="padding:6px 0;border-bottom:1px solid var(--dv)">'+kv('ファイル',h(m.f))+(HOST&&m.path?kv('場所','<span title="'+h(m.path)+'" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">'+h(m.path)+'</span>'):'')+kv(m.k==='映像'||m.k==='画像'?'解像度':'形式',h(m.res||'—'))+kv('長さ',m.d?hms(m.d):'—')+(m.size?kv('サイズ',mb(m.size)):'')+(m.px!==-1||m.file?kv('プロキシ',px):'')+'</div>'+
+    '<div style="padding:6px 0;border-bottom:1px solid var(--dv)">'+kv('ファイル',h(m.f))+(HOST&&m.path?kv('場所','<span title="'+h(m.path)+'" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">'+h(m.path)+'</span>'):'')+kv(m.k==='映像'||m.k==='画像'?'解像度':'形式',h(m.res||'—'))+kv('長さ',m.d?hms(m.d):'—')+kv('ビン','<select class="inp" aria-label="ビン" data-in="mbin" data-mid="'+m.id+'" style="height:26px;width:100%"><option value="">なし</option>'+userBins().map(function(b){return '<option value="'+b.id+'"'+(m.bin===b.id?' selected':'')+'>'+h(b.name)+'</option>';}).join('')+'</select>')+(m.size?kv('サイズ',mb(m.size)):'')+(m.px!==-1||m.file?kv('プロキシ',px):'')+'</div>'+
     ph('権利情報',r?'<span style="font-weight:400">'+stl(r[0],r[1])+'</span>':'')+
     '<div style="padding:6px 0;border-bottom:1px solid var(--dv)">'+kv('状態','<select class="inp" aria-label="権利の状態" data-in="rights" style="height:26px;width:100%">'+[['ok','許可済み'],['wn','要確認'],['free','フリー素材'],['own','自社収録']].map(function(o){return '<option value="'+o[0]+'"'+(m.r===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>')+
       kv('権利者',h(m.ho))+kv('出典',h(m.src))+kv('許諾',h(m.pm))+kv('期限',h(m.ex))+'</div>'+

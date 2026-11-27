@@ -13,6 +13,7 @@ import { mark, saveP } from '../store';
 import { E, TST, audible, redrawProg, sync, trPairs } from '../engine';
 import { TRANSITIONS, transitionById } from '../transitions';
 import { transGallery } from '../transPreview';
+import { binOptions, inBin } from '../bins';
 import { fitZoom, primary, zoomVal } from '../editOps';
 import { num } from '../exporter';
 import { R } from './media';
@@ -146,6 +147,7 @@ export function xRange(){var d=progDur();if(S.x&&S.x.range==='イン点〜アウ
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
+loadAview();
 ROWS=[];
 EYE='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8z"/></svg>';
 LOCK='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0110 0v3h1v11H6V10zm2 0h6V7a3 3 0 00-6 0z"/></svg>';
@@ -154,12 +156,11 @@ PROPS={fsz:{min:12,max:300,step:1,unit:'px',def:59,dec:0},lh:{min:80,max:300,ste
   fin:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2},xd:{min:0.1,max:10,step:0.05,unit:'s',def:1,dec:2},fout:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2}};
 R.edit=function(){
   var left;
-  if(S.etab!=='text'&&S.etab!=='trans'){var L=P.media.filter(function(m){return m.k==='映像'||m.k==='音声'||m.k==='画像'||m.k==='テイク';});
-    left='<div class="row" style="padding:12px 16px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="'+h(S.eq||'')+'" style="height:28px">'+btn('＋ 読込','imp')+'</div><div class="scroll"><div class="asg">'+
-    L.filter(function(m){return !S.eq||m.n.indexOf(S.eq)>=0;}).map(function(m){var r=D.rights[m.r]||['—',''],can=(m.url&&!m.loading)||(m.sample&&m.k!=='音声'&&m.k!=='テイク');
-      return '<div style="position:relative"'+(can?' data-am="'+m.id+'"':'')+'><div class="tb" style="cursor:'+(can?'grab':'default')+';background:'+(m.thumb?'#000 url('+m.thumb+') center / cover':m.k==='音声'?'#2f6b45':m.k==='テイク'?'#5a4a8a':(m.col||['#555'])[0])+'"><span>'+m.k+'</span><span>'+(m.k==='画像'?'':mmss(m.d))+'</span></div>'+
-      (can?'<button class="b s" aria-label="「'+h(m.n)+'」をタイムラインに追加" title="タイムラインに追加"'+A('addtl',m.id)+' style="position:absolute;right:4px;top:4px;width:24px;height:24px;padding:0;border-radius:50%">'+ic('plus',14)+'</button>':'')+
-      '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(m.k==='音声'?h(m.c)+' ':'')+h(m.n)+'</div><div class="'+(m.r==='wn'?'t-wn':'t-ok')+'">'+r[0]+'</div></div>';}).join('')+'</div>'+'</div>';}
+  if(S.etab!=='text'&&S.etab!=='trans'){var L=P.media.filter(function(m){return (m.k==='映像'||m.k==='音声'||m.k==='画像'||m.k==='テイク')&&inBin(m,S.ebin||'all')&&(!S.eq||m.n.indexOf(S.eq)>=0);}),av=S.aview||'grid';
+    left='<div class="row" style="padding:12px 16px 8px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="'+h(S.eq||'')+'" style="height:28px">'+btn('＋ 読込','imp')+'</div>'+
+      '<div class="row" style="padding:0 16px 10px;gap:6px"><select class="inp grow" data-in="ebin" aria-label="ビン" style="height:28px;min-width:0">'+binOptions(S.ebin||'all',['映像','音声','テイク','画像'])+'</select>'+
+      '<span class="seg">'+[['list','リスト','list'],['grid','グリッド','grid'],['large','大きいグリッド','gridL']].map(function(x){return '<button class="b s ico'+(av===x[0]?' on':'')+'" aria-label="'+x[1]+'" title="'+x[1]+'" aria-pressed="'+(av===x[0])+'"'+A('aview',x[0])+'>'+ic(x[2],14)+'</button>';}).join('')+'</span></div>'+
+      '<div class="scroll"><div class="'+(av==='list'?'asl':av==='large'?'asg lg':'asg')+'">'+L.map(function(m){return assetItem(m,av);}).join('')+'</div></div>';}
   else if(S.etab==='trans')left='<div class="scroll" style="padding:14px">'+transGallery()+'</div>';
   else left='<div class="scroll" style="padding:14px">'+styleGallery()+'</div>';
   var tools=[['select','選択',keyOf('tSel')],['split','分割',keyOf('tSplit')],['trash','削除',''],['hand','ハンド',keyOf('tHand')],['text','文字','']],ins=inspector(),rngOn=P.pin!=null||P.pout!=null;
@@ -179,3 +180,15 @@ R.edit=function(){
     (P.sample?'<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>':'')+'</div></div>';
 };
 }
+
+/* アセットタブの素材：リスト（1 行ずつ）・グリッド・大きいグリッド。ドラッグでタイムラインへ、＋で追加 */
+function assetItem(m,av){var r=D.rights[m.r]||['—',''],can=(m.url&&!m.loading)||(m.sample&&m.k!=='音声'&&m.k!=='テイク');
+  var bg=m.thumb?'#000 url('+m.thumb+') center / cover':m.k==='音声'?'#2f6b45':m.k==='テイク'?'#5a4a8a':(m.col||['#555'])[0];
+  var add=can?'<button class="b s" aria-label="「'+h(m.n)+'」をタイムラインに追加" title="タイムラインに追加"'+A('addtl',m.id)+' style="'+(av==='list'?'':'position:absolute;right:4px;top:4px;')+'width:24px;height:24px;padding:0;border-radius:50%;flex:none">'+ic('plus',14)+'</button>':'';
+  var nm=(m.k==='音声'?h(m.c)+' ':'')+h(m.n);
+  if(av==='list')return '<div class="ali"'+(can?' data-am="'+m.id+'" style="cursor:grab"':'')+'><div class="tb" style="background:'+bg+'"></div><div class="grow" style="min-width:0"><div class="nm">'+nm+'</div><div class="mu">'+h(m.k)+(m.k==='画像'?'':'　'+mmss(m.d))+'　<span class="'+(m.r==='wn'?'t-wn':'t-ok')+'">'+r[0]+'</span></div></div>'+add+'</div>';
+  return '<div style="position:relative"'+(can?' data-am="'+m.id+'"':'')+'><div class="tb" style="cursor:'+(can?'grab':'default')+';background:'+bg+'"><span>'+m.k+'</span><span>'+(m.k==='画像'?'':mmss(m.d))+'</span></div>'+add+
+    '<div style="margin-top:4px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nm+'</div><div class="'+(m.r==='wn'?'t-wn':'t-ok')+'">'+r[0]+'</div></div>';}
+/* アセットタブの表示とビンを覚えておく（この PC の、このブラウザだけ） */
+export function saveAview(){try{localStorage.setItem('matsuko.assets',JSON.stringify({v:S.aview||'grid',b:S.ebin||'all'}));}catch(e){}}
+export function loadAview(){try{var o=JSON.parse(localStorage.getItem('matsuko.assets')||'{}');if(['list','grid','large'].indexOf(o.v)>=0)S.aview=o.v;if(typeof o.b==='string')S.ebin=o.b;}catch(e){}}

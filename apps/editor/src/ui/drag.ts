@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { SYS_PREFIX, canQueryLocalFonts, fontById, presetById, queryLocalFonts, systemFontsState } from './titleStyles';
 import { transitionById } from './transitions';
+import { focusBinName, moveToBin, renameBin } from './bins';
 import { isCutB } from './transPreview';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
@@ -11,7 +12,7 @@ import { importFiles } from './importWeb';
 import { HOST } from './desktop';
 import { redrawProg } from './engine';
 import { addTitle, addToTimeline, carve, gapAt, locked, placeMedia, reorderV1, selClips, selIds, zoomTo } from './editOps';
-import { drawTL, selTitle, setProp, syncTLScroll } from './pages/edit';
+import { drawTL, saveAview, selTitle, setProp, syncTLScroll } from './pages/edit';
 import { draw, go } from './render';
 import { closeMenu, mbOpen, menuAct, openCx, openMenu, toast } from './menus';
 import { KEY_GLOBAL, actionFor, comboOf, runKey } from './keys';
@@ -48,7 +49,9 @@ export function pdMarks(){[].forEach.call(document.querySelectorAll('.dragl,.dra
 export function pdEnd(e,ok){var d=PD;PD=null;if(!d||!d.on)return;var f=document.getElementById('dragf');if(f)f.remove();document.body.classList.remove('dragging');pdMarks();
   /* ドラッグの後のクリック（選択など）は起こさない */
   var stop=function(x){x.stopPropagation();x.preventDefault();};document.addEventListener('click',stop,true);setTimeout(function(){document.removeEventListener('click',stop,true);},0);
-  if(ok&&d.kind==='cut'){var t=pdUnder(e,'[data-rc]');if(t&&t.dataset.rc!==d.id){var rc=t.getBoundingClientRect();reorderV1(d.id,t.dataset.rc,e.clientX>rc.left+rc.width/2);}}
+  [].forEach.call(document.querySelectorAll('.bin.dropon'),function(x){x.classList.remove('dropon');});
+  if(ok&&d.kind==='tobin'){var bt=pdUnder(e,'[data-binid]');if(bt)moveToBin(d.id,bt.dataset.binid);}
+  else if(ok&&d.kind==='cut'){var t=pdUnder(e,'[data-rc]');if(t&&t.dataset.rc!==d.id){var rc=t.getBoundingClientRect();reorderV1(d.id,t.dataset.rc,e.clientX>rc.left+rc.width/2);}}
   else if(ok&&pdUnder(e,'[data-body]')){if(d.kind==='title')dropTitle(e,d.id);else if(d.kind==='trans')dropTrans(e,d.id);else dropMedia(e);}
   var g=document.querySelector('[data-ghost]');if(g)g.hidden=true;S.dropT=null;S.dropCut=null;S.dragMedia=null;}
 
@@ -61,12 +64,15 @@ document.addEventListener('pointerdown',function(e){if(e.button!==0||!e.target.c
   /* テロップのスタイル・トランジションも、タイムラインへドラッグして置ける */
   var tl=e.target.closest('[data-a="tLook"]'),tn=!tl&&e.target.closest('[data-trn]');
   if(tl||tn){var pr=tl&&presetById(tl.dataset.v),df=tn&&transitionById(tn.dataset.trn);if(!pr&&!df)return;PD={kind:tl?'title':'trans',id:tl?pr.id:df.id,x:e.clientX,y:e.clientY,on:false,label:tl?pr.name:df.name};return;}
+  /* メディアページ：素材をビンへドラッグして入れる */
+  var mr=S.page==='media'&&e.target.closest('[data-a="mrow"]');if(mr){var mm0=M(mr.dataset.v);if(mm0)PD={kind:'tobin',id:mm0.id,x:e.clientX,y:e.clientY,on:false,label:mm0.n};return;}
   var r=e.target.closest('[data-rc]'),a=!r&&e.target.closest('[data-am]');if(!r&&!a)return;
   var id=r?r.dataset.rc:a.dataset.am,c=r&&C(id),mm=r?(c&&c.m&&M(c.m)):M(id);PD={kind:r?'cut':'media',id:id,x:e.clientX,y:e.clientY,on:false,label:mm?mm.n:''};});
 document.addEventListener('pointermove',function(e){if(!PD)return;
   if(!PD.on){if(Math.abs(e.clientX-PD.x)+Math.abs(e.clientY-PD.y)<5)return;PD.on=true;if(PD.kind==='media')S.dragMedia=PD.id;
     var f=document.createElement('div');f.id='dragf';f.className='dragf';f.textContent=PD.label||'クリップ';document.getElementById('app').appendChild(f);document.body.classList.add('dragging');}
   e.preventDefault();var ar=document.getElementById('app').getBoundingClientRect(),f=document.getElementById('dragf');if(f){f.style.left=((e.clientX-ar.left)/SCALE+12)+'px';f.style.top=((e.clientY-ar.top)/SCALE+12)+'px';}
+  if(PD.kind==='tobin'){[].forEach.call(document.querySelectorAll('.bin.dropon'),function(x){x.classList.remove('dropon');});var bt=pdUnder(e,'[data-binid]');if(bt)bt.classList.add('dropon');return;}
   if(PD.kind==='cut'){pdMarks();var t=pdUnder(e,'[data-rc]');if(t&&t.dataset.rc!==PD.id){var rc=t.getBoundingClientRect();t.classList.add(e.clientX>rc.left+rc.width/2?'dragr':'dragl');}return;}
   if(pdUnder(e,'[data-body]')){if(PD.kind==='title')ghostTitle(e);else if(PD.kind==='trans')ghostTrans(e);else ghostAt(e);}else{var g=document.querySelector('[data-ghost]');if(g)g.hidden=true;S.dropT=null;S.dropCut=null;}});
 document.addEventListener('pointerup',function(e){pdEnd(e,true);});
@@ -86,9 +92,14 @@ document.addEventListener('click',function(e){
   if(a&&ACT[a.dataset.a]){if(a.tagName==='INPUT'&&a.type==='radio'){ACT[a.dataset.a](a.dataset.v);return;}e.preventDefault();ACT[a.dataset.a](a.dataset.v);return;}
   var b=e.target.closest('button');if(b&&!b.closest('#mb')&&!b.disabled&&b.closest('#page'))toast('この機能は、まだ使えません');
 });
+/* ビンの名前：同じビンを続けて 2 回押したら名前を変える（1 回目で描き直すため、dblclick は届かない） */
+var BINCLK={id:null,t:0};
+document.addEventListener('click',function(e){var bn=e.target.closest&&e.target.closest('[data-binid]'),id=bn&&bn.dataset.binid;if(!id){BINCLK.id=null;return;}
+  var now=Date.now();if(BINCLK.id===id&&now-BINCLK.t<450){BINCLK.id=null;e.stopPropagation();e.preventDefault();S.binEdit=id;draw();focusBinName();return;}BINCLK={id:id,t:now};},true);
 document.addEventListener('dblclick',function(e){var r=e.target.closest('[data-a="mrow"]');if(r){var m=M(r.dataset.v);if(m)addToTimeline(m);}});
 document.addEventListener('mouseover',function(e){var m=e.target.closest&&e.target.closest('[data-menu]');if(m&&mbOpen!==null&&mbOpen!==m.dataset.menu)openMenu(m);});
 document.addEventListener('contextmenu',function(e){
+  var bn=e.target.closest('[data-binid]');if(bn&&bn.dataset.binid){e.preventDefault();closeMenu();openCx(e.clientX,e.clientY,[['名前を変更','binRen@'+bn.dataset.binid],['削除','binDel@'+bn.dataset.binid]]);return;}
   if(e.target.closest('[data-kfarea]')){e.preventDefault();closeMenu();openCx(e.clientX,e.clientY);return;}
   var th=e.target.closest('[data-trh]');if(th){e.preventDefault();closeMenu();S.cxTrack=th.dataset.trh;openCx(e.clientX,e.clientY,[['映像トラックを追加','addV'],['音声トラックを追加','addA'],'-',[th.dataset.trh+' を削除','delTrk']]);return;}
   var bd=e.target.closest('[data-body]');if(!bd)return;e.preventDefault();closeMenu();var p=bodyPos(e),t=p.x/(S.pps||10),row=rowAt(p.y),ce=e.target.closest('[data-c]'),c=ce&&C(ce.dataset.c);
@@ -106,6 +117,9 @@ document.addEventListener('focusin',function(e){var k=e.target.dataset&&e.target
 document.addEventListener('change',function(e){var k=e.target.dataset&&e.target.dataset.in;if(!k)return;
   if(k==='mtype'){S.mtype=e.target.value;draw();}else if(k==='msort'){S.msort=e.target.value;draw();}else if(k==='countin')S.countin=e.target.checked;
   else if(k==='tfont'){var tf=selTitle();if(tf){mark();tf.font=e.target.value;if(fontById(tf.font).weight)delete tf.weight;changed();}}
+  else if(k==='mbin'){moveToBin(e.target.dataset.mid,e.target.value);}
+  else if(k==='ebin'){S.ebin=e.target.value;saveAview();draw();}
+  else if(k==='binname'){renameBin(e.target.dataset.bid,e.target.value);}
   else if(k==='trk'){var tc=selClipXin();if(tc){mark();tc.xin.k=e.target.value;changed();}}
   else if(k==='tfontname'){var tn=selTitle(),fn=e.target.value.replace(/["\\]/g,'').trim();if(tn&&fn){mark();tn.font=SYS_PREFIX+fn;changed();}}
   else if(k==='tst'||k==='tsz'||k==='tstart'||k==='tdur'){var ti=selTitle();if(ti){mark();if(k==='tst')ti.st=e.target.value;else if(k==='tsz')ti.sz=e.target.value;else if(k==='tstart')ti.start=Math.max(0,+e.target.value||0);else ti.out=ti.in+Math.max(0.5,+e.target.value||0.5);var sk={};sk[ti.id]=1;carve(ti.tr,ti.start,cEnd(ti),sk);changed();}}
@@ -143,3 +157,8 @@ document.addEventListener('keydown',wantSysFonts,true);
 
 /* インスペクタのトランジションの種類：選んでいる映像のクリップ（つなぎ目の後ろ） */
 function selClipXin(){var c=S.sel.map(C).filter(function(x){return x&&x.xin&&T(x.tr)&&T(x.tr).kind==='v';})[0];return c||null;}
+
+/* ビンの名前の入力：Enter で決める、Esc でやめる、ほかを押したら決める */
+addEventListener('keydown',function(e){var t=e.target;if(!t||!t.dataset||t.dataset.in!=='binname')return;
+  if(e.key==='Enter'){e.preventDefault();e.stopPropagation();t.blur();}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();S.binEdit=null;draw();}},true);
+document.addEventListener('focusout',function(e){var t=e.target;if(t&&t.dataset&&t.dataset.in==='binname'&&S.binEdit)renameBin(t.dataset.bid,t.value);});
