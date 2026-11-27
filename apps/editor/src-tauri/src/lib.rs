@@ -53,6 +53,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::env_info,
             commands::media_base,
+            commands::system_fonts,
             menu::menu_set,
             project::project_default_location,
             project::project_pick_location,

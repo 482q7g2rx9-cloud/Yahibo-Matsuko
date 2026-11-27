@@ -68,9 +68,17 @@ export interface JobEvent {
   data: Record<string, unknown> | null;
 }
 
+/** PC に入っているフォント。family は canvas の font に入れる名前、name は画面に出す名前 */
+export interface SysFont {
+  family: string;
+  name: string;
+}
+
 export interface Host {
   desktop: true;
   envInfo(): Promise<EnvInfo>;
+  /** PC に入っているフォント（テロップで使う） */
+  systemFonts(): Promise<SysFont[]>;
   project: {
     /** 開いているプロジェクト（なければ null） */
     current: Opened | null;
@@ -133,6 +141,7 @@ function keep(o: Opened): Opened {
 const host: Host = {
   desktop: true,
   envInfo: () => invoke<EnvInfo>('env_info'),
+  systemFonts: () => invoke<SysFont[]>('system_fonts'),
   project: {
     current: null,
     defaultLocation: () => invoke('project_default_location'),

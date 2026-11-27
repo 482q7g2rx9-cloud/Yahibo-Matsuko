@@ -47,3 +47,53 @@ pub async fn media_base() -> Option<String> {
         None
     }
 }
+
+/// PC に入っているフォント（テロップで使う）。family は canvas の font に入れる名前、name は画面に出す名前（日本語名があればそれ）
+#[derive(Serialize, Clone)]
+pub struct SysFont {
+    pub family: String,
+    pub name: String,
+}
+
+static SYS_FONTS: std::sync::OnceLock<Vec<SysFont>> = std::sync::OnceLock::new();
+
+fn load_sys_fonts() -> Vec<SysFont> {
+    let mut db = fontdb::Database::new();
+    db.load_system_fonts();
+    let mut map = std::collections::BTreeMap::<String, String>::new();
+    for face in db.faces() {
+        let Some((family, _)) = face.families.first() else {
+            continue;
+        };
+        // macOS の「.SF NS」のような、アプリから使わない内部のフォントは出さない
+        if family.is_empty() || family.starts_with('.') {
+            continue;
+        }
+        let ja = face
+            .families
+            .iter()
+            .find(|(_, l)| *l == fontdb::Language::Japanese_Japan)
+            .map(|(n, _)| n.clone());
+        let e = map.entry(family.clone()).or_insert_with(|| family.clone());
+        if let Some(ja) = ja {
+            *e = ja;
+        }
+    }
+    let mut v: Vec<SysFont> = map
+        .into_iter()
+        .map(|(family, name)| SysFont { family, name })
+        .collect();
+    v.sort_by_key(|a| a.name.to_lowercase());
+    v
+}
+
+#[tauri::command]
+pub async fn system_fonts() -> Vec<SysFont> {
+    if let Some(v) = SYS_FONTS.get() {
+        return v.clone();
+    }
+    let v = tokio::task::spawn_blocking(load_sys_fonts)
+        .await
+        .unwrap_or_default();
+    SYS_FONTS.get_or_init(|| v).clone()
+}

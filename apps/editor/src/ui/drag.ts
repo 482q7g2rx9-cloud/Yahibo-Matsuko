@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { fontById } from './titleStyles';
+import { SYS_PREFIX, fontById } from './titleStyles';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
 import { C, M, cEnd } from './project';
@@ -88,6 +88,7 @@ document.addEventListener('focusin',function(e){var k=e.target.dataset&&e.target
 document.addEventListener('change',function(e){var k=e.target.dataset&&e.target.dataset.in;if(!k)return;
   if(k==='mtype'){S.mtype=e.target.value;draw();}else if(k==='msort'){S.msort=e.target.value;draw();}else if(k==='countin')S.countin=e.target.checked;
   else if(k==='tfont'){var tf=selTitle();if(tf){mark();tf.font=e.target.value;if(fontById(tf.font).weight)delete tf.weight;changed();}}
+  else if(k==='tfontname'){var tn=selTitle(),fn=e.target.value.replace(/["\\]/g,'').trim();if(tn&&fn){mark();tn.font=SYS_PREFIX+fn;changed();}}
   else if(k==='tst'||k==='tsz'||k==='tstart'||k==='tdur'){var ti=selTitle();if(ti){mark();if(k==='tst')ti.st=e.target.value;else if(k==='tsz')ti.sz=e.target.value;else if(k==='tstart')ti.start=Math.max(0,+e.target.value||0);else ti.out=ti.in+Math.max(0.5,+e.target.value||0.5);var sk={};sk[ti.id]=1;carve(ti.tr,ti.start,cEnd(ti),sk);changed();}}
   else if(k==='ttext'||k==='cp'){drawTL();}
   else if(k==='pSnap'){PREF.snap=e.target.checked;S.snap=PREF.snap;savePref();}else if(k==='pFollow'){PREF.follow=e.target.checked;savePref();}

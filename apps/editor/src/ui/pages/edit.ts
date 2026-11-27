@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { TITLE_FONTS, TITLE_PRESETS, fontById, presetById, presetThumb } from '../titleStyles';
+import { SYS_PREFIX, TITLE_FONTS, TITLE_PRESETS, canQueryLocalFonts, fontById, isSystemFont, presetById, presetThumb, systemFonts, systemFontsState } from '../titleStyles';
+import { HOST } from '../desktop';
 import { canvasAttrs, pqLabel } from '../projectSettings';
 import { pw, splitter } from '../panels';
 import * as KS from '../../core/silence';
@@ -76,7 +77,7 @@ export function hotEdit(el){var cid=el.dataset.cid,key=el.dataset.k,c=C(cid);if(
   inp.addEventListener('blur',function(){fin(true);});}
 export function titleForm(c){return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0">'+
   '<label for="ttext" class="t2">文字（改行できます）</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" style="width:100%;height:auto;padding:6px 8px;resize:vertical">'+h(c.label)+'</textarea>'+
-  '<div class="fg"><span>フォント</span><select class="inp" data-in="tfont" aria-label="フォント">'+TITLE_FONTS.map(function(f){return '<option value="'+f.id+'"'+((c.font||'gothic')===f.id?' selected':'')+'>'+h(f.name)+'</option>';}).join('')+'</select></div>'+
+  fontRow(c)+
   '<div class="fg"><span>太さ</span>'+(fontById(c.font).weight?'<span class="mu">このフォントは太さが決まっています</span>':'<span class="seg">'+[[400,'細め'],[700,'標準'],[900,'極太']].map(function(x){return btn(x[1],'tSet','weight|'+x[0],'s'+((c.weight||700)===x[0]?' on':''));}).join('')+'</span>')+'</div>'+
   '<div class="fg"><span>揃え</span><span class="seg">'+[['left','左'],['center','中央'],['right','右']].map(function(x){var cur=c.align||(c.st==='credit'||c.st==='sub'?'center':'left');return btn(x[1],'tSet','align|'+x[0],'s'+(cur===x[0]?' on':''));}).join('')+'</span></div>'+
   numRow('行間',c,'lh')+numRow('文字の間隔',c,'ls')+
@@ -84,6 +85,17 @@ export function titleForm(c){return '<div style="display:flex;flex-direction:col
   '<div class="fg"><span>開始（秒）</span><input class="inp" type="number" step="0.1" min="0" data-in="tstart" value="'+c.start.toFixed(1)+'" aria-label="開始（秒）"></div>'+
   '<div class="fg"><span>長さ（秒）</span><input class="inp" type="number" step="0.1" min="0.5" data-in="tdur" value="'+cLen(c).toFixed(1)+'" aria-label="長さ（秒）"></div>'+
   '<div class="row" style="gap:8px">'+btn('再生ヘッドへ移動','tToHead','','s')+btn('削除','delSel','','s')+'</div></div>';}
+/* フォントの選択。アプリのフォント（同梱）と PC のフォント（titleStyles.ts の systemFonts）を分けて出す */
+function fontRow(c){var cur=c.font||'gothic',sys=systemFonts(),st=systemFontsState(),desk=!!HOST;
+  var opt=function(id,name){return '<option value="'+h(id)+'"'+(cur===id?' selected':'')+'>'+h(name)+'</option>';};
+  var o='<optgroup label="アプリのフォント">'+TITLE_FONTS.map(function(f){return opt(f.id,f.name);}).join('')+'</optgroup>';
+  var missing=isSystemFont(cur)&&!sys.some(function(f){return SYS_PREFIX+f.family===cur;});
+  if(sys.length||missing)o+='<optgroup label="PC のフォント'+(sys.length?'（'+sys.length+'）':'')+'">'+(missing?opt(cur,fontById(cur).name+(st==='ok'?'（この PC にありません）':'')):'')+sys.map(function(f){return opt(SYS_PREFIX+f.family,f.name);}).join('')+'</optgroup>';
+  var r='<div class="fg"><span>フォント</span><select class="inp" data-in="tfont" aria-label="フォント">'+o+'</select></div>';
+  if(desk){if(st!=='ok')r+='<div class="mu" style="font-size:11px">PC のフォントを読み込んでいます…</div>';}
+  else{if(canQueryLocalFonts()&&st!=='ok')r+='<div class="row" style="gap:8px;justify-content:flex-end">'+btn(st==='loading'?'読み込み中…':'PC のフォントを読み込む','tSysFonts','','s')+'</div>'+(st==='error'?'<div class="mu" style="font-size:11px">PC のフォントを読めませんでした。下の欄に名前を入れても使えます。</div>':'');
+    if(!canQueryLocalFonts()||st==='error')r+='<div class="fg"><span>名前で指定</span><input class="inp" data-in="tfontname" placeholder="例：メイリオ" aria-label="PC のフォントの名前" value="'+(isSystemFont(cur)?h(cur.slice(SYS_PREFIX.length)):'')+'"></div>';}
+  return r;}
 /* テロップのスタイルの一覧（titleStyles.ts）。テロップを選んでいればそのスタイルを変え、選んでいなければ新しく追加する */
 export function styleGallery(){var t=selTitle(),cur=t&&t.lookId;
   return '<div class="mu" style="line-height:1.6;margin-bottom:10px">'+(t?'選んでいるテロップのスタイルを変えます。':'押すと、そのスタイルのテロップを再生ヘッドの位置に追加します（T キーでも追加できます）。')+'画面の上・字幕・クレジットなどの種類は、インスペクタで変えられます。</div>'+

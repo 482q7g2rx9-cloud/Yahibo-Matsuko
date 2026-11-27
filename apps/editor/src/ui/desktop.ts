@@ -5,6 +5,7 @@ import { historyReset, historyTick } from './history';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { C, M, P, emptyProject, migrate, setP, uid } from './project';
 import { S } from './state';
+import { queryLocalFontsIfGranted, setSystemFonts } from './titleStyles';
 import { btn, h, hm } from './util';
 import { saveP, saveTimer, setHIST, setREDO } from './store';
 import { IMP, nextCode } from './importWeb';
@@ -119,7 +120,9 @@ document.addEventListener('pointerdown',function(){PDOWN=true;},true);
 addEventListener('pointerup',function(){PDOWN=false;},true);
 addEventListener('pointercancel',function(){PDOWN=false;},true);
 if(HOST){HOST.media.onJob(onJob);
+  if(HOST.systemFonts)HOST.systemFonts().then(function(v){setSystemFonts(v||[]);if(S.page==='edit')draw();}).catch(function(){});
   HOST.onFileDrag(function(e){var ov=document.getElementById('drop');if(e.type==='over')ov.hidden=false;else if(e.type==='leave')ov.hidden=true;
     else{ov.hidden=true;importPaths(e.paths||[]);if(S.page!=='media'&&S.page!=='edit'&&S.page!=='cut')go('media');}});
   addEventListener('pagehide',function(){saveNow();});}
+else queryLocalFontsIfGranted().then(function(ok){if(ok&&S.page==='edit')draw();});
 }

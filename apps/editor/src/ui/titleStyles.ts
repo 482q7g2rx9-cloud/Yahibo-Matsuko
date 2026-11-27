@@ -147,13 +147,80 @@ export const TITLE_FONTS: TitleFont[] = [
   { id: 'hand', name: '手書き風（Yusei Magic）', family: '"Yusei Magic"', weight: 400 },
   { id: 'dot', name: 'ドット（DotGothic16）', family: '"DotGothic16"', weight: 400 },
 ];
+/* PC に入っているフォント。id は「sys:」＋ family。
+   デスクトップ版は起動時に一覧をもらう（src-tauri の system_fonts）。
+   ブラウザ版は Local Font Access（Chrome・Edge）で、使う人が許可したときだけ読める。
+   読めないブラウザでも、フォントの名前を打てば使える */
+export interface SysFont {
+  family: string;
+  name: string;
+}
+export const SYS_PREFIX = 'sys:';
+let sysFonts: SysFont[] = [];
+/** 一覧を読んだか（読めなかったときは null のまま） */
+let sysState: 'none' | 'loading' | 'ok' | 'error' = 'none';
+export function systemFonts(): SysFont[] {
+  return sysFonts;
+}
+export function systemFontsState(): string {
+  return sysState;
+}
+export function setSystemFonts(v: SysFont[]): void {
+  const seen: Record<string, SysFont> = {};
+  for (const f of v) if (f && f.family && !seen[f.family]) seen[f.family] = { family: f.family, name: f.name || f.family };
+  sysFonts = Object.values(seen).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  sysState = 'ok';
+}
+/** ブラウザで PC のフォント一覧を読めるか */
+export function canQueryLocalFonts(): boolean {
+  return typeof window !== 'undefined' && 'queryLocalFonts' in window;
+}
+/** ブラウザ版：PC のフォント一覧を読む（初めては、押したときに呼ぶ。許可を求められる） */
+export async function queryLocalFonts(): Promise<boolean> {
+  if (!canQueryLocalFonts()) return false;
+  sysState = 'loading';
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const list: { family: string }[] = await (window as any).queryLocalFonts();
+    setSystemFonts(list.map((f) => ({ family: f.family, name: f.family })));
+    return true;
+  } catch (e) {
+    sysState = 'error';
+    return false;
+  }
+}
+/** ブラウザ版：前に許可していれば、黙って一覧を読む */
+export async function queryLocalFontsIfGranted(): Promise<boolean> {
+  if (!canQueryLocalFonts() || !navigator.permissions) return false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const st = await navigator.permissions.query({ name: 'local-fonts' as any });
+    if (st.state !== 'granted') return false;
+  } catch (e) {
+    return false;
+  }
+  return queryLocalFonts();
+}
+/** CSS の font-family に入れられるように、名前を引用符で囲む */
+function quoteFamily(name: string): string {
+  return '"' + name.replace(/["\\\n\r]/g, '') + '"';
+}
+export function isSystemFont(id: string | undefined): boolean {
+  return !!id && id.startsWith(SYS_PREFIX);
+}
 export function fontById(id: string | undefined): TitleFont {
+  if (id && isSystemFont(id)) {
+    const family = id.slice(SYS_PREFIX.length);
+    const f = sysFonts.find((x) => x.family === family);
+    return { id, name: f ? f.name : family, family: quoteFamily(family) };
+  }
   return TITLE_FONTS.find((f) => f.id === id) || TITLE_FONTS[0];
 }
 /** canvas の font に入れる文字列 */
 export function titleFont(font: string | undefined, weight: number | undefined, px: number): string {
   const f = fontById(font);
-  return (f.weight || weight || 700) + ' ' + px + 'px ' + f.family + ',sans-serif';
+  // 日本語の文字がないフォント（英字だけのものなど）でも、日本語はゴシックで出す
+  return (f.weight || weight || 700) + ' ' + px + 'px ' + f.family + (isSystemFont(f.id) ? ',' + TITLE_FONTS[0].family : '') + ',sans-serif';
 }
 /* 使うフォントを読み込んでおく（読み込みが終わったら、描き直す関数を呼ぶ） */
 const requested: Record<string, Promise<unknown>> = {};
