@@ -21,27 +21,36 @@ export function route(e){if(!E.ctx||e._routed||!e._audio)return;try{var s=E.ctx.
 export function imgFor(m){var e=E.imgs[m.id];if(!e||e._src!==m.url){e=new Image();if(HOST)e.crossOrigin='anonymous';e.onload=redrawProg;e._src=m.url;e.src=m.url;E.imgs[m.id]=e;}return e;}
 export function elFor(c,m,audio){var e=E.els[c.id];if(e&&e._src===m.url&&!!e._audio===audio)return e;if(e)dropEl(c.id);
   e=document.createElement(audio?'audio':'video');if(HOST)e.crossOrigin='anonymous';e.preload='auto';e.playsInline=true;e.src=m.url;e._src=m.url;e._audio=audio;
-  if(!audio){e.muted=true;e.addEventListener('seeked',idleRedraw);e.addEventListener('loadeddata',idleRedraw);}else route(e);
+  if(!audio){e.muted=true;var ok=function(){if(!E.playing)E.idle.fresh=(E.idle.fresh||0)+1;if(!E.playing&&e.readyState>=2&&e.videoWidth&&E.els[c.id]===e)keepFrame(c.id,e,e.videoWidth,e.videoHeight);seekNext(e);idleRedraw();};e.addEventListener('seeked',ok);e.addEventListener('loadeddata',ok);}else route(e);
   e.addEventListener('error',function(){playErr(m,e);});
   E.els[c.id]=e;return e;}
 /* 再生できなかった素材は、1回だけ知らせる（デスクトップ版の Linux で GStreamer のプラグインが足りないときなど） */
 export var PLAYERR;
 export function playErr(m,e){if(!m||!e.error||PLAYERR[m.id+'|'+m.url])return;PLAYERR[m.id+'|'+m.url]=1;var c=e.error.code;
   toast('「'+m.n+'」を再生できませんでした'+(c===4?'（この形式を再生する機能がありません'+(HOST&&/Linux/.test(navigator.userAgent)?'。gstreamer1.0-libav を入れてください':'')+'）':c===2?'（ファイルを読めませんでした）':'（'+(e.error.message||'コード '+c)+'）'));}
-export function dropEl(id){var e=E.els[id];if(!e)return;try{e.pause();e.removeAttribute('src');e.load&&e.load();}catch(x){}delete E.els[id];}
+/* 止まっているときの位置合わせ（トラックバーを動かしているとき）。
+   位置を変えるたびに読み込みをやり直すと、いつまでも絵が出ないので、前の位置合わせが終わるまで待ち、
+   終わったら（seeked）、その間に来た最後の位置へ合わせる */
+export function seekTo(e,lt){e._want=lt;if(e.seeking||e.readyState<1)return;if(Math.abs(e.currentTime-lt)>0.02){try{e.currentTime=lt;}catch(x){}}}
+export function seekNext(e){if(E.playing||e._want==null||e.seeking)return;if(Math.abs(e.currentTime-e._want)>0.02){try{e.currentTime=e._want;}catch(x){}}}
+export function dropEl(id){delete E.last[id];var e=E.els[id];if(!e)return;try{e.pause();e.removeAttribute('src');e.load&&e.load();}catch(x){}delete E.els[id];}
 export function dbLin(db){return Math.pow(10,(db||0)/20);}
 export function audible(tr){if(tr.mute)return false;var so=P.tracks.some(function(t){return t.kind==='a'&&t.solo;});return !so||!!tr.solo;}
 /* 時刻 t に映る・鳴るクリップの素材を、その位置に合わせる。少し先のクリップは準備しておく */
-export function sync(t,play){var want={};
+export function sync(t,play){var want={},near=[];
   P.clips.forEach(function(c){if(c.type!=='media')return;var m=M(c.m),tr=T(c.tr);if(!m||!m.url||m.loading||m.k==='画像'||!tr)return;
     var s=c.start,e=cEnd(c),a=tr.kind==='a';if(a?!audible(tr):(m.k!=='映像'||tr.hide))return;
-    if(t>=s-1e-6&&t<e)want[c.id]={c:c,m:m,a:a,lt:c.in+(t-s)};else if(s>t&&s-t<1.5)want[c.id]={c:c,m:m,a:a,lt:c.in,pre:1};});
+    if(t>=s-1e-6&&t<e)want[c.id]={c:c,m:m,a:a,lt:c.in+(t-s)};else if(s>t&&s-t<1.5)want[c.id]={c:c,m:m,a:a,lt:c.in,pre:1};
+    /* 止まっているとき（トラックバーを動かしているとき）は、前後の映像のクリップも用意しておく（入ったときにすぐ絵が出るように） */
+    else if(!play&&!a&&(s>t&&s-t<20||e<=t&&t-e<20))near.push({c:c,m:m,a:a,lt:s>t?c.in:Math.max(c.in,c.in+(e-s)-0.05),pre:1,d:s>t?s-t:t-e});});
+  near.sort(function(x,y){return x.d-y.d;}).slice(0,4).forEach(function(w){want[w.c.id]=w;});
   Object.keys(want).forEach(function(id){var w=want[id],e=elFor(w.c,w.m,w.a);
     if(w.a){var lin=dbLin(w.c.vol);if(e._g){e._g.gain.value=lin;e.volume=1;}else e.volume=Math.min(1,lin);}
     if(w.pre){if(!e.paused)e.pause();if(Math.abs(e.currentTime-w.lt)>0.05&&!e.seeking){try{e.currentTime=w.lt;}catch(x){}}return;}
-    if(Math.abs(e.currentTime-w.lt)>(play?0.3:0.02)){try{e.currentTime=w.lt;}catch(x){}}
+    if(!play)seekTo(e,w.lt);else{e._want=null;if(Math.abs(e.currentTime-w.lt)>0.3){try{e.currentTime=w.lt;}catch(x){}}}
     if(play&&e.paused){var pr=e.play();if(pr&&pr.catch)pr.catch(function(){});}if(!play&&!e.paused)e.pause();});
   Object.keys(E.els).forEach(function(id){if(id in want)return;var e=E.els[id],c=C(id);if(!e.paused)e.pause();if(!c||Math.min(Math.abs(c.start-t),Math.abs(cEnd(c)-t))>30)dropEl(id);});}
+/* E.idle：止まっているとき（トラックバーを動かしているときなど）に映像を描いた回数と、絵がなく「読み込み中」を出した回数（fb は代わりに前の絵・サムネイルを出した回数） */
 /* 再生の様子（テストで途切れを数える）：frames 描いた回数、vframes 映像を描いた回数、blank 間に合わず描けなかった回数、
    stale 止まった映像を描いた回数、maxGap・slow 描く間隔の最大（ミリ秒）と 50 ミリ秒を超えた回数 */
 /* 1フレームを描く：V1 から上へ重ねる。見本の素材は色の画面に名前を出す */
@@ -54,10 +63,20 @@ export function drawClip(cx,W,H,c){var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='
   if(m.url&&!m.loading){if(m.k==='画像'){src=imgFor(m);if(src.complete){w=src.naturalWidth;hh=src.naturalHeight;}}else{src=E.els[c.id]||elFor(c,m,false);if(src.readyState>=2){w=src.videoWidth;hh=src.videoHeight;}if(E.playing){var st=E.stats,lt=c.in+(S.t.edit-c.start);st.vframes++;if(!w){st.blank++;if(st.at.length<40)st.at.push('blank@'+S.t.edit.toFixed(2));}else if(src.paused||src.seeking)st.stale++;else if(Math.abs(src.currentTime-lt)>0.15){st.late++;if(st.at.length<40)st.at.push('late@'+S.t.edit.toFixed(2)+'('+(src.currentTime-lt).toFixed(2)+')');}}}}
   var sc=(c.scale==null?100:c.scale)/100;cx.save();cx.globalAlpha=Math.max(0,Math.min(1,(c.op==null?100:c.op)/100));
   cx.translate(W/2+(c.x||0)/100*W,H/2+(c.y||0)/100*H);cx.rotate((c.rot||0)*Math.PI/180);
+  /* 映像の絵がまだ出ないとき（位置合わせ中・読み込み中）は、そのクリップで最後に描けた絵、なければサムネイルを出す */
+  if(!w&&m.k==='映像'&&m.url&&!m.loading){var fb=E.last[c.id];if(!fb&&m.thumb){var ti=thumbFor(m);if(ti.complete&&ti.naturalWidth)fb=ti;}
+    if(fb){E.idle.fb++;if(fb===E.thumbs[m.id])E.idle.thumb=(E.idle.thumb||0)+1;src=fb;w=fb.width||fb.naturalWidth;hh=fb.height||fb.naturalHeight;}}
+  else if(w&&m.k==='映像'&&!E.playing)keepFrame(c.id,src,w,hh);
+  if(!E.playing&&m.k==='映像'&&m.url)E.idle.frames++;
   if(w){var s=Math.min(W/w,H/hh)*sc;cx.drawImage(src,-w*s/2,-hh*s/2,w*s,hh*s);}
-  else{var col=m.col||['#333','#222'],g=cx.createLinearGradient(-W/2,-H/2,W/2,H/2);g.addColorStop(0,col[0]);g.addColorStop(1,col[1]);cx.fillStyle=g;cx.fillRect(-W/2*sc,-H/2*sc,W*sc,H*sc);
+  else{if(m.url&&!E.playing)E.idle.ph++;var col=m.col||['#333','#222'],g=cx.createLinearGradient(-W/2,-H/2,W/2,H/2);g.addColorStop(0,col[0]);g.addColorStop(1,col[1]);cx.fillStyle=g;cx.fillRect(-W/2*sc,-H/2*sc,W*sc,H*sc);
     cx.fillStyle='rgba(255,255,255,.78)';cx.font='500 '+Math.round(H*.05*sc)+'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(m.n+(m.url?'（読み込み中）':'（見本）'),0,0);}
   cx.restore();}
+/* 止まっているときに描けた映像の絵を、クリップごとに 1 枚覚えておく（長い辺 960 まで） */
+export function keepFrame(id,v,w,hh){var k=Math.min(1,960/Math.max(w,hh)),cw=Math.max(1,Math.round(w*k)),ch=Math.max(1,Math.round(hh*k)),c=E.last[id];
+  if(c&&c._t===v.currentTime&&c.width===cw)return;if(!c){c=document.createElement('canvas');E.last[id]=c;}
+  if(c.width!==cw||c.height!==ch){c.width=cw;c.height=ch;}try{c.getContext('2d').drawImage(v,0,0,cw,ch);c._t=v.currentTime;}catch(x){delete E.last[id];}}
+export function thumbFor(m){var e=E.thumbs[m.id];if(!e||e._src!==m.thumb){e=new Image();if(HOST)e.crossOrigin='anonymous';e.onload=idleRedraw;e._src=m.thumb;e.src=m.thumb;E.thumbs[m.id]=e;}return e;}
 /* テロップ：name=店名（画面下・白文字縁取り） q=質問（画面上・黄色帯） sub=字幕（下中央・半透明帯） credit=クレジット（下から上へ流れる） */
 export var TST;
 /* テロップのクリップを描く：位置・拡大率・回転・不透明度は、動画のクリップと同じく画面の中心を基準にする */
@@ -105,7 +124,7 @@ export function progStop(){E.playing=false;cancelAnimationFrame(E.raf);sync(S.t.
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
-E={ctx:null,master:null,mon:null,els:{},imgs:{},playing:false,raf:0,base:0,t0:0,stats:{frames:0,vframes:0,blank:0,stale:0,late:0,maxGap:0,slow:0,last:0,at:[]}};
+E={ctx:null,master:null,mon:null,els:{},imgs:{},last:{},thumbs:{},idle:{frames:0,ph:0,fb:0},playing:false,raf:0,base:0,t0:0,stats:{frames:0,vframes:0,blank:0,stale:0,late:0,maxGap:0,slow:0,last:0,at:[]}};
 PLAYERR={};
 TST={name:'店名テロップ',q:'質問テロップ',sub:'字幕',credit:'クレジット'};
 }

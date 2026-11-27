@@ -4569,8 +4569,14 @@ function elFor(c, m, audio) {
   e._audio = audio;
   if (!audio) {
     e.muted = true;
-    e.addEventListener("seeked", idleRedraw);
-    e.addEventListener("loadeddata", idleRedraw);
+    var ok = function() {
+      if (!E.playing) E.idle.fresh = (E.idle.fresh || 0) + 1;
+      if (!E.playing && e.readyState >= 2 && e.videoWidth && E.els[c.id] === e) keepFrame(c.id, e, e.videoWidth, e.videoHeight);
+      seekNext(e);
+      idleRedraw();
+    };
+    e.addEventListener("seeked", ok);
+    e.addEventListener("loadeddata", ok);
   } else route(e);
   e.addEventListener("error", function() {
     playErr(m, e);
@@ -4585,7 +4591,27 @@ function playErr(m, e) {
   var c = e.error.code;
   toast("「" + m.n + "」を再生できませんでした" + (c === 4 ? "（この形式を再生する機能がありません" + (HOST && /Linux/.test(navigator.userAgent) ? "。gstreamer1.0-libav を入れてください" : "") + "）" : c === 2 ? "（ファイルを読めませんでした）" : "（" + (e.error.message || "コード " + c) + "）"));
 }
+function seekTo(e, lt) {
+  e._want = lt;
+  if (e.seeking || e.readyState < 1) return;
+  if (Math.abs(e.currentTime - lt) > 0.02) {
+    try {
+      e.currentTime = lt;
+    } catch (x) {
+    }
+  }
+}
+function seekNext(e) {
+  if (E.playing || e._want == null || e.seeking) return;
+  if (Math.abs(e.currentTime - e._want) > 0.02) {
+    try {
+      e.currentTime = e._want;
+    } catch (x) {
+    }
+  }
+}
 function dropEl(id) {
+  delete E.last[id];
   var e = E.els[id];
   if (!e) return;
   try {
@@ -4607,7 +4633,7 @@ function audible(tr) {
   return !so || !!tr.solo;
 }
 function sync(t, play) {
-  var want = {};
+  var want = {}, near = [];
   P.clips.forEach(function(c) {
     if (c.type !== "media") return;
     var m = M(c.m), tr = T(c.tr);
@@ -4616,6 +4642,12 @@ function sync(t, play) {
     if (a ? !audible(tr) : m.k !== "映像" || tr.hide) return;
     if (t >= s - 1e-6 && t < e) want[c.id] = { c, m, a, lt: c.in + (t - s) };
     else if (s > t && s - t < 1.5) want[c.id] = { c, m, a, lt: c.in, pre: 1 };
+    else if (!play && !a && (s > t && s - t < 20 || e <= t && t - e < 20)) near.push({ c, m, a, lt: s > t ? c.in : Math.max(c.in, c.in + (e - s) - 0.05), pre: 1, d: s > t ? s - t : t - e });
+  });
+  near.sort(function(x, y) {
+    return x.d - y.d;
+  }).slice(0, 4).forEach(function(w) {
+    want[w.c.id] = w;
   });
   Object.keys(want).forEach(function(id) {
     var w = want[id], e = elFor(w.c, w.m, w.a);
@@ -4636,10 +4668,14 @@ function sync(t, play) {
       }
       return;
     }
-    if (Math.abs(e.currentTime - w.lt) > (play ? 0.3 : 0.02)) {
-      try {
-        e.currentTime = w.lt;
-      } catch (x) {
+    if (!play) seekTo(e, w.lt);
+    else {
+      e._want = null;
+      if (Math.abs(e.currentTime - w.lt) > 0.3) {
+        try {
+          e.currentTime = w.lt;
+        } catch (x) {
+        }
       }
     }
     if (play && e.paused) {
@@ -4716,10 +4752,26 @@ function drawClip(cx, W, H, c) {
   cx.globalAlpha = Math.max(0, Math.min(1, (c.op == null ? 100 : c.op) / 100));
   cx.translate(W / 2 + (c.x || 0) / 100 * W, H / 2 + (c.y || 0) / 100 * H);
   cx.rotate((c.rot || 0) * Math.PI / 180);
+  if (!w && m.k === "映像" && m.url && !m.loading) {
+    var fb = E.last[c.id];
+    if (!fb && m.thumb) {
+      var ti = thumbFor(m);
+      if (ti.complete && ti.naturalWidth) fb = ti;
+    }
+    if (fb) {
+      E.idle.fb++;
+      if (fb === E.thumbs[m.id]) E.idle.thumb = (E.idle.thumb || 0) + 1;
+      src = fb;
+      w = fb.width || fb.naturalWidth;
+      hh = fb.height || fb.naturalHeight;
+    }
+  } else if (w && m.k === "映像" && !E.playing) keepFrame(c.id, src, w, hh);
+  if (!E.playing && m.k === "映像" && m.url) E.idle.frames++;
   if (w) {
     var s = Math.min(W / w, H / hh) * sc;
     cx.drawImage(src, -w * s / 2, -hh * s / 2, w * s, hh * s);
   } else {
+    if (m.url && !E.playing) E.idle.ph++;
     var col = m.col || ["#333", "#222"], g = cx.createLinearGradient(-W / 2, -H / 2, W / 2, H / 2);
     g.addColorStop(0, col[0]);
     g.addColorStop(1, col[1]);
@@ -4732,6 +4784,36 @@ function drawClip(cx, W, H, c) {
     cx.fillText(m.n + (m.url ? "（読み込み中）" : "（見本）"), 0, 0);
   }
   cx.restore();
+}
+function keepFrame(id, v, w, hh) {
+  var k = Math.min(1, 960 / Math.max(w, hh)), cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(hh * k)), c = E.last[id];
+  if (c && c._t === v.currentTime && c.width === cw) return;
+  if (!c) {
+    c = document.createElement("canvas");
+    E.last[id] = c;
+  }
+  if (c.width !== cw || c.height !== ch) {
+    c.width = cw;
+    c.height = ch;
+  }
+  try {
+    c.getContext("2d").drawImage(v, 0, 0, cw, ch);
+    c._t = v.currentTime;
+  } catch (x) {
+    delete E.last[id];
+  }
+}
+function thumbFor(m) {
+  var e = E.thumbs[m.id];
+  if (!e || e._src !== m.thumb) {
+    e = new Image();
+    if (HOST) e.crossOrigin = "anonymous";
+    e.onload = idleRedraw;
+    e._src = m.thumb;
+    e.src = m.thumb;
+    E.thumbs[m.id] = e;
+  }
+  return e;
 }
 var TST;
 function titleInfo(c) {
@@ -4917,7 +4999,7 @@ function progStop() {
   syncPlayBtn();
 }
 function init$a() {
-  E = { ctx: null, master: null, mon: null, els: {}, imgs: {}, playing: false, raf: 0, base: 0, t0: 0, stats: { frames: 0, vframes: 0, blank: 0, stale: 0, late: 0, maxGap: 0, slow: 0, last: 0, at: [] } };
+  E = { ctx: null, master: null, mon: null, els: {}, imgs: {}, last: {}, thumbs: {}, idle: { frames: 0, ph: 0, fb: 0 }, playing: false, raf: 0, base: 0, t0: 0, stats: { frames: 0, vframes: 0, blank: 0, stale: 0, late: 0, maxGap: 0, slow: 0, last: 0, at: [] } };
   PLAYERR = {};
   TST = { name: "店名テロップ", q: "質問テロップ", sub: "字幕", credit: "クレジット" };
 }
