@@ -178,8 +178,10 @@ R.edit=function(){
         (rngOn?'<span class="t-ac" style="margin-left:6px">書き出し範囲 '+tc(P.pin||0)+' – '+tc(P.pout!=null?P.pout:progDur())+'</span>'+btn('範囲を消去','pclear','','s'):'')+
         '</div><div class="tl tl2" data-tlwrap>'+tlInner()+'</div>'+
       '<div class="tlfoot"><button aria-label="縮小" title="縮小（'+keyOf('zout')+'）"'+A('zout')+'>−</button><input type="range" min="0" max="100" value="'+zoomVal()+'" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（'+keyOf('zin')+'）"'+A('zin')+'>＋</button></div></div></div></div>'+
-  '<div class="pn r" style="width:'+pw('editR')+'px">'+splitter('editR','r')+''+ph('インスペクタ','<span class="x">'+h(ins.name)+'</span>')+'<div class="scroll">'+ins.html+
-    (P.sample?'<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>':'')+'</div></div>';
+  /* インスペクタ：幅は固定（320px）。見出しの右のボタンで閉じて、細い帯にできる */
+  (insClosed()?'<div class="pn r insc"><button class="ib" aria-label="インスペクタを開く" title="インスペクタを開く"'+A('insToggle')+'>'+ic('chevL',16)+'</button><span class="vt">インスペクタ</span></div>':
+  '<div class="pn r" style="width:320px">'+ph('インスペクタ','<span class="x">'+h(ins.name)+'</span><button class="ib" aria-label="インスペクタを閉じる" title="インスペクタを閉じる"'+A('insToggle')+'>'+ic('chevR',16)+'</button>')+'<div class="scroll">'+ins.html+
+    (P.sample?'<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>':'')+'</div></div>');
 };
 }
 
@@ -194,3 +196,7 @@ function assetItem(m,av){var r=D.rights[m.r]||['—',''],can=(m.url&&!m.loading)
 /* アセットタブの表示とビンを覚えておく（この PC の、このブラウザだけ） */
 export function saveAview(){try{localStorage.setItem('matsuko.assets',JSON.stringify({v:S.aview||'grid',b:S.ebin||'all'}));}catch(e){}}
 export function loadAview(){try{var o=JSON.parse(localStorage.getItem('matsuko.assets')||'{}');if(['list','grid','large'].indexOf(o.v)>=0)S.aview=o.v;if(typeof o.b==='string')S.ebin=o.b;}catch(e){}}
+
+/* インスペクタを閉じているか（このブラウザに覚える） */
+export function insClosed(){try{return localStorage.getItem('matsuko.inspector')==='closed';}catch(e){return !!S.insClosed;}}
+export function toggleInspector(){var c=!insClosed();S.insClosed=c;try{localStorage.setItem('matsuko.inspector',c?'closed':'open');}catch(e){}draw();}

@@ -16,7 +16,7 @@ import { E, heads, progPlay, progStop, setProg } from './engine';
 import { REC, fxPlay, rec, setREC, srcPlay, srcSeek, stopAll } from './source';
 import { addTitle, addToTimeline, addTrack, carve, closeRange, copySel, delClips, delTrack, fitZoom, insPoint, insertSegs, linked, locked, pasteAt, primary, rm, selIds, splitAt, toggleLink, zoomTo } from './editOps';
 import { X, deskEnqueue, presetX, saveJob, xCancel, xPause, xStart } from './exporter';
-import { PROPS, detectSilence, drawTL, keepSegs, propVal, saveAview, selTitle, setProp } from './pages/edit';
+import { PROPS, detectSilence, drawTL, keepSegs, propVal, saveAview, selTitle, setProp, toggleInspector } from './pages/edit';
 import { newJob } from './pages/export';
 import { draw, go } from './render';
 import { applyDesign, ask, infoDlg, openCx, resetProject, toast } from './menus';
@@ -116,6 +116,7 @@ ACT={
     var L=S.sel.map(C).filter(function(c){return c&&c.type==='title'&&!locked(c);});
     if(L.length){mark();L.forEach(function(c){c.look=lk();c.lookId=pr.id;});changed();return toast('スタイルを「'+pr.name+'」にしました');}
     addTitle('center',S.t.edit);var c=C(S.sel[0]);if(c&&c.type==='title'){c.look=lk();c.lookId=pr.id;changed();}},
+  insToggle:function(){toggleInspector();},
   binAdd:function(){addBin();},binRen:function(v){S.binEdit=v;S.bin='b:'+v;draw();focusBinName();},binDel:function(v){deleteBin(v);},
   aview:function(v){S.aview=v;saveAview();draw();},
   trApply:function(v){applyTransition(v);},trDel:function(v){var c=C(v);if(!c||!c.xin)return;mark();delete c.xin;changed();},

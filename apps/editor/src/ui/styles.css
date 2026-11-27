@@ -455,3 +455,7 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .asg.lg{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
 .seg .b.ico{width:28px;height:28px;padding:0}
 .bin.dropon{background:var(--sel);box-shadow:inset 0 0 0 1px var(--ac)}
+
+/* インスペクタを閉じたときの帯 */
+.pn.r.insc{width:30px;align-items:center;padding-top:6px;gap:10px;border-left:1px solid var(--dv)}
+.pn.r.insc .vt{writing-mode:vertical-rl;color:var(--tx2);font-weight:500;letter-spacing:.1em}
