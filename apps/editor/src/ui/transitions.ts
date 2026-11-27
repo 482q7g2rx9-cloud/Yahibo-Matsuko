@@ -173,7 +173,7 @@ export function mixTransition(
   cx.restore();
 }
 
-/* 一覧に出す見本（A＝青、B＝橙のカードを、進み 0.4 で切り替えた絵） */
+/* 一覧に出す見本（A＝濃いグレー、B＝明るいグレーのカードを、進み 0.4 で切り替えた絵） */
 const thumbs: Record<string, string> = {};
 /* 見本の進み（形がわかりやすいところ） */
 const THUMB_P: Record<string, number> = { fadeblack: 0.6, fadewhite: 0.6, circleopen: 0.45, circleclose: 0.55, zoomin: 0.3, pixelize: 0.4 };
@@ -204,6 +204,6 @@ export function transitionThumb(id: string): string {
   c.height = H;
   const cx = c.getContext('2d');
   if (!cx) return '';
-  mixTransition(cx, id, card('A', '#2f6fd1', '#1b3f7a', W, H), card('B', '#f08a24', '#a8460e', W, H), THUMB_P[id] || 0.4, W, H);
+  mixTransition(cx, id, card('A', '#4a4a4a', '#2e2e2e', W, H), card('B', '#a3a3a3', '#7a7a7a', W, H), THUMB_P[id] || 0.4, W, H);
   return (thumbs[id] = c.toDataURL('image/png'));
 }

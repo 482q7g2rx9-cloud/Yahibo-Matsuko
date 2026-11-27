@@ -1312,7 +1312,7 @@ function transitionThumb(id) {
   c.height = H;
   const cx = c.getContext("2d");
   if (!cx) return "";
-  mixTransition(cx, id, card("A", "#2f6fd1", "#1b3f7a", W, H), card("B", "#f08a24", "#a8460e", W, H), THUMB_P[id] || 0.4, W, H);
+  mixTransition(cx, id, card("A", "#4a4a4a", "#2e2e2e", W, H), card("B", "#a3a3a3", "#7a7a7a", W, H), THUMB_P[id] || 0.4, W, H);
   return thumbs[id] = c.toDataURL("image/png");
 }
 var IDB;
