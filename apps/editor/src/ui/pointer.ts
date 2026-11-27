@@ -3,7 +3,7 @@
 import { C, P, T, cEnd, cLen, fades, gainFrac, gainFromFrac, srcMax, srcMin, uid } from './project';
 import { S, TOTAL } from './state';
 import { HIST, changed, mark } from './store';
-import { E, progStop, setProg, sync } from './engine';
+import { E, progStop, redrawProg, setProg, sync, trPairs } from './engine';
 import { srcSeek } from './source';
 import { EPS, addTitle, carve, delClips, linked, locked, openRange, selClips, selIds, splitAt } from './editOps';
 import { PROPS, ROWS, drawTL, hotEdit, propVal, setProp } from './pages/edit';
@@ -24,7 +24,8 @@ export function prevEnd(c){return P.clips.reduce(function(a,x){return x!==c&&x.t
 /* ゲインライン・フェードをドラッグしている間の表示（音量は「いまの値（変えた量）」） */
 export function gainTip(e,d){var el=document.getElementById('gtip');if(!e){if(el)el.remove();return;}var c=C(d.cid);if(!c)return;
   if(!el){el=document.createElement('div');el.id='gtip';el.className='gtip';document.getElementById('app').appendChild(el);}
-  var t;if(d.k==='gain'){var v=c.vol||0,dv=v-d.v0;t=v.toFixed(1)+' dB　('+(dv>=0?'+':'')+dv.toFixed(1)+' dB)';}
+  var t;if(d.k==='trlen'){t='長さ '+((c.xin&&c.xin.d)||0).toFixed(2)+' 秒';}
+  else if(d.k==='gain'){var v=c.vol||0,dv=v-d.v0;t=v.toFixed(1)+' dB　('+(dv>=0?'+':'')+dv.toFixed(1)+' dB)';}
   else{var f=fades(c);t=(d.side==='in'?'フェードイン ':'フェードアウト ')+f[d.side==='in'?0:1].toFixed(2)+' 秒';}
   el.textContent=t;var a=document.getElementById('app').getBoundingClientRect();el.style.left=((e.clientX-a.left)/SCALE+14)+'px';el.style.top=((e.clientY-a.top)/SCALE+14)+'px';}
 export function nextStart(c){return P.clips.reduce(function(a,x){return x!==c&&x.tr===c.tr&&x.start>=cEnd(c)-EPS?Math.min(a,x.start):a;},1e9);}
@@ -44,6 +45,11 @@ document.addEventListener('pointerdown',function(e){if(e.button!==0)return;
   var p=bodyPos(e),t=p.x/pps,row=rowAt(p.y);e.preventDefault();
   if(S.tool==='hand'){DRAG={k:'pan',x0:e.clientX,y0:e.clientY,sl:p.b.scrollLeft,st:p.b.scrollTop};return;}
   if(S.tool==='text'){addTitle('name',t,row&&row.kind==='v'?row.id:null);return;}
+  /* トランジションの帯：端をドラッグで長さ、それ以外を押すとつなぎ目の後ろのクリップを選ぶ */
+  var tx=S.tool==='select'&&e.target.closest('[data-trx]'),tb=tx&&C(tx.dataset.trx);
+  if(tb&&tb.xin){var te=e.target.closest('[data-tre]');S.sel=[tb.id];
+    if(te){mark();DRAG={k:'trlen',cid:tb.id,x0:p.x,v0:trPairs().filter(function(q){return q.b===tb;}).map(function(q){return q.d;})[0]||tb.xin.d||1,moved:false};gainTip(e,DRAG);}
+    draw();return;}
   /* ゲインライン（音量）・フェードのハンドル */
   var gl=S.tool==='select'&&e.target.closest('[data-gain],[data-fade]'),gc=gl&&C(gl.dataset.cid);
   if(gc&&!locked(gc)){mark();if(S.sel.indexOf(gc.id)<0)S.sel=[gc.id];var fd=gl.dataset.fade;
@@ -66,6 +72,11 @@ document.addEventListener('pointermove',function(e){if(!DRAG)return;var d=DRAG;
   if(d.k==='scut'){var r=d.el.getBoundingClientRect();srcSeek((e.clientX-r.left)/r.width*TOTAL.cut);return;}
   if(d.k==='seek'){var ru=document.querySelector('[data-rul]'),b=document.querySelector('[data-body]');if(ru)setProg(((e.clientX-ru.getBoundingClientRect().left)/SCALE+(b?b.scrollLeft:0))/(S.pps||10));return;}
   if(d.k==='pan'){var b2=document.querySelector('[data-body]');if(b2){b2.scrollLeft=d.sl-(e.clientX-d.x0);b2.scrollTop=d.st-(e.clientY-d.y0);}return;}
+  if(d.k==='trlen'){var tp=bodyPos(e),tb=C(d.cid);if(!tb||!tb.xin)return;if(!d.moved&&Math.abs(tp.x-d.x0)<2)return;d.moved=true;
+    var a=P.clips.filter(function(c){return c!==tb&&c.tr===tb.tr&&c.type==='media'&&Math.abs(cEnd(c)-tb.start)<1e-3;})[0],mx=a?Math.min(cLen(a),cLen(tb)):cLen(tb);
+    /* つなぎ目を中心に左右へ同じだけ伸び縮みする */
+    tb.xin.d=Math.round(Math.max(0.1,Math.min(mx,2*Math.abs(tp.x/(S.pps||10)-tb.start)))*100)/100;
+    drawTL();gainTip(e,d);if(E.playing)sync(S.t.edit,true);else{sync(S.t.edit,false);redrawProg();}return;}
   if(d.k==='gain'||d.k==='fade'){var gp=bodyPos(e),gc=C(d.cid);if(!gc)return;if(!d.moved&&Math.abs(gp.x-d.x0)+Math.abs(gp.y-d.y0)<2)return;d.moved=true;
     if(d.k==='gain'){var rw=ROWS.filter(function(z){return z.id===gc.tr;})[0],hh=Math.max(10,(rw?rw.h:40)-2),fine=e.shiftKey?.1:1;
       gc.vol=Math.round(gainFromFrac(gainFrac(d.v0)+(gp.y-d.y0)*fine/hh)*10)/10;if(Math.abs(gc.vol)<.05)gc.vol=0;}
@@ -95,6 +106,7 @@ document.addEventListener('pointermove',function(e){if(!DRAG)return;var d=DRAG;
   drawTL();showSnap(sp);[].forEach.call(document.querySelectorAll('[data-c]'),function(el){if(skip[el.dataset.c])el.classList.add('mv');});});
 document.addEventListener('pointerup',function(e){var d=DRAG;DRAG=null;if(!d)return;showSnap(null);
   if(d.k==='hot'){if(!d.moved){HIST.pop();hotEdit(d.el);}else drawTL();return;}
+  if(d.k==='trlen'){gainTip(null);if(!d.moved){HIST.pop();return;}changed();return;}
   if(d.k==='gain'||d.k==='fade'){gainTip(null);if(!d.moved){HIST.pop();return;}var gc=C(d.cid);if(gc){if(!gc.vol)delete gc.vol;if(!gc.fin)delete gc.fin;if(!gc.fout)delete gc.fout;}changed();sync(S.t.edit,E.playing);return;}
   if(d.k==='marq'){var q=document.querySelector('[data-marq]');if(q)q.hidden=true;if(!d.moved)S.sel=d.add?S.sel:[];draw();return;}
   if(d.k!=='move'&&d.k!=='trim')return;

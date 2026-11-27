@@ -436,10 +436,14 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .tsl.on .tsb{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
 .tsl.on .tsn{color:var(--ac)}
 
-/* トランジション：つなぎ目をまたぐ帯 */
-.tl2 .trx{position:absolute;z-index:4;pointer-events:none;box-sizing:border-box;border:1px solid rgba(255,255,255,.85);border-radius:3px;background:linear-gradient(90deg,rgba(30,30,30,.75),rgba(120,120,120,.75));color:#fff;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
-.tl2 .trx.on{border-color:var(--wt);box-shadow:0 0 0 1px var(--wt)}
-.tl2 .trx span{padding:0 4px;overflow:hidden;text-overflow:ellipsis}
+/* トランジション：つなぎ目をまたぐ帯（斜線。端をドラッグで長さ） */
+.tl2 .trx{position:absolute;z-index:4;box-sizing:border-box;border:1px solid rgba(255,255,255,.9);border-radius:2px;cursor:pointer;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.75) 0 1px,transparent 1px 5px),rgba(12,22,32,.55)}
+.tl2 .trx.on{border-color:var(--wt);box-shadow:0 0 0 2px var(--wt)}
+.tl2 .trx.lkd{pointer-events:none}
+.tl2 .trx .tre{position:absolute;top:0;bottom:0;width:6px;cursor:ew-resize}
+.tl2 .trx .tre.l{left:-3px}.tl2 .trx .tre.r{right:-3px}
+.tl2 .trx .tre:hover{background:rgba(255,255,255,.5)}
 
 </style>
 <div id="app">
@@ -2687,7 +2691,8 @@ function tlInner() {
     })[0], d = transitionById(q.k);
     if (!r || !d) return;
     var on = S.sel.indexOf(q.b.id) >= 0;
-    cl += '<div class="trx' + (on ? " on" : "") + '" style="left:' + (q.w0 * pps).toFixed(1) + "px;width:" + Math.max(6, q.d * pps).toFixed(1) + "px;top:" + (r.y + Math.round(r.h * 0.3)) + "px;height:" + Math.max(12, Math.round(r.h * 0.4)) + 'px" title="' + h(d.name) + '"><span>' + h(d.name) + "</span></div>";
+    var lk = T(q.tr) && T(q.tr).lock;
+    cl += '<div class="trx' + (on ? " on" : "") + (lk ? " lkd" : "") + '" data-trx="' + q.b.id + '" style="left:' + (q.w0 * pps).toFixed(1) + "px;width:" + Math.max(6, q.d * pps).toFixed(1) + "px;top:" + (r.y + 1) + "px;height:" + (r.h - 2) + 'px" title="' + h(d.name) + "　" + q.d.toFixed(2) + ' 秒">' + (lk ? "" : '<span class="tre l" data-tre="l"></span><span class="tre r" data-tre="r"></span>') + "</div>";
   });
   var step = tickStep(pps), lab = "";
   for (var t = 0; t * pps < W; t += step) lab += '<div class="rl" style="left:' + (t * pps).toFixed(1) + 'px">' + tc(t) + "</div>";
@@ -6279,7 +6284,9 @@ function gainTip(e, d) {
     document.getElementById("app").appendChild(el);
   }
   var t;
-  if (d.k === "gain") {
+  if (d.k === "trlen") {
+    t = "長さ " + (c.xin && c.xin.d || 0).toFixed(2) + " 秒";
+  } else if (d.k === "gain") {
     var v = c.vol || 0, dv = v - d.v0;
     t = v.toFixed(1) + " dB　(" + (dv >= 0 ? "+" : "") + dv.toFixed(1) + " dB)";
   } else {
@@ -6342,6 +6349,22 @@ function init$2() {
     }
     if (S.tool === "text") {
       addTitle("name", t, row && row.kind === "v" ? row.id : null);
+      return;
+    }
+    var tx = S.tool === "select" && e.target.closest("[data-trx]"), tb = tx && C(tx.dataset.trx);
+    if (tb && tb.xin) {
+      var te = e.target.closest("[data-tre]");
+      S.sel = [tb.id];
+      if (te) {
+        mark();
+        DRAG = { k: "trlen", cid: tb.id, x0: p.x, v0: trPairs().filter(function(q) {
+          return q.b === tb;
+        }).map(function(q) {
+          return q.d;
+        })[0] || tb.xin.d || 1, moved: false };
+        gainTip(e, DRAG);
+      }
+      draw();
       return;
     }
     var gl = S.tool === "select" && e.target.closest("[data-gain],[data-fade]"), gc = gl && C(gl.dataset.cid);
@@ -6425,6 +6448,24 @@ function init$2() {
       if (b2) {
         b2.scrollLeft = d.sl - (e.clientX - d.x0);
         b2.scrollTop = d.st - (e.clientY - d.y0);
+      }
+      return;
+    }
+    if (d.k === "trlen") {
+      var tp = bodyPos(e), tb = C(d.cid);
+      if (!tb || !tb.xin) return;
+      if (!d.moved && Math.abs(tp.x - d.x0) < 2) return;
+      d.moved = true;
+      var a = P.clips.filter(function(c) {
+        return c !== tb && c.tr === tb.tr && c.type === "media" && Math.abs(cEnd(c) - tb.start) < 1e-3;
+      })[0], mx = a ? Math.min(cLen(a), cLen(tb)) : cLen(tb);
+      tb.xin.d = Math.round(Math.max(0.1, Math.min(mx, 2 * Math.abs(tp.x / (S.pps || 10) - tb.start))) * 100) / 100;
+      drawTL();
+      gainTip(e, d);
+      if (E.playing) sync(S.t.edit, true);
+      else {
+        sync(S.t.edit, false);
+        redrawProg();
       }
       return;
     }
@@ -6568,6 +6609,15 @@ function init$2() {
         HIST.pop();
         hotEdit(d.el);
       } else drawTL();
+      return;
+    }
+    if (d.k === "trlen") {
+      gainTip(null);
+      if (!d.moved) {
+        HIST.pop();
+        return;
+      }
+      changed();
       return;
     }
     if (d.k === "gain" || d.k === "fade") {

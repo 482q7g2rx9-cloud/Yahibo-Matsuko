@@ -432,7 +432,11 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .tsl.on .tsb{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
 .tsl.on .tsn{color:var(--ac)}
 
-/* トランジション：つなぎ目をまたぐ帯 */
-.tl2 .trx{position:absolute;z-index:4;pointer-events:none;box-sizing:border-box;border:1px solid rgba(255,255,255,.85);border-radius:3px;background:linear-gradient(90deg,rgba(30,30,30,.75),rgba(120,120,120,.75));color:#fff;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
-.tl2 .trx.on{border-color:var(--wt);box-shadow:0 0 0 1px var(--wt)}
-.tl2 .trx span{padding:0 4px;overflow:hidden;text-overflow:ellipsis}
+/* トランジション：つなぎ目をまたぐ帯（斜線。端をドラッグで長さ） */
+.tl2 .trx{position:absolute;z-index:4;box-sizing:border-box;border:1px solid rgba(255,255,255,.9);border-radius:2px;cursor:pointer;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.75) 0 1px,transparent 1px 5px),rgba(12,22,32,.55)}
+.tl2 .trx.on{border-color:var(--wt);box-shadow:0 0 0 2px var(--wt)}
+.tl2 .trx.lkd{pointer-events:none}
+.tl2 .trx .tre{position:absolute;top:0;bottom:0;width:6px;cursor:ew-resize}
+.tl2 .trx .tre.l{left:-3px}.tl2 .trx .tre.r{right:-3px}
+.tl2 .trx .tre:hover{background:rgba(255,255,255,.5)}

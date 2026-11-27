@@ -52,7 +52,8 @@ export function tlInner(){var pps=S.pps||10,dur=progDur(),b=document.querySelect
   var H=y;P.clips.forEach(function(c){var r=ROWS.filter(function(x){return x.id===c.tr;})[0];if(r)cl+=clipHtml(c,r,pps);});
   /* トランジション：つなぎ目をまたぐ帯 */
   trPairs().forEach(function(q){var r=ROWS.filter(function(x){return x.id===q.tr;})[0],d=transitionById(q.k);if(!r||!d)return;var on=S.sel.indexOf(q.b.id)>=0;
-    cl+='<div class="trx'+(on?' on':'')+'" style="left:'+(q.w0*pps).toFixed(1)+'px;width:'+Math.max(6,q.d*pps).toFixed(1)+'px;top:'+(r.y+Math.round(r.h*.3))+'px;height:'+Math.max(12,Math.round(r.h*.4))+'px" title="'+h(d.name)+'"><span>'+h(d.name)+'</span></div>';});
+    var lk=T(q.tr)&&T(q.tr).lock;
+    cl+='<div class="trx'+(on?' on':'')+(lk?' lkd':'')+'" data-trx="'+q.b.id+'" style="left:'+(q.w0*pps).toFixed(1)+'px;width:'+Math.max(6,q.d*pps).toFixed(1)+'px;top:'+(r.y+1)+'px;height:'+(r.h-2)+'px" title="'+h(d.name)+'　'+q.d.toFixed(2)+' 秒">'+(lk?'':'<span class="tre l" data-tre="l"></span><span class="tre r" data-tre="r"></span>')+'</div>';});
   var step=tickStep(pps),lab='';for(var t=0;t*pps<W;t+=step)lab+='<div class="rl" style="left:'+(t*pps).toFixed(1)+'px">'+tc(t)+'</div>';
   var rng=P.pin!=null||P.pout!=null?'<div class="rng" style="left:'+((P.pin||0)*pps)+'px;width:'+(((P.pout!=null?P.pout:dur)-(P.pin||0))*pps)+'px" title="書き出し範囲"></div>':'',ph0=S.t.edit*pps;
   return '<div class="corner" data-time="edit">'+tc(S.t.edit)+'</div>'+
