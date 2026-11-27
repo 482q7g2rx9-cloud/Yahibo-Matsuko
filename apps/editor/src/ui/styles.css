@@ -150,7 +150,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--ac);width:14px;height:
 .vsep{width:1px;height:18px;background:var(--dv);margin:0 4px;flex:none}
 
 /* モニター・再生操作 */
-.mon{flex:none;background:#000;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.mon{flex:none;background:var(--bg1);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
 .frame{display:flex;align-items:center;justify-content:center;color:#9a9a9a;border:1px solid #333;position:relative}
 .tp{height:38px;flex:none;display:flex;align-items:center;padding:0 14px;background:var(--bg1);border-bottom:1px solid var(--dv)}
 .tp .tc{width:150px;color:var(--ac);font-size:13px;font-weight:500}.tp .mid{flex:1;display:flex;justify-content:center;align-items:center;gap:2px}.tp .end{width:150px;text-align:right;color:var(--mu)}
