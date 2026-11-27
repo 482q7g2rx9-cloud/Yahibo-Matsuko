@@ -3,6 +3,7 @@ import { SYS_PREFIX, TITLE_FONTS, TITLE_PRESETS, canQueryLocalFonts, fontById, i
 import { HOST } from '../desktop';
 import { canvasAttrs, pqLabel } from '../projectSettings';
 import { pw, splitter } from '../panels';
+import { SCALE } from '../fit';
 import * as KS from '../../core/silence';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from '../data';
@@ -148,6 +149,8 @@ export function xRange(){var d=progDur();if(S.x&&S.x.range==='イン点〜アウ
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){
 loadAview();
+/* ウインドウの大きさが変わったら、インスペクタの幅を合わせる */
+var rsz=0;addEventListener('resize',function(){clearTimeout(rsz);rsz=setTimeout(function(){var pn=document.querySelector('.pn.r:not(.insc)');if(S.page==='edit'&&pn&&Math.abs(pn.getBoundingClientRect().width/SCALE-insWidth())>1)draw();},150);});
 ROWS=[];
 EYE='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8z"/></svg>';
 LOCK='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0110 0v3h1v11H6V10zm2 0h6V7a3 3 0 00-6 0z"/></svg>';
@@ -178,9 +181,9 @@ R.edit=function(){
         (rngOn?'<span class="t-ac" style="margin-left:6px">書き出し範囲 '+tc(P.pin||0)+' – '+tc(P.pout!=null?P.pout:progDur())+'</span>'+btn('範囲を消去','pclear','','s'):'')+
         '</div><div class="tl tl2" data-tlwrap>'+tlInner()+'</div>'+
       '<div class="tlfoot"><button aria-label="縮小" title="縮小（'+keyOf('zout')+'）"'+A('zout')+'>−</button><input type="range" min="0" max="100" value="'+zoomVal()+'" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（'+keyOf('zin')+'）"'+A('zin')+'>＋</button></div></div></div></div>'+
-  /* インスペクタ：幅は固定（320px）。見出しの右のボタンで閉じて、細い帯にできる */
+  /* インスペクタ：幅は固定（前にドラッグで広げられた最大の幅：画面の幅の 36%、最大 560px）。見出しの右のボタンで閉じて、細い帯にできる */
   (insClosed()?'<div class="pn r insc"><button class="ib" aria-label="インスペクタを開く" title="インスペクタを開く"'+A('insToggle')+'>'+ic('chevL',16)+'</button><span class="vt">インスペクタ</span></div>':
-  '<div class="pn r" style="width:320px">'+ph('インスペクタ','<span class="x">'+h(ins.name)+'</span><button class="ib" aria-label="インスペクタを閉じる" title="インスペクタを閉じる"'+A('insToggle')+'>'+ic('chevR',16)+'</button>')+'<div class="scroll">'+ins.html+
+  '<div class="pn r" style="width:'+insWidth()+'px">'+ph('インスペクタ','<span class="x">'+h(ins.name)+'</span><button class="ib" aria-label="インスペクタを閉じる" title="インスペクタを閉じる"'+A('insToggle')+'>'+ic('chevR',16)+'</button>')+'<div class="scroll">'+ins.html+
     (P.sample?'<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>':'')+'</div></div>');
 };
 }
@@ -200,3 +203,5 @@ export function loadAview(){try{var o=JSON.parse(localStorage.getItem('matsuko.a
 /* インスペクタを閉じているか（このブラウザに覚える） */
 export function insClosed(){try{return localStorage.getItem('matsuko.inspector')==='closed';}catch(e){return !!S.insClosed;}}
 export function toggleInspector(){var c=!insClosed();S.insClosed=c;try{localStorage.setItem('matsuko.inspector',c?'closed':'open');}catch(e){}draw();}
+/* インスペクタの幅：画面の幅の 36%（280〜560px）。前に端をドラッグして広げられた最大の幅と同じ */
+export function insWidth(){var app=document.getElementById('app'),aw=app?app.clientWidth:1180;return Math.round(Math.max(280,Math.min(560,aw*0.36)));}

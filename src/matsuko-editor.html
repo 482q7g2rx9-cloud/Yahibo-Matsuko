@@ -2363,6 +2363,139 @@ function openPicker() {
 function init$n() {
   IMP = { total: 0, done: 0, cur: "" };
 }
+var PREF;
+function savePref() {
+  try {
+    localStorage.setItem("matsuko.pref", JSON.stringify(PREF));
+  } catch (e) {
+  }
+}
+function openPrefs(tab) {
+  closeMenu();
+  S.ptab = tab || S.ptab || "general";
+  S.capture = null;
+  renderPrefs();
+}
+function prefRow(label, ctl) {
+  return '<div class="prow"><div><div>' + label + "</div></div><div>" + ctl + "</div></div>";
+}
+function renderPrefs() {
+  var d = document.getElementById("dlg"), t = S.ptab, body = "";
+  if (t === "general") body = "<h3>一般</h3>" + prefRow("テーマ", '<span class="seg">' + [["light", "ライト"], ["dark", "ダーク"], ["system", "システムに合わせる"]].map(function(x) {
+    return btn(x[1], "pTheme", x[0], "s" + (S.theme === x[0] ? " on" : ""));
+  }).join("") + "</span>") + prefRow("表示サイズ", '<span class="seg">' + [[0.9, "大"], [0.75, "デフォルト"], [0.65, "小"]].map(function(x) {
+    return btn(x[1], "pUi", x[0], "s" + (PREF.ui === x[0] ? " on" : ""));
+  }).join("") + "</span>") + prefRow("アクセントカラー", '<span class="row" style="gap:8px">' + [["blue", "青", "#378ef0"], ["green", "緑", "#2d9d78"], ["orange", "オレンジ", "#e68619"], ["purple", "紫", "#9256d9"]].map(function(x) {
+    return '<button class="sw' + (S.accent === x[0] ? " on" : "") + '" aria-label="' + x[1] + '" aria-pressed="' + (S.accent === x[0]) + '" title="' + x[1] + '"' + A("pAcc", x[0]) + ' style="background:' + x[2] + '"></button>';
+  }).join("") + "</span>");
+  else if (t === "timeline") body = "<h3>タイムライン</h3>" + prefRow("スナップ", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"' + (PREF.snap ? " checked" : "") + ">最初から入れておく</label>") + prefRow("再生中の表示", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"' + (PREF.follow ? " checked" : "") + ">再生ヘッドを追いかける</label>");
+  else {
+    var groups = [];
+    KB.forEach(function(k) {
+      if (groups.indexOf(k[1]) < 0) groups.push(k[1]);
+    });
+    body = "<h3>ショートカット</h3>" + groups.map(function(g) {
+      return '<div class="pgrp">' + g + "</div>" + KB.filter(function(k) {
+        return k[1] === g;
+      }).map(function(k) {
+        var cap = S.capture === k[0], keys = KEYMAP[k[0]], custom = JSON.stringify(keys) !== JSON.stringify(k[3]);
+        return '<div class="krow' + (cap ? " cap" : "") + '" data-krow="' + k[0] + '"><span>' + h(k[2]) + '</span><span class="row" style="gap:4px;flex-wrap:wrap">' + (cap ? '<span class="t-ac">キーを押してください…</span>' : keys.length ? keys.map(function(c) {
+          return "<kbd>" + h(keyLabel(c)) + "</kbd>";
+        }).join("") : '<span class="mu">なし</span>') + '</span><span class="row" style="gap:4px;justify-content:flex-end">' + (cap ? btn("取り消し", "kCancel", "", "s") : btn("変更", "kSet", k[0], "s")) + (custom && !cap ? btn("戻す", "kReset", k[0], "s") : "") + "</span></div>";
+      }).join("");
+    }).join("") + '<div class="pgrp">マウスなど（変えられません）</div>' + MOUSE.map(function(m) {
+      return '<div class="krow"><span>' + h(m[1]) + "</span><span><kbd>" + h(m[0]) + "</kbd></span><span></span></div>";
+    }).join("") + '<div class="row" style="justify-content:flex-end;margin-top:12px">' + btn("すべて初期設定に戻す", "kResetAll", "", "s") + "</div>";
+  }
+  d.innerHTML = '<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">環境設定</h2>' + btn("閉じる", "dlgNo", "", "s") + '</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">' + [["general", "一般"], ["timeline", "タイムライン"], ["keys", "ショートカット"]].map(function(x) {
+    return "<button" + (t === x[0] ? ' aria-current="true"' : "") + A("ptab", x[0]) + ">" + x[1] + "</button>";
+  }).join("") + '</nav><div class="pcont">' + body + "</div></div></div>";
+  d.hidden = false;
+  var sc = d.querySelector(".pcont");
+  if (sc && renderPrefs.st && renderPrefs.tab === t) sc.scrollTop = renderPrefs.st;
+  renderPrefs.tab = t;
+  if (sc) sc.addEventListener("scroll", function() {
+    renderPrefs.st = sc.scrollTop;
+  });
+  var fr = S.kFocus && d.querySelector('[data-krow="' + S.kFocus + '"]');
+  if (fr) fr.scrollIntoView({ block: "nearest" });
+}
+function assignKey(id, c) {
+  KB.forEach(function(k) {
+    if (k[0] !== id) {
+      var i = KEYMAP[k[0]].indexOf(c);
+      if (i >= 0) {
+        KEYMAP[k[0]].splice(i, 1);
+        toast("「" + keyLabel(c) + "」を「" + k[2] + "」から外しました");
+      }
+    }
+  });
+  KEYMAP[id] = [c];
+  saveKeys();
+}
+function init$m() {
+  PREF = { snap: true, follow: true, ui: 0.75, uiv: 2 };
+  try {
+    var pf = JSON.parse(localStorage.getItem("matsuko.pref") || "{}");
+    if (typeof pf.snap === "boolean") PREF.snap = pf.snap;
+    if (typeof pf.follow === "boolean") PREF.follow = pf.follow;
+    if (pf.uiv === 2) {
+      if ([0.65, 0.75, 0.9].indexOf(pf.ui) >= 0) PREF.ui = pf.ui;
+      else if (pf.ui === 1) PREF.ui = 0.9;
+    } else if (typeof pf.ui === "number") PREF.ui = pf.ui >= 1.2 ? 0.9 : pf.ui >= 0.95 ? 0.75 : 0.65;
+  } catch (e) {
+  }
+  S.snap = PREF.snap;
+}
+var SCALE, BASE_W, BASE_H;
+function fit() {
+  var a = document.getElementById("app"), w = innerWidth, hh = innerHeight, s = Math.min(typeof PREF !== "undefined" ? PREF.ui : 1, w / BASE_W, hh / BASE_H);
+  ["dd", "cx", "toast", "dlg", "drop"].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && el.parentNode !== a) a.appendChild(el);
+  });
+  SCALE = s;
+  a.classList.add("fit");
+  a.style.setProperty("--xh", Math.max(0, Math.round(hh / s - BASE_H)) + "px");
+  a.style.setProperty("--xw", Math.max(0, Math.round(w / s - BASE_W)) + "px");
+  document.body.classList.add("fit");
+  a.style.width = w / s + "px";
+  a.style.height = hh / s + "px";
+  if (ZOOM == null) {
+    a.style.transform = "none";
+    a.style.width = w / 1.25 + "px";
+    a.style.zoom = "1.25";
+    ZOOM = Math.abs(a.getBoundingClientRect().width - w) < 2;
+    a.style.width = w / s + "px";
+    document.documentElement.dataset.scale = ZOOM ? "zoom" : "transform";
+  }
+  if (ZOOM) {
+    a.style.transform = "none";
+    a.style.zoom = String(s);
+  } else {
+    a.style.zoom = "";
+    a.style.transform = "scale(" + s + ")";
+  }
+}
+var ZOOM;
+function init$l() {
+  SCALE = 1;
+  ZOOM = null;
+  BASE_W = 1180;
+  BASE_H = 720;
+  addEventListener("resize", fit);
+  applyDesign();
+  buildMb();
+  fit();
+  draw();
+  try {
+    document.fonts && document.fonts.ready.then(function() {
+      clearThumbs();
+      draw();
+    });
+  } catch (e) {
+  }
+}
 const SILENCE_PAD = 0.1;
 const SILENCE_MIN_MARK = 0.2;
 const MIN_KEEP = 0.1;
@@ -2486,7 +2619,7 @@ function startPreview(id) {
     })();
   })();
 }
-function init$m() {
+function init$k() {
   PV = null;
   document.addEventListener("mouseover", function(e) {
     var el = e.target.closest && e.target.closest("[data-trn]");
@@ -2888,7 +3021,7 @@ function saveJob(j) {
   a.click();
   a.remove();
 }
-function init$l() {
+function init$j() {
   VM = [["MP4（H.264）", "video/mp4;codecs=avc1.640028,mp4a.40.2", "mp4"], ["MP4（H.264）", "video/mp4;codecs=avc1.42E01E,mp4a.40.2", "mp4"], ["MP4（H.264）", "video/mp4;codecs=avc1,mp4a.40.2", "mp4"], ["MP4", "video/mp4", "mp4"], ["WebM（VP9）", "video/webm;codecs=vp9,opus", "webm"], ["WebM（VP8）", "video/webm;codecs=vp8,opus", "webm"], ["WebM", "video/webm", "webm"]];
   AM = [["MP4（AAC 音声）", "audio/mp4", "mp4"], ["WebM（Opus 音声）", "audio/webm;codecs=opus", "webm"], ["WebM（音声）", "audio/webm", "webm"]];
   X = null;
@@ -2950,7 +3083,7 @@ function tlText(m) {
   });
   return o.length ? o.slice(0, 4).join(" / ") + (o.length > 4 ? " ほか" : "") : "—";
 }
-function init$k() {
+function init$i() {
   R = {};
   R.media = function() {
     var ub = bins(), bins$1 = D.bins.map(binRow).join("") + '<div class="row" style="padding:12px 8px 6px 16px"><span class="mu grow">ビン</span><button class="ib" aria-label="ビンを作る" title="ビンを作る"' + A("binAdd") + ">" + ic("plus", 14) + "</button></div>" + ub.map(function(b) {
@@ -3268,8 +3401,16 @@ function xRange() {
   }
   return [0, d];
 }
-function init$j() {
+function init$h() {
   loadAview();
+  var rsz = 0;
+  addEventListener("resize", function() {
+    clearTimeout(rsz);
+    rsz = setTimeout(function() {
+      var pn = document.querySelector(".pn.r:not(.insc)");
+      if (S.page === "edit" && pn && Math.abs(pn.getBoundingClientRect().width / SCALE - insWidth()) > 1) draw();
+    }, 150);
+  });
   ROWS = [];
   EYE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8z"/></svg>';
   LOCK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V7a5 5 0 0110 0v3h1v11H6V10zm2 0h6V7a3 3 0 00-6 0z"/></svg>';
@@ -3304,8 +3445,8 @@ function init$j() {
     return '<div class="pn l" style="width:' + pw("editL") + 'px">' + splitter("editL", "l") + ph("素材") + tabs([["assets", "アセット"], ["text", "テロップ"], ["trans", "トランジション"]], S.etab === "text" || S.etab === "trans" ? S.etab : "assets", "etab", "素材の種類") + left + '</div><div class="pc" style="background:var(--bg0)"><div style="height:calc(280px + var(--xh,0px)*.5);flex:none;display:flex;flex-direction:column;background:#000">' + ph("プレビュー", '<span class="x">全長 ' + mmss(progDur()) + "</span>") + '<div class="mon" style="flex:1;min-height:0"><canvas data-prog ' + canvasAttrs() + ' style="height:calc(203px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas></div><div class="tp" style="height:34px;border-bottom:0;padding:0 12px"><span class="tc" data-time="edit">' + tc(S.t.edit) + '</span><span class="mid">' + ibtn("inPt", "イン点を設定（I キー）", "pin") + ibtn("outPt", "アウト点を設定（O キー）", "pout") + '<span class="vsep"></span>' + ibtn("prevCut", "前の編集点へ（↑）", "prev") + ibtn("back", "1フレーム戻る（←）", "fb") + playBtn(E.playing) + ibtn("fwd", "1フレーム進む（→）", "ff") + ibtn("nextCut", "次の編集点へ（↓）", "next") + '<span class="vsep"></span>' + ibtn("split", "再生ヘッドで分割（S キー）", "split") + '</span><span class="end row" style="justify-content:flex-end;gap:6px"><button class="b s" style="height:24px;padding:0 8px;border:0;background:none;color:var(--mu)" title="プレビューの画質"' + A("psOpen") + ">" + pqLabel() + "</button>" + ibtn("full", "全画面", "todo") + '</span></div></div><div style="flex:1;min-height:0;display:flex"><div style="width:44px;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px;background:var(--bg1);border-right:1px solid var(--ln)">' + tools.map(function(t) {
       var on = S.tool === t[0];
       return '<button aria-label="' + t[1] + '" title="' + t[1] + (t[2] ? "（" + t[2] + " キー）" : "") + '" aria-pressed="' + on + '"' + A("tool", t[0]) + ' style="width:38px;height:44px;padding:0;border:0;border-radius:4px;background:' + (on ? "var(--bg4)" : "transparent") + ";color:" + (on ? "var(--ac)" : "var(--tx2)") + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">' + ic(t[0], 16) + '<span style="font-size:10px;color:var(--tx2)">' + t[1] + "</span></button>";
-    }).join("") + '</div><div style="flex:1;min-width:0;display:flex;flex-direction:column"><div class="row tlbar"><button class="b s' + (S.snap ? " on" : "") + '" aria-pressed="' + S.snap + '"' + A("snapT") + ' title="スナップ（N キー）">スナップ</button>' + btn("＋ トラック", "addTrk", "", "s", "トラックを追加") + (rngOn ? '<span class="t-ac" style="margin-left:6px">書き出し範囲 ' + tc(P.pin || 0) + " – " + tc(P.pout != null ? P.pout : progDur()) + "</span>" + btn("範囲を消去", "pclear", "", "s") : "") + '</div><div class="tl tl2" data-tlwrap>' + tlInner() + '</div><div class="tlfoot"><button aria-label="縮小" title="縮小（' + keyOf("zout") + '）"' + A("zout") + '>−</button><input type="range" min="0" max="100" value="' + zoomVal() + '" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（' + keyOf("zin") + '）"' + A("zin") + ">＋</button></div></div></div></div>" + /* インスペクタ：幅は固定（320px）。見出しの右のボタンで閉じて、細い帯にできる */
-    (insClosed() ? '<div class="pn r insc"><button class="ib" aria-label="インスペクタを開く" title="インスペクタを開く"' + A("insToggle") + ">" + ic("chevL", 16) + '</button><span class="vt">インスペクタ</span></div>' : '<div class="pn r" style="width:320px">' + ph("インスペクタ", '<span class="x">' + h(ins.name) + '</span><button class="ib" aria-label="インスペクタを閉じる" title="インスペクタを閉じる"' + A("insToggle") + ">" + ic("chevR", 16) + "</button>") + '<div class="scroll">' + ins.html + (P.sample ? '<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>' : "") + "</div></div>");
+    }).join("") + '</div><div style="flex:1;min-width:0;display:flex;flex-direction:column"><div class="row tlbar"><button class="b s' + (S.snap ? " on" : "") + '" aria-pressed="' + S.snap + '"' + A("snapT") + ' title="スナップ（N キー）">スナップ</button>' + btn("＋ トラック", "addTrk", "", "s", "トラックを追加") + (rngOn ? '<span class="t-ac" style="margin-left:6px">書き出し範囲 ' + tc(P.pin || 0) + " – " + tc(P.pout != null ? P.pout : progDur()) + "</span>" + btn("範囲を消去", "pclear", "", "s") : "") + '</div><div class="tl tl2" data-tlwrap>' + tlInner() + '</div><div class="tlfoot"><button aria-label="縮小" title="縮小（' + keyOf("zout") + '）"' + A("zout") + '>−</button><input type="range" min="0" max="100" value="' + zoomVal() + '" data-in="zoom" aria-label="タイムラインの拡大率"><button aria-label="拡大" title="拡大（' + keyOf("zin") + '）"' + A("zin") + ">＋</button></div></div></div></div>" + /* インスペクタ：幅は固定（前にドラッグで広げられた最大の幅：画面の幅の 36%、最大 560px）。見出しの右のボタンで閉じて、細い帯にできる */
+    (insClosed() ? '<div class="pn r insc"><button class="ib" aria-label="インスペクタを開く" title="インスペクタを開く"' + A("insToggle") + ">" + ic("chevL", 16) + '</button><span class="vt">インスペクタ</span></div>' : '<div class="pn r" style="width:' + insWidth() + 'px">' + ph("インスペクタ", '<span class="x">' + h(ins.name) + '</span><button class="ib" aria-label="インスペクタを閉じる" title="インスペクタを閉じる"' + A("insToggle") + ">" + ic("chevR", 16) + "</button>") + '<div class="scroll">' + ins.html + (P.sample ? '<div style="padding:10px 16px 12px"><div style="font-weight:500;margin-bottom:6px">コメント</div><div class="box"><span class="t-lb">山本（講師）</span><br>質問テロップを入れて意図を伝えましょう。</div></div>' : "") + "</div></div>");
   };
 }
 function assetItem(m, av) {
@@ -3345,6 +3486,10 @@ function toggleInspector() {
   } catch (e) {
   }
   draw();
+}
+function insWidth() {
+  var app = document.getElementById("app"), aw = app ? app.clientWidth : 1180;
+  return Math.round(Math.max(280, Math.min(560, aw * 0.36)));
 }
 var EPS;
 function rm(c) {
@@ -3577,92 +3722,8 @@ function zoomTo(p, at) {
   S.tlx = Math.max(0, at * p - px);
   drawTL();
 }
-function init$i() {
+function init$g() {
   EPS = 1e-6;
-}
-var PREF;
-function savePref() {
-  try {
-    localStorage.setItem("matsuko.pref", JSON.stringify(PREF));
-  } catch (e) {
-  }
-}
-function openPrefs(tab) {
-  closeMenu();
-  S.ptab = tab || S.ptab || "general";
-  S.capture = null;
-  renderPrefs();
-}
-function prefRow(label, ctl) {
-  return '<div class="prow"><div><div>' + label + "</div></div><div>" + ctl + "</div></div>";
-}
-function renderPrefs() {
-  var d = document.getElementById("dlg"), t = S.ptab, body = "";
-  if (t === "general") body = "<h3>一般</h3>" + prefRow("テーマ", '<span class="seg">' + [["light", "ライト"], ["dark", "ダーク"], ["system", "システムに合わせる"]].map(function(x) {
-    return btn(x[1], "pTheme", x[0], "s" + (S.theme === x[0] ? " on" : ""));
-  }).join("") + "</span>") + prefRow("表示サイズ", '<span class="seg">' + [[0.9, "大"], [0.75, "デフォルト"], [0.65, "小"]].map(function(x) {
-    return btn(x[1], "pUi", x[0], "s" + (PREF.ui === x[0] ? " on" : ""));
-  }).join("") + "</span>") + prefRow("アクセントカラー", '<span class="row" style="gap:8px">' + [["blue", "青", "#378ef0"], ["green", "緑", "#2d9d78"], ["orange", "オレンジ", "#e68619"], ["purple", "紫", "#9256d9"]].map(function(x) {
-    return '<button class="sw' + (S.accent === x[0] ? " on" : "") + '" aria-label="' + x[1] + '" aria-pressed="' + (S.accent === x[0]) + '" title="' + x[1] + '"' + A("pAcc", x[0]) + ' style="background:' + x[2] + '"></button>';
-  }).join("") + "</span>");
-  else if (t === "timeline") body = "<h3>タイムライン</h3>" + prefRow("スナップ", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"' + (PREF.snap ? " checked" : "") + ">最初から入れておく</label>") + prefRow("再生中の表示", '<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"' + (PREF.follow ? " checked" : "") + ">再生ヘッドを追いかける</label>");
-  else {
-    var groups = [];
-    KB.forEach(function(k) {
-      if (groups.indexOf(k[1]) < 0) groups.push(k[1]);
-    });
-    body = "<h3>ショートカット</h3>" + groups.map(function(g) {
-      return '<div class="pgrp">' + g + "</div>" + KB.filter(function(k) {
-        return k[1] === g;
-      }).map(function(k) {
-        var cap = S.capture === k[0], keys = KEYMAP[k[0]], custom = JSON.stringify(keys) !== JSON.stringify(k[3]);
-        return '<div class="krow' + (cap ? " cap" : "") + '" data-krow="' + k[0] + '"><span>' + h(k[2]) + '</span><span class="row" style="gap:4px;flex-wrap:wrap">' + (cap ? '<span class="t-ac">キーを押してください…</span>' : keys.length ? keys.map(function(c) {
-          return "<kbd>" + h(keyLabel(c)) + "</kbd>";
-        }).join("") : '<span class="mu">なし</span>') + '</span><span class="row" style="gap:4px;justify-content:flex-end">' + (cap ? btn("取り消し", "kCancel", "", "s") : btn("変更", "kSet", k[0], "s")) + (custom && !cap ? btn("戻す", "kReset", k[0], "s") : "") + "</span></div>";
-      }).join("");
-    }).join("") + '<div class="pgrp">マウスなど（変えられません）</div>' + MOUSE.map(function(m) {
-      return '<div class="krow"><span>' + h(m[1]) + "</span><span><kbd>" + h(m[0]) + "</kbd></span><span></span></div>";
-    }).join("") + '<div class="row" style="justify-content:flex-end;margin-top:12px">' + btn("すべて初期設定に戻す", "kResetAll", "", "s") + "</div>";
-  }
-  d.innerHTML = '<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">環境設定</h2>' + btn("閉じる", "dlgNo", "", "s") + '</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">' + [["general", "一般"], ["timeline", "タイムライン"], ["keys", "ショートカット"]].map(function(x) {
-    return "<button" + (t === x[0] ? ' aria-current="true"' : "") + A("ptab", x[0]) + ">" + x[1] + "</button>";
-  }).join("") + '</nav><div class="pcont">' + body + "</div></div></div>";
-  d.hidden = false;
-  var sc = d.querySelector(".pcont");
-  if (sc && renderPrefs.st && renderPrefs.tab === t) sc.scrollTop = renderPrefs.st;
-  renderPrefs.tab = t;
-  if (sc) sc.addEventListener("scroll", function() {
-    renderPrefs.st = sc.scrollTop;
-  });
-  var fr = S.kFocus && d.querySelector('[data-krow="' + S.kFocus + '"]');
-  if (fr) fr.scrollIntoView({ block: "nearest" });
-}
-function assignKey(id, c) {
-  KB.forEach(function(k) {
-    if (k[0] !== id) {
-      var i = KEYMAP[k[0]].indexOf(c);
-      if (i >= 0) {
-        KEYMAP[k[0]].splice(i, 1);
-        toast("「" + keyLabel(c) + "」を「" + k[2] + "」から外しました");
-      }
-    }
-  });
-  KEYMAP[id] = [c];
-  saveKeys();
-}
-function init$h() {
-  PREF = { snap: true, follow: true, ui: 0.75, uiv: 2 };
-  try {
-    var pf = JSON.parse(localStorage.getItem("matsuko.pref") || "{}");
-    if (typeof pf.snap === "boolean") PREF.snap = pf.snap;
-    if (typeof pf.follow === "boolean") PREF.follow = pf.follow;
-    if (pf.uiv === 2) {
-      if ([0.65, 0.75, 0.9].indexOf(pf.ui) >= 0) PREF.ui = pf.ui;
-      else if (pf.ui === 1) PREF.ui = 0.9;
-    } else if (typeof pf.ui === "number") PREF.ui = pf.ui >= 1.2 ? 0.9 : pf.ui >= 0.95 ? 0.75 : 0.65;
-  } catch (e) {
-  }
-  S.snap = PREF.snap;
 }
 function checks() {
   var o = [], d = progDur(), used = {};
@@ -3733,7 +3794,7 @@ function newJob() {
   if (!HOST) S.queue.push(j);
   return j;
 }
-function init$g() {
+function init$f() {
   R.export = function() {
     if (!S.x) S.x = presetX(S.preset);
     var x = S.x, f = xFmt(), bits = xBits(), dur = progDur(), rg = xRange(), est = (bits.v + bits.a) * (rg[1] - rg[0]) / 8, ck = checks(), nw = ck.filter(function(c) {
@@ -3773,55 +3834,6 @@ function init$g() {
       return '<div style="display:grid;grid-template-columns:100px 1fr;align-items:center;height:40px"><span class="t2">' + r[0] + "</span>" + r[1] + "</div>";
     }).join("") + '<div class="box" style="margin-top:12px;padding:14px;border:1px solid var(--dv);line-height:1.9">推定サイズ　約 ' + mb(est || 0) + (HOST ? "<br>" : "<br>書き出しにかかる時間　約 " + mmss(rg[1] - rg[0]) + "（実際の長さと同じ）<br>") + '</div></div><div class="row" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv)">' + btn("キューに追加", "qadd", "", "sec", "", "flex:1;height:36px") + btn("書き出し", "xrun", "", "pri", "", "flex:1;height:36px") + "</div></div>";
   };
-}
-var SCALE, BASE_W, BASE_H;
-function fit() {
-  var a = document.getElementById("app"), w = innerWidth, hh = innerHeight, s = Math.min(typeof PREF !== "undefined" ? PREF.ui : 1, w / BASE_W, hh / BASE_H);
-  ["dd", "cx", "toast", "dlg", "drop"].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el && el.parentNode !== a) a.appendChild(el);
-  });
-  SCALE = s;
-  a.classList.add("fit");
-  a.style.setProperty("--xh", Math.max(0, Math.round(hh / s - BASE_H)) + "px");
-  a.style.setProperty("--xw", Math.max(0, Math.round(w / s - BASE_W)) + "px");
-  document.body.classList.add("fit");
-  a.style.width = w / s + "px";
-  a.style.height = hh / s + "px";
-  if (ZOOM == null) {
-    a.style.transform = "none";
-    a.style.width = w / 1.25 + "px";
-    a.style.zoom = "1.25";
-    ZOOM = Math.abs(a.getBoundingClientRect().width - w) < 2;
-    a.style.width = w / s + "px";
-    document.documentElement.dataset.scale = ZOOM ? "zoom" : "transform";
-  }
-  if (ZOOM) {
-    a.style.transform = "none";
-    a.style.zoom = String(s);
-  } else {
-    a.style.zoom = "";
-    a.style.transform = "scale(" + s + ")";
-  }
-}
-var ZOOM;
-function init$f() {
-  SCALE = 1;
-  ZOOM = null;
-  BASE_W = 1180;
-  BASE_H = 720;
-  addEventListener("resize", fit);
-  applyDesign();
-  buildMb();
-  fit();
-  draw();
-  try {
-    document.fonts && document.fonts.ready.then(function() {
-      clearThumbs();
-      draw();
-    });
-  } catch (e) {
-  }
 }
 var ACT;
 function jump(dir) {
@@ -7780,23 +7792,23 @@ init$n();
 init$b();
 init$a();
 init$o();
+init$g();
+init$j();
 init$i();
-init$l();
-init$k();
 init$6();
 init$5();
-init$j();
+init$h();
 init$4();
 init$3();
-init$g();
+init$f();
 init$8();
 init$c();
 init$d();
-init$h();
+init$m();
 init$e();
 init$2();
 init$1();
-init$f();
-init$m();
+init$l();
+init$k();
 init();
 </script>
