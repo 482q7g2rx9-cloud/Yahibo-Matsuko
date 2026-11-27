@@ -108,7 +108,11 @@ export function drawTitleClip(cx,W,H,c,t){var sc=(c.scale==null?100:c.scale)/100
   cx.save();cx.globalAlpha*=op;cx.translate(W/2+(c.x||0)/100*W,H/2+(c.y||0)/100*H);cx.rotate((c.rot||0)*Math.PI/180);cx.scale(sc,sc);cx.translate(-W/2,-H/2);
   drawTitle(cx,W,H,titleInfo(c),t);cx.restore();}
 /* 文字の大きさ：fsz（1080p の画面での px）。なければ前の「小・中・大」 */
-export function drawTitle(cx,W,H,ti,t){var sz={'小':.042,'中':.055,'大':.075}[ti.sz||'中']||.055,fs=ti.fsz?Math.max(4,Math.round(H*ti.fsz/1080)):Math.round(H*sz),lines=String(ti.label||'').split('\n'),lh=fs*((ti.lh||135)/100),pad=fs*.6;
+/* 文字が空のテロップは、画面だけ薄く「テキストを入力」と出す（書き出しには出さない） */
+export var NOPH=false;
+export function setNoPh(v){NOPH=v;}
+export var TITLE_PH='テキストを入力';
+export function drawTitle(cx,W,H,ti,t){if(!String(ti.label||'').trim()){if(NOPH||(X&&X.run))return;cx.save();cx.globalAlpha*=.45;var o={};for(var k in ti)o[k]=ti[k];o.label=TITLE_PH;drawTitle(cx,W,H,o,t);cx.restore();return;}var sz={'小':.042,'中':.055,'大':.075}[ti.sz||'中']||.055,fs=ti.fsz?Math.max(4,Math.round(H*ti.fsz/1080)):Math.round(H*sz),lines=String(ti.label||'').split('\n'),lh=fs*((ti.lh||135)/100),pad=fs*.6;
   /* フォント・太さ・文字の間隔（titleStyles.ts）。まだ読み込んでいないフォントは、読み込めたら描き直す */
   loadFont(ti.font,ti.weight,redrawProg);cx.font=titleFont(ti.font,ti.weight,fs);cx.textBaseline='middle';cx.lineJoin='round';
   if('letterSpacing' in cx)cx.letterSpacing=((ti.ls||0)*H/1080)+'px';

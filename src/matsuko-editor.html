@@ -774,7 +774,7 @@ function nudge$1(x, list, dt) {
   for (const c of list) carve$1(x, c.tr, c.start, cEnd$1(c), skip);
   return true;
 }
-const TITLE_TEXT = { center: "テキストを入力", name: "名前・肩書き", q: "質問を入力", sub: "字幕を入力", credit: "出演\n協力\n制作" };
+const TITLE_TEXT = { center: "", name: "名前・肩書き", q: "質問を入力", sub: "字幕を入力", credit: "出演\n協力\n制作" };
 function addTitle$1(x, st, t, tid) {
   const p = x.p;
   t = Math.max(0, t || 0);
@@ -2781,20 +2781,25 @@ function deskEnqueue(j, run) {
 }
 function titleImages(from, to, W, H) {
   var out = [];
-  P.clips.forEach(function(c) {
-    if (c.type !== "title" || cEnd(c) <= from || c.start >= to) return;
-    var ti = titleInfo(c), cv = document.createElement("canvas"), scroll = c.st === "credit";
-    cv.width = W;
-    if (scroll) {
-      var sz = { "小": 0.042, "中": 0.055, "大": 0.075 }[c.sz || "中"] || 0.055, lh = (c.fsz ? Math.max(4, Math.round(H * c.fsz / 1080)) : Math.round(H * sz)) * ((c.lh || 135) / 100), bh = lh * String(c.label || "").split("\n").length;
-      cv.height = Math.max(2, Math.ceil(bh));
-      drawTitle(cv.getContext("2d"), W, H, ti, ti.t + ti.d * H / (H + bh));
-    } else {
-      cv.height = H;
-      drawTitleClip(cv.getContext("2d"), W, H, c, c.start);
-    }
-    out.push({ clip: c.id, png: cv.toDataURL("image/png"), scroll });
-  });
+  setNoPh(true);
+  try {
+    P.clips.forEach(function(c) {
+      if (c.type !== "title" || !String(c.label || "").trim() || cEnd(c) <= from || c.start >= to) return;
+      var ti = titleInfo(c), cv = document.createElement("canvas"), scroll = c.st === "credit";
+      cv.width = W;
+      if (scroll) {
+        var sz = { "小": 0.042, "中": 0.055, "大": 0.075 }[c.sz || "中"] || 0.055, lh = (c.fsz ? Math.max(4, Math.round(H * c.fsz / 1080)) : Math.round(H * sz)) * ((c.lh || 135) / 100), bh = lh * String(c.label || "").split("\n").length;
+        cv.height = Math.max(2, Math.ceil(bh));
+        drawTitle(cv.getContext("2d"), W, H, ti, ti.t + ti.d * H / (H + bh));
+      } else {
+        cv.height = H;
+        drawTitleClip(cv.getContext("2d"), W, H, c, c.start);
+      }
+      out.push({ clip: c.id, png: cv.toDataURL("image/png"), scroll });
+    });
+  } finally {
+    setNoPh(false);
+  }
   return out;
 }
 function deskStart(j) {
@@ -2995,7 +3000,7 @@ function tickStep(pps) {
   return 600;
 }
 function clipHtml(c, r, pps) {
-  var m = c.m ? M(c.m) : null, on = S.sel.indexOf(c.id) >= 0, tr = T(c.tr), x = c.start * pps, w = Math.max(2, cLen(c) * pps), st = "left:" + x.toFixed(1) + "px;width:" + w.toFixed(1) + "px;top:" + r.y + "px;height:" + r.h + "px;", cls = (on ? " on" : "") + (tr.lock ? " lkd" : ""), fx = c.type === "title" || r.kind === "v" && c.type === "media" && (hasFx(c) || m && m.sample) ? '<span class="fxb" style="width:16px;height:12px;line-height:12px">fx</span>' : "", nm = h(c.type === "title" ? String(c.label || "").split("\n")[0] : c.type === "adj" ? c.label : m ? m.n : "（素材なし）"), tip = ' title="' + nm + "　" + tc(c.start) + "〜" + tc(cEnd(c)) + (c.link ? "（リンク）" : "") + '"', tm = '<span class="trim l"></span><span class="trim r"></span>';
+  var m = c.m ? M(c.m) : null, on = S.sel.indexOf(c.id) >= 0, tr = T(c.tr), x = c.start * pps, w = Math.max(2, cLen(c) * pps), st = "left:" + x.toFixed(1) + "px;width:" + w.toFixed(1) + "px;top:" + r.y + "px;height:" + r.h + "px;", cls = (on ? " on" : "") + (tr.lock ? " lkd" : ""), fx = c.type === "title" || r.kind === "v" && c.type === "media" && (hasFx(c) || m && m.sample) ? '<span class="fxb" style="width:16px;height:12px;line-height:12px">fx</span>' : "", nm = h(c.type === "title" ? String(c.label || "").split("\n")[0] || "テキストを入力" : c.type === "adj" ? c.label : m ? m.n : "（素材なし）"), tip = ' title="' + nm + "　" + tc(c.start) + "〜" + tc(cEnd(c)) + (c.link ? "（リンク）" : "") + '"', tm = '<span class="trim l"></span><span class="trim r"></span>';
   if (r.kind === "v") {
     if (c.type === "title") return '<div class="ci title' + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + "line-height:" + (r.h - 2) + 'px">' + fx + nm + tm + "</div>";
     if (c.type === "adj") return '<div class="ci adj' + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + "line-height:" + (r.h - 2) + 'px">' + nm + tm + "</div>";
@@ -3160,7 +3165,7 @@ function hotEdit(el) {
   });
 }
 function titleForm(c) {
-  return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0"><label for="ttext" class="t2">文字</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" style="width:100%;height:auto;padding:6px 8px;resize:vertical">' + h(c.label) + "</textarea>" + fontRow(c) + (fontById(c.font).weight ? "" : '<div class="fg"><span>太さ</span><span class="seg">' + [[400, "細め"], [700, "標準"], [900, "極太"]].map(function(x) {
+  return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0"><label for="ttext" class="t2">文字</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" placeholder="テキストを入力" style="width:100%;height:auto;padding:6px 8px;resize:vertical">' + h(c.label) + "</textarea>" + fontRow(c) + (fontById(c.font).weight ? "" : '<div class="fg"><span>太さ</span><span class="seg">' + [[400, "細め"], [700, "標準"], [900, "極太"]].map(function(x) {
     return btn(x[1], "tSet", "weight|" + x[0], "s" + ((c.weight || 700) === x[0] ? " on" : ""));
   }).join("") + "</span></div>") + '<div class="fg"><span>揃え</span><span class="seg">' + [["left", "左"], ["center", "中央"], ["right", "右"]].map(function(x) {
     var cur = c.align || (c.st === "credit" || c.st === "sub" || c.st === "center" ? "center" : "left");
@@ -5781,7 +5786,23 @@ function drawTitleClip(cx, W, H, c, t) {
   drawTitle(cx, W, H, titleInfo(c), t);
   cx.restore();
 }
+var NOPH = false;
+function setNoPh(v) {
+  NOPH = v;
+}
+var TITLE_PH = "テキストを入力";
 function drawTitle(cx, W, H, ti, t) {
+  if (!String(ti.label || "").trim()) {
+    if (NOPH || X && X.run) return;
+    cx.save();
+    cx.globalAlpha *= 0.45;
+    var o = {};
+    for (var k in ti) o[k] = ti[k];
+    o.label = TITLE_PH;
+    drawTitle(cx, W, H, o, t);
+    cx.restore();
+    return;
+  }
   var sz = { "小": 0.042, "中": 0.055, "大": 0.075 }[ti.sz || "中"] || 0.055, fs = ti.fsz ? Math.max(4, Math.round(H * ti.fsz / 1080)) : Math.round(H * sz), lines = String(ti.label || "").split("\n"), lh = fs * ((ti.lh || 135) / 100), pad = fs * 0.6;
   loadFont(ti.font, ti.weight, redrawProg);
   cx.font = titleFont(ti.font, ti.weight, fs);

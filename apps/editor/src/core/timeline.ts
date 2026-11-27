@@ -289,7 +289,7 @@ export function nudge(x: Ctx, list: Clip[], dt: number): boolean {
 
 /** テロップの長さ（秒）と、最初に入れておく文字 */
 export const TITLE_LEN: Record<string, number> = { name: 4, q: 4, sub: 4, credit: 8 };
-export const TITLE_TEXT: Record<string, string> = { center: 'テキストを入力', name: '名前・肩書き', q: '質問を入力', sub: '字幕を入力', credit: '出演\n協力\n制作' };
+export const TITLE_TEXT: Record<string, string> = { center: '', name: '名前・肩書き', q: '質問を入力', sub: '字幕を入力', credit: '出演\n協力\n制作' };
 
 /** テロップを置く。tid のトラックが空いていればそこ、なければ V1 より上の空いている映像トラック、なければトラックを足す */
 export function addTitle(x: Ctx, st: string, t: number, tid?: string): Clip {
