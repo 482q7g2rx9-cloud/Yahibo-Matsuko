@@ -38,7 +38,7 @@ export function runKey(a,e){var pg=S.page;
   if(a==='prev'||a==='next'){jump(a==='prev'?-1:1);return;}if(a==='top'||a==='end'){ACT[a]();heads(true);return;}
   var tool={tSel:'select',tSplit:'split',tHand:'hand'};if(tool[a]){S.tool=tool[a];draw();return;}
   if(a==='nl'||a==='nr'){nudge(a==='nl'?-frameSec():frameSec());return;}
-  if(a==='addTitle'){ACT.addTitle('name');return;}if(ACT[a])ACT[a]();}
+  if(a==='addTitle'){ACT.addTitle('center');return;}if(ACT[a])ACT[a]();}
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){

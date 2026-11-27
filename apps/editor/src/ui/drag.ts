@@ -35,7 +35,7 @@ export function dropMedia(e){var m=M(S.dragMedia),i=dropInfo(e),g=document.query
 export function ghostTitle(e){var g=document.querySelector('[data-ghost]'),i=dropInfo(e);if(!g)return;if(!i.row||i.row.kind!=='v'){g.hidden=true;S.dropT=null;return;}
   var t=i.t,sb=snapBy([t,t+4],snapPts({}));if(sb)t=Math.max(0,t+sb.d);S.dropT=t;S.dropRow=i.row.id;g.hidden=false;g.style.cssText='left:'+(t*(S.pps||10))+'px;top:'+i.row.y+'px;width:'+Math.max(4,4*(S.pps||10))+'px;height:'+i.row.h+'px';}
 export function dropTitle(e,id){var g=document.querySelector('[data-ghost]');if(g)g.hidden=true;var pr=presetById(id),i=dropInfo(e);if(!pr||!i.row||i.row.kind!=='v'||S.dropT==null)return;
-  addTitle('name',S.dropT,i.row.id);var c=C(S.sel[0]);if(c&&c.type==='title'){c.look=JSON.parse(JSON.stringify(pr.look));c.lookId=pr.id;changed();}}
+  addTitle('center',S.dropT,i.row.id);var c=C(S.sel[0]);if(c&&c.type==='title'){c.look=JSON.parse(JSON.stringify(pr.look));c.lookId=pr.id;changed();}}
 /* トランジション：近いつなぎ目（同じ映像トラックで、前のクリップとくっついているところ）に付ける */
 export function cutNear(e){var i=dropInfo(e),pps=S.pps||10;if(!i.row||i.row.kind!=='v')return null;var best=null,lim=Math.max(0.4,24/pps);
   P.clips.forEach(function(b){if(b.tr!==i.row.id||!isCutB(b))return;var d=Math.abs(b.start-i.t);if(d<=lim&&(!best||d<Math.abs(best.start-i.t)))best=b;});return best?{b:best,row:i.row}:null;}

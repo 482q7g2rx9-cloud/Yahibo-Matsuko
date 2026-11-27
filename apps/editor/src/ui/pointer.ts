@@ -44,7 +44,7 @@ document.addEventListener('pointerdown',function(e){if(e.button!==0)return;
   if(e.target.closest('.tb2'))return;
   var p=bodyPos(e),t=p.x/pps,row=rowAt(p.y);e.preventDefault();
   if(S.tool==='hand'){DRAG={k:'pan',x0:e.clientX,y0:e.clientY,sl:p.b.scrollLeft,st:p.b.scrollTop};return;}
-  if(S.tool==='text'){addTitle('name',t,row&&row.kind==='v'?row.id:null);return;}
+  if(S.tool==='text'){addTitle('center',t,row&&row.kind==='v'?row.id:null);return;}
   /* トランジションの帯：端をドラッグで長さ、それ以外を押すとつなぎ目の後ろのクリップを選ぶ */
   var tx=S.tool==='select'&&e.target.closest('[data-trx]'),tb=tx&&C(tx.dataset.trx);
   if(tb&&tb.xin){var te=e.target.closest('[data-tre]');S.sel=[tb.id];

@@ -95,7 +95,7 @@ export function titleForm(c){return '<div style="display:flex;flex-direction:col
   '<label for="ttext" class="t2">文字</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" style="width:100%;height:auto;padding:6px 8px;resize:vertical">'+h(c.label)+'</textarea>'+
   fontRow(c)+
   (fontById(c.font).weight?'':'<div class="fg"><span>太さ</span><span class="seg">'+[[400,'細め'],[700,'標準'],[900,'極太']].map(function(x){return btn(x[1],'tSet','weight|'+x[0],'s'+((c.weight||700)===x[0]?' on':''));}).join('')+'</span></div>')+
-  '<div class="fg"><span>揃え</span><span class="seg">'+[['left','左'],['center','中央'],['right','右']].map(function(x){var cur=c.align||(c.st==='credit'||c.st==='sub'?'center':'left');return btn(x[1],'tSet','align|'+x[0],'s'+(cur===x[0]?' on':''));}).join('')+'</span></div>'+
+  '<div class="fg"><span>揃え</span><span class="seg">'+[['left','左'],['center','中央'],['right','右']].map(function(x){var cur=c.align||(c.st==='credit'||c.st==='sub'||c.st==='center'?'center':'left');return btn(x[1],'tSet','align|'+x[0],'s'+(cur===x[0]?' on':''));}).join('')+'</span></div>'+
   numRow('行間',c,'lh')+numRow('文字の間隔',c,'ls')+
   '<div class="fg"><span>スタイル</span><span class="row" style="gap:8px;min-width:0">'+(c.look?'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+h((presetById(c.lookId)||{name:'カスタム'}).name)+'</span>'+btn('外す','tLookOff','','s'):'<span class="mu">なし</span>')+'</span></div>'+
   '<div class="fg"><span>開始（秒）</span><input class="inp" type="number" step="0.1" min="0" data-in="tstart" value="'+c.start.toFixed(1)+'" aria-label="開始（秒）"></div>'+

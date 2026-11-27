@@ -120,6 +120,8 @@ export function drawTitle(cx,W,H,ti,t){var sz={'小':.042,'中':.055,'大':.075}
   if(ti.st==='q'){cx.textAlign='left';cx.fillStyle='rgba(255,210,60,.92)';cx.fillRect(W*.06,H*.07,tw+pad*2,bh+pad*.8);cx.fillStyle='#1a1400';lines.forEach(function(l,i){plain(l,W*.06+pad,H*.07+pad*.4+lh*(i+.5));});}
   else if(ti.st==='sub'){cx.textAlign='center';var y0=H*.92-bh;cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect((W-tw)/2-pad,y0-pad*.4,tw+pad*2,bh+pad*.8);cx.fillStyle='#fff';lines.forEach(function(l,i){plain(l,W/2,y0+lh*(i+.5));});}
   else if(ti.st==='credit'){cx.textAlign=al||'center';var pr=Math.max(0,Math.min(1,(t-ti.t)/ti.d)),y=H-(H+bh)*pr;lines.forEach(function(l,i){outl(l,ax(W/2),y+lh*(i+.5));});}
+  /* center：画面の真ん中（新しく置くテロップ） */
+  else if(ti.st==='center'){cx.textAlign=al||'center';var yc=H/2-bh/2;lines.forEach(function(l,i){outl(l,ax(W/2),yc+lh*(i+.5));});}
   else{cx.textAlign=al||'left';var yb=H*.9-bh;lines.forEach(function(l,i){outl(l,ax(W*.06),yb+lh*(i+.5));});}}
 /* 止まっているときだけ描き直す（再生中は毎フレーム描くので、素材の読み込みのたびに描くと重くなる） */
 export function idleRedraw(){if(!E.playing)redrawProg();}
@@ -149,5 +151,5 @@ export function progStop(){E.playing=false;cancelAnimationFrame(E.raf);sync(S.t.
 export function init(){
 E={prevTr:null,ctx:null,master:null,mon:null,els:{},imgs:{},last:{},thumbs:{},idle:{frames:0,ph:0,fb:0},playing:false,raf:0,base:0,t0:0,stats:{frames:0,vframes:0,blank:0,stale:0,late:0,maxGap:0,slow:0,last:0,at:[]}};
 PLAYERR={};
-TST={name:'店名テロップ',q:'質問テロップ',sub:'字幕',credit:'クレジット'};
+TST={center:'テロップ',name:'店名テロップ',q:'質問テロップ',sub:'字幕',credit:'クレジット'};
 }

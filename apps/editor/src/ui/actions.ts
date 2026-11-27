@@ -56,7 +56,7 @@ ACT={
   pin:function(){if(S.page!=='edit')return;mark();P.pin=S.t.edit;if(P.pout!=null&&P.pout<=P.pin)P.pout=null;saveP();draw();toast('イン点を '+tc(P.pin)+' にしました');},
   pout:function(){if(S.page!=='edit')return;mark();P.pout=S.t.edit;if(P.pin!=null&&P.pin>=P.pout)P.pin=null;saveP();draw();toast('アウト点を '+tc(P.pout)+' にしました');},
   pclear:function(){mark();P.pin=P.pout=null;saveP();draw();toast('書き出し範囲を消去しました');},
-  addTitle:function(v){addTitle(v||'name',S.t.edit);},
+  addTitle:function(v){addTitle(v||'center',S.t.edit);},
   tToHead:function(){var c=selTitle();if(!c)return;mark();c.start=S.t.edit;carve(c.tr,c.start,cEnd(c),(function(){var o={};o[c.id]=1;return o;})());changed();},
   delSel:function(){delClips(S.sel.slice(),false);},rdel:function(){delClips(S.sel.slice(),true);},
   split:function(){if(S.page!=='edit')go('edit');var ids=S.sel.filter(function(id){var c=C(id);return c&&S.t.edit>c.start&&S.t.edit<cEnd(c);});splitAt(S.t.edit,ids);},
@@ -115,7 +115,7 @@ ACT={
   tLook:function(v){var pr=presetById(v);if(!pr)return;var lk=function(){return JSON.parse(JSON.stringify(pr.look));};
     var L=S.sel.map(C).filter(function(c){return c&&c.type==='title'&&!locked(c);});
     if(L.length){mark();L.forEach(function(c){c.look=lk();c.lookId=pr.id;});changed();return toast('スタイルを「'+pr.name+'」にしました');}
-    addTitle('name',S.t.edit);var c=C(S.sel[0]);if(c&&c.type==='title'){c.look=lk();c.lookId=pr.id;changed();}},
+    addTitle('center',S.t.edit);var c=C(S.sel[0]);if(c&&c.type==='title'){c.look=lk();c.lookId=pr.id;changed();}},
   binAdd:function(){addBin();},binRen:function(v){S.binEdit=v;S.bin='b:'+v;draw();focusBinName();},binDel:function(v){deleteBin(v);},
   aview:function(v){S.aview=v;saveAview();draw();},
   trApply:function(v){applyTransition(v);},trDel:function(v){var c=C(v);if(!c||!c.xin)return;mark();delete c.xin;changed();},
