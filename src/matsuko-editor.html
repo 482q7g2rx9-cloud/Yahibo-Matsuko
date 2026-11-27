@@ -6979,6 +6979,70 @@ function dropMedia(e) {
   }
   changed();
 }
+function ghostTitle(e) {
+  var g = document.querySelector("[data-ghost]"), i = dropInfo(e);
+  if (!g) return;
+  if (!i.row || i.row.kind !== "v") {
+    g.hidden = true;
+    S.dropT = null;
+    return;
+  }
+  var t = i.t, sb = snapBy([t, t + 4], snapPts({}));
+  if (sb) t = Math.max(0, t + sb.d);
+  S.dropT = t;
+  S.dropRow = i.row.id;
+  g.hidden = false;
+  g.style.cssText = "left:" + t * (S.pps || 10) + "px;top:" + i.row.y + "px;width:" + Math.max(4, 4 * (S.pps || 10)) + "px;height:" + i.row.h + "px";
+}
+function dropTitle(e, id) {
+  var g = document.querySelector("[data-ghost]");
+  if (g) g.hidden = true;
+  var pr = presetById(id), i = dropInfo(e);
+  if (!pr || !i.row || i.row.kind !== "v" || S.dropT == null) return;
+  addTitle("name", S.dropT, i.row.id);
+  var c = C(S.sel[0]);
+  if (c && c.type === "title") {
+    c.look = JSON.parse(JSON.stringify(pr.look));
+    c.lookId = pr.id;
+    changed();
+  }
+}
+function cutNear(e) {
+  var i = dropInfo(e), pps = S.pps || 10;
+  if (!i.row || i.row.kind !== "v") return null;
+  var best = null, lim = Math.max(0.4, 24 / pps);
+  P.clips.forEach(function(b) {
+    if (b.tr !== i.row.id || !isCutB(b)) return;
+    var d = Math.abs(b.start - i.t);
+    if (d <= lim && (!best || d < Math.abs(best.start - i.t))) best = b;
+  });
+  return best ? { b: best, row: i.row } : null;
+}
+function ghostTrans(e) {
+  var g = document.querySelector("[data-ghost]"), q = cutNear(e), pps = S.pps || 10;
+  if (!g) return;
+  if (!q) {
+    g.hidden = true;
+    S.dropCut = null;
+    return;
+  }
+  var d = q.b.xin && q.b.xin.d || 1;
+  S.dropCut = q.b.id;
+  g.hidden = false;
+  g.style.cssText = "left:" + (q.b.start - d / 2) * pps + "px;top:" + q.row.y + "px;width:" + Math.max(6, d * pps) + "px;height:" + q.row.h + "px";
+}
+function dropTrans(e, id) {
+  var g = document.querySelector("[data-ghost]");
+  if (g) g.hidden = true;
+  var b = S.dropCut && C(S.dropCut), def = transitionById(id);
+  S.dropCut = null;
+  if (!b || !def || locked(b)) return;
+  mark();
+  b.xin = { k: id, d: b.xin && b.xin.d || 1 };
+  S.sel = [b.id];
+  changed();
+  toast("「" + def.name + "」を付けました");
+}
 var PD;
 function pdUnder(e, sel2) {
   var f = document.getElementById("dragf");
@@ -7014,10 +7078,15 @@ function pdEnd(e, ok) {
       var rc = t.getBoundingClientRect();
       reorderV1(d.id, t.dataset.rc, e.clientX > rc.left + rc.width / 2);
     }
-  } else if (ok && pdUnder(e, "[data-body]")) dropMedia(e);
+  } else if (ok && pdUnder(e, "[data-body]")) {
+    if (d.kind === "title") dropTitle(e, d.id);
+    else if (d.kind === "trans") dropTrans(e, d.id);
+    else dropMedia(e);
+  }
   var g = document.querySelector("[data-ghost]");
   if (g) g.hidden = true;
   S.dropT = null;
+  S.dropCut = null;
   S.dragMedia = null;
 }
 function init$1() {
@@ -7038,8 +7107,15 @@ function init$1() {
   }, true);
   PD = null;
   document.addEventListener("pointerdown", function(e) {
-    if (e.button !== 0) return;
-    var r = e.target.closest && e.target.closest("[data-rc]"), a = !r && e.target.closest && e.target.closest("[data-am]");
+    if (e.button !== 0 || !e.target.closest) return;
+    var tl = e.target.closest('[data-a="tLook"]'), tn = !tl && e.target.closest("[data-trn]");
+    if (tl || tn) {
+      var pr = tl && presetById(tl.dataset.v), df = tn && transitionById(tn.dataset.trn);
+      if (!pr && !df) return;
+      PD = { kind: tl ? "title" : "trans", id: tl ? pr.id : df.id, x: e.clientX, y: e.clientY, on: false, label: tl ? pr.name : df.name };
+      return;
+    }
+    var r = e.target.closest("[data-rc]"), a = !r && e.target.closest("[data-am]");
     if (!r && !a) return;
     var id = r ? r.dataset.rc : a.dataset.am, c = r && C(id), mm = r ? c && c.m && M(c.m) : M(id);
     PD = { kind: r ? "cut" : "media", id, x: e.clientX, y: e.clientY, on: false, label: mm ? mm.n : "" };
@@ -7072,11 +7148,15 @@ function init$1() {
       }
       return;
     }
-    if (pdUnder(e, "[data-body]")) ghostAt(e);
-    else {
+    if (pdUnder(e, "[data-body]")) {
+      if (PD.kind === "title") ghostTitle(e);
+      else if (PD.kind === "trans") ghostTrans(e);
+      else ghostAt(e);
+    } else {
       var g = document.querySelector("[data-ghost]");
       if (g) g.hidden = true;
       S.dropT = null;
+      S.dropCut = null;
     }
   });
   document.addEventListener("pointerup", function(e) {

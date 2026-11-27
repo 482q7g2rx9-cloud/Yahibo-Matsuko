@@ -14,7 +14,7 @@ import { TRANSITION_GROUPS, TRANSITION_DEFAULT_D, transitionById, transitionThum
 function prevOf(b) {
   return P.clips.filter(function (c) { return c !== b && c.tr === b.tr && c.type === 'media' && Math.abs(cEnd(c) - b.start) < 1e-3; })[0];
 }
-function isCutB(b) {
+export function isCutB(b) {
   var tr = b && T(b.tr), m = b && M(b.m);
   return !!(b && b.type === 'media' && tr && tr.kind === 'v' && m && (m.k === '映像' || m.k === '画像') && prevOf(b));
 }
