@@ -92,7 +92,7 @@ export function hotEdit(el){var cid=el.dataset.cid,key=el.dataset.k,c=C(cid);if(
   inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();fin(true);}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();fin(false);}});
   inp.addEventListener('blur',function(){fin(true);});}
 export function titleForm(c){return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0">'+
-  '<label for="ttext" class="t2">文字</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" placeholder="テキストを入力" style="width:100%;height:auto;padding:6px 8px;resize:vertical">'+h(c.label)+'</textarea>'+
+  '<label for="ttext" class="t2">文字</label><textarea class="inp" id="ttext" data-in="ttext" rows="3" placeholder="テキストを入力" style="width:100%;height:78px;padding:6px 8px;resize:none;overflow-y:auto">'+h(c.label)+'</textarea>'+
   fontRow(c)+
   (fontById(c.font).weight?'':'<div class="fg"><span>太さ</span><span class="seg">'+[[400,'細め'],[700,'標準'],[900,'極太']].map(function(x){return btn(x[1],'tSet','weight|'+x[0],'s'+((c.weight||700)===x[0]?' on':''));}).join('')+'</span></div>')+
   '<div class="fg"><span>揃え</span><span class="seg">'+[['left','左'],['center','中央'],['right','右']].map(function(x){var cur=c.align||(c.st==='credit'||c.st==='sub'||c.st==='center'?'center':'left');return btn(x[1],'tSet','align|'+x[0],'s'+(cur===x[0]?' on':''));}).join('')+'</span></div>'+
