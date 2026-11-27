@@ -14,6 +14,7 @@ mod history;
 mod media;
 mod menu;
 mod project;
+mod script;
 #[cfg(target_os = "linux")]
 mod server;
 mod state;
@@ -76,6 +77,9 @@ pub fn run() {
             export::export_cancel,
             files::save_pick,
             files::save_write,
+            script::script_pick,
+            script::script_read,
+            script::script_watch,
         ])
         .build(tauri::generate_context!())
         .expect("Matsuko Editor を起動できませんでした");

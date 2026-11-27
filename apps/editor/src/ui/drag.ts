@@ -2,6 +2,7 @@
 import { SYS_PREFIX, canQueryLocalFonts, fontById, presetById, queryLocalFonts, systemFontsState } from './titleStyles';
 import { transitionById } from './transitions';
 import { focusBinName, moveToBin, renameBin } from './bins';
+import { linkClips, linksOfRow, relink, renderImport, scriptSettings, setScriptSetting, syncScriptWatch } from './scriptLink';
 import { isCutB } from './transPreview';
 // 画面本体（ブラウザ版から機械的に分けたもの）。型は少しずつ付けていく（docs/tauri-plan.md の M2）
 import { D } from './data';
@@ -117,6 +118,8 @@ document.addEventListener('focusin',function(e){var k=e.target.dataset&&e.target
 document.addEventListener('change',function(e){var k=e.target.dataset&&e.target.dataset.in;if(!k)return;
   if(k==='mtype'){S.mtype=e.target.value;draw();}else if(k==='msort'){S.msort=e.target.value;draw();}else if(k==='countin')S.countin=e.target.checked;
   else if(k==='tfont'){var tf=selTitle();if(tf){mark();tf.font=e.target.value;if(fontById(tf.font).weight)delete tf.weight;changed();}}
+  else if(k==='scrRelink'){if(e.target.value){var lsr=linksOfRow(e.target.dataset.row);lsr.forEach(function(l){relink(l.id,e.target.value);});}}
+  else if(k==='clipLink'){if(e.target.value)linkClips(e.target.value,[e.target.dataset.cid]);}
   else if(k==='mbin'){moveToBin(e.target.dataset.mid,e.target.value);}
   else if(k==='ebin'){S.ebin=e.target.value;saveAview();draw();}
   else if(k==='binname'){renameBin(e.target.dataset.bid,e.target.value);}
@@ -162,3 +165,11 @@ function selClipXin(){var c=S.sel.map(C).filter(function(x){return x&&x.xin&&T(x
 addEventListener('keydown',function(e){var t=e.target;if(!t||!t.dataset||t.dataset.in!=='binname')return;
   if(e.key==='Enter'){e.preventDefault();e.stopPropagation();t.blur();}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();S.binEdit=null;draw();}},true);
 document.addEventListener('focusout',function(e){var t=e.target;if(t&&t.dataset&&t.dataset.in==='binname'&&S.binEdit)renameBin(t.dataset.bid,t.value);});
+
+/* 台本の取り込み画面のチェック・付け替えの選択、プロジェクト設定の台本連携 */
+document.addEventListener('change',function(e){var t=e.target,d=t&&t.dataset;if(!d)return;
+  if(d.impc!==undefined&&S.imp){S.imp.accept[d.impc]=t.checked;return;}
+  if(d.impr!==undefined&&S.imp){S.imp.relink[d.impr]=t.value==='1';return;}
+  if(d.impf!==undefined&&S.imp){S.imp.force=t.checked;renderImport();return;}
+  if(d.pss==='watch'){setScriptSetting('watch',t.checked?null:false);syncScriptWatch(true);return;}
+  if(d.pss==='confirmAll'){setScriptSetting('confirmAll',t.value==='all'?true:null);return;}});

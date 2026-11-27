@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { presetById } from './titleStyles';
 import { applyTransition } from './transPreview';
+import { applyImport, closeImport, confirmLink, gotoClip, gotoRow, importScript, linkClips, pickScriptFile, setScriptSetting, syncScriptWatch, undoImport, unlink } from './scriptLink';
 import { addBin, deleteBin, focusBinName } from './bins';
 import { frameSec, openProjectSettings, rebuildProxies, renderProjectSettings, setPs } from './projectSettings';
 import { openHistory, restoreHistory } from './history';
@@ -99,7 +100,11 @@ ACT={
   xsave:function(v){saveJob(S.queue.filter(function(q){return q.id===v;})[0]);},
   xview:function(v){stopAll();S.xplay=v;draw();},xback:function(){S.xplay=null;draw();},
   chk:function(){S.bin='wn';var w=P.media.filter(function(m){return m.r==='wn';})[0];if(w)S.media=w.id;go('media');},
-  link:function(){S.linked=true;draw();},
+  link:function(){pickScriptFile();},
+  scrPick:function(){pickScriptFile();},scrImport:function(){importScript();},scrUndo:function(){undoImport();},scrFilter:function(v){S.scrFilter=v;draw();},scrOrphan:function(){S.scrFilter='orphan';go('script');},
+  scrLink:function(v){linkClips(v,S.sel.slice());},scrUnlink:function(v){unlink(v);},scrOk:function(v){confirmLink(v);},scrClip:function(v){gotoClip(v);},scrRow:function(v){gotoRow(v);},
+  impNo:function(){closeImport();},impGo:function(){applyImport();},
+  psScriptPick:function(){pickScriptFile();},psScriptOff:function(){setScriptSetting('path');setScriptSetting('name');syncScriptWatch(true);renderProjectSettings();},
   save:function(){if(HOST){if(!HOST.project.current)return ensureProject().then(saveNow);saveNow().then(function(ok){if(ok)toast('保存しました');});return;}saveP();toast('保存しました');},
   open:function(){if(HOST)openProject(function(){return HOST.project.openDialog();});},
   npLoc:function(){newProjectDlg.pick();},npOk:function(){createProject();},relink:function(v){var m=M(v);if(m&&HOST)relink(m);},

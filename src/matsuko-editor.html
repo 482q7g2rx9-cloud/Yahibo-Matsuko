@@ -464,6 +464,34 @@ body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!impor
 .pn.r.insc{width:30px;align-items:center;padding-top:6px;gap:10px;border-left:1px solid var(--dv)}
 .pn.r.insc .vt{writing-mode:vertical-rl;color:var(--tx2);font-weight:500;letter-spacing:.1em}
 
+/* 台本ページ */
+.srh,.srow{display:grid;grid-template-columns:64px 56px minmax(90px,.9fr) minmax(110px,1.1fr) minmax(200px,2.4fr) minmax(200px,1.6fr);gap:10px;padding:8px 16px;align-items:start}
+.srh{flex:none;color:var(--tx2);font-weight:500;background:var(--bg2);border-bottom:1px solid var(--dv)}
+.srow{border-bottom:1px solid var(--dv);line-height:1.55}
+.srow.on{background:var(--sel)}
+.srow.del{opacity:.75}
+.srow .sno{color:var(--lb);font-weight:500;white-space:nowrap}
+.shd{padding:10px 16px 6px;font-weight:500;background:var(--bg1);border-bottom:1px solid var(--dv);position:sticky;top:0;z-index:1}
+.scl{display:flex;flex-direction:column;gap:4px;min-width:0}
+.slc{display:flex;align-items:center;border:1px solid var(--bd);border-radius:4px;overflow:hidden;min-width:0}
+.slc .lnk{flex:1;min-width:0;text-align:left;border:0;background:none;color:var(--tx);padding:3px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.slc .lnk:hover{background:var(--bg2)}
+.slc .x{border:0;background:none;color:var(--mu);width:24px;height:24px;cursor:pointer}
+.slc.stale{border-color:var(--wn)}.slc.orphan{border-color:var(--er)}
+.sdf,.impd{margin-top:6px;padding:6px 8px;border-radius:4px;background:var(--wnb)}
+.sdf>div,.impd>div{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.sdf del,.impd del{color:var(--er)}.sdf ins,.impd ins{color:var(--ok);text-decoration:none}
+.impd{margin-left:28px;background:var(--bg2)}
+/* 取り込みの確認画面 */
+.dlg.imp{width:min(760px,92vw)}
+.dlg.imp .impl{max-height:60vh;overflow:auto}
+.imph{font-weight:500;margin:14px 0 6px;color:var(--tx2)}
+.impi{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--dv);min-width:0}
+/* タイムラインのクリップの印（台本） */
+.tl2 .ci .lkb{position:absolute;right:4px;top:2px;z-index:3;font-size:10px;line-height:14px;padding:0 4px;border-radius:3px;color:#fff;pointer-events:none}
+.tl2 .ci .lkb.wn{background:#c9820d}.tl2 .ci .lkb.er{background:#d7373f}
+.dlg.imp .ph2{display:flex;align-items:center;margin-bottom:8px}.dlg.imp .ph2 h2{margin:0;flex:1}
+
 </style>
 <div id="app">
 <header id="top"></header>
@@ -482,7 +510,7 @@ var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var D;
-function init$s() {
+function init$t() {
   D = {
     title: "地元商店街 密着ドキュメント（8分）",
     people: [["佐", "var(--ac)", "#0b1220"], ["田", "#ffb454", "#1b1204"], ["山", "var(--ok)", "#0b1a10"]],
@@ -884,7 +912,7 @@ var hasFx = hasFx$1;
 function setP(v) {
   P = v;
 }
-function init$r() {
+function init$s() {
   P = sampleProject();
   uid = uid$1;
 }
@@ -920,7 +948,7 @@ function persist() {
   } catch (e) {
   }
 }
-function init$q() {
+function init$r() {
   S = {
     page: "edit",
     theme: "system",
@@ -943,7 +971,7 @@ function init$q() {
     tlx: 0,
     tly: 0,
     tool: "select",
-    open: { clip: 1, motion: 1, audio: 1, video: 1, comp: 1, track: 1, color: 1, trans: 1 },
+    open: { clip: 1, motion: 1, audio: 1, video: 1, comp: 1, track: 1, color: 1, trans: 1, script: 1 },
     fx: "オブジェクトトラッキング",
     fxClosed: {},
     ba: "after",
@@ -1653,7 +1681,7 @@ function setHIST(v) {
 function setREDO(v) {
   REDO = v;
 }
-function init$p() {
+function init$q() {
   IDB = {
     db: null,
     open: function() {
@@ -2035,7 +2063,7 @@ function rec() {
 function setREC(v) {
   REC = v;
 }
-function init$o() {
+function init$p() {
   SRC = { el: null, id: null, playing: false, raf: 0 };
   SIM = null;
   FXP = null;
@@ -2360,7 +2388,7 @@ function openPicker() {
   i.value = "";
   i.click();
 }
-function init$n() {
+function init$o() {
   IMP = { total: 0, done: 0, cur: "" };
 }
 var PREF;
@@ -2433,7 +2461,7 @@ function assignKey(id, c) {
   KEYMAP[id] = [c];
   saveKeys();
 }
-function init$m() {
+function init$n() {
   PREF = { snap: true, follow: true, ui: 0.75, uiv: 2 };
   try {
     var pf = JSON.parse(localStorage.getItem("matsuko.pref") || "{}");
@@ -2478,7 +2506,7 @@ function fit() {
   }
 }
 var ZOOM;
-function init$l() {
+function init$m() {
   SCALE = 1;
   ZOOM = null;
   BASE_W = 1180;
@@ -2619,7 +2647,7 @@ function startPreview(id) {
     })();
   })();
 }
-function init$k() {
+function init$l() {
   PV = null;
   document.addEventListener("mouseover", function(e) {
     var el = e.target.closest && e.target.closest("[data-trn]");
@@ -2724,6 +2752,485 @@ function focusBinName() {
     el.focus();
     el.select();
   }
+}
+const ROW_TEXT_KEYS = ["time", "music", "video", "body", "type"];
+function rowText(r) {
+  const o = {};
+  if (r) for (const k of ROW_TEXT_KEYS) o[k] = r[k] ?? "";
+  return o;
+}
+function linkState(l, s) {
+  const r = s && s.rows.find((x) => x.id === l.rowId);
+  if (!r || r.deleted) return "orphan";
+  return (r.rev || 0) > (l.rev || 0) ? "stale" : "ok";
+}
+const CHANGE_AUTO = {
+  add: true,
+  split: true,
+  copy: true,
+  order: true,
+  move: true,
+  undelete: true,
+  change: false,
+  delete: false,
+  merge: false
+};
+const CHANGE_LABEL = {
+  add: "追加",
+  split: "分割",
+  copy: "複製",
+  order: "順番の変更",
+  move: "移動",
+  undelete: "削除の取り消し",
+  change: "変更",
+  delete: "削除",
+  merge: "結合"
+};
+function validateLinkFile(o) {
+  const e = [];
+  const f = o;
+  if (!f || typeof f !== "object") return ["連携ファイルではありません"];
+  if (f.schema !== 1) e.push("対応していない形式です（schema " + String(f.schema) + "）");
+  if (!f.project || typeof f.project.id !== "string" || !f.project.id) e.push("プロジェクトの id がありません");
+  if (typeof f.exportSeq !== "number") e.push("書き出し番号（exportSeq）がありません");
+  if (!Array.isArray(f.rows)) e.push("台本行（rows）がありません");
+  else if (f.rows.some((r) => !r || typeof r.id !== "string" || !r.id)) e.push("id のない台本行があります");
+  if (!Array.isArray(f.scenes)) e.push("シーン（scenes）がありません");
+  return e;
+}
+const sameRows = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function diffLink(prev, next) {
+  const d = { same: false, messages: [], missing: [], changes: [], sceneChanges: 0 };
+  const bad = validateLinkFile(next);
+  if (bad.length) {
+    d.block = "invalid";
+    d.messages = bad;
+    return d;
+  }
+  if (prev) {
+    if (prev.projectId !== next.project.id) {
+      d.block = "project";
+      d.messages.push("別のプロジェクトの台本です（" + (next.project.title || next.project.id) + "）。取り込めません");
+      return d;
+    }
+    if (next.exportSeq === prev.exportSeq && sameRows(prev.rows, next.rows) && JSON.stringify(prev.scenes) === JSON.stringify(next.scenes)) {
+      d.same = true;
+      d.messages.push("更新はありません");
+      return d;
+    }
+    if (next.exportSeq < prev.exportSeq) {
+      d.block = "older";
+      d.messages.push("前回より古い書き出しです（前回 #" + prev.exportSeq + "、今回 #" + next.exportSeq + "）");
+    }
+    const ids = new Set(next.rows.map((r) => r.id));
+    d.missing = prev.rows.filter((r) => !ids.has(r.id)).map((r) => r.id);
+    if (d.missing.length) {
+      d.block = "missing";
+      d.messages.push("前回あった行が " + d.missing.length + " 件、ファイルにありません。ファイルが壊れているおそれがあるため、取り込みを止めました");
+    }
+    const ps2 = new Map(prev.scenes.map((s) => [s.id, s]));
+    for (const s of next.scenes) {
+      const o = ps2.get(s.id);
+      if (!o || o.title !== s.title || o.order !== s.order || o.time !== s.time) d.sceneChanges++;
+    }
+  } else {
+    d.sceneChanges = next.scenes.length;
+  }
+  const pr = new Map((prev ? prev.rows : []).map((r) => [r.id, r]));
+  const add = (kind, after, before, other) => d.changes.push({ key: kind + ":" + after.id, kind, rowId: after.id, before, after, other });
+  for (const r of next.rows) {
+    const o = pr.get(r.id);
+    if (!o) {
+      if (r.deleted) continue;
+      if (r.splitFrom) add("split", r, void 0, r.splitFrom);
+      else if (r.copiedFrom) add("copy", r, void 0, r.copiedFrom);
+      else add("add", r);
+      continue;
+    }
+    if (o.deleted && !r.deleted) add("undelete", r, o);
+    else if (!o.deleted && r.deleted) {
+      if (r.mergedInto) add("merge", r, o, r.mergedInto);
+      else add("delete", r, o);
+    }
+    if (r.deleted) continue;
+    if ((r.rev || 0) > (o.rev || 0) && ROW_TEXT_KEYS.some((k) => (r[k] ?? "") !== (o[k] ?? ""))) add("change", r, o);
+    if ((r.sceneId || "") !== (o.sceneId || "")) add("move", r, o);
+    else if (r.order !== o.order) add("order", r, o);
+  }
+  return d;
+}
+function applyLink(prev, next, diff, links2, choice = {}, now = (/* @__PURE__ */ new Date()).toISOString()) {
+  const ok = (c) => choice.accept && c.key in choice.accept ? !!choice.accept[c.key] : true;
+  const pr = new Map((prev ? prev.rows : []).map((r) => [r.id, r]));
+  const byRow = /* @__PURE__ */ new Map();
+  for (const c of diff.changes) byRow.set(c.rowId, (byRow.get(c.rowId) || []).concat(c));
+  const rows = [];
+  for (const r of next.rows) {
+    const o = pr.get(r.id), cs = byRow.get(r.id) || [];
+    if (!o) {
+      if (r.deleted) continue;
+      const c = cs[0];
+      if (c && !ok(c)) continue;
+      rows.push({ ...r });
+      continue;
+    }
+    const x = { ...r };
+    for (const c of cs) {
+      if (ok(c)) continue;
+      if (c.kind === "change") {
+        for (const k of ROW_TEXT_KEYS) x[k] = o[k];
+        x.rev = o.rev;
+      } else if (c.kind === "delete" || c.kind === "merge") {
+        Object.assign(x, o, { order: r.order, sceneId: r.sceneId });
+        x.deleted = false;
+        delete x.deletedAt;
+        delete x.mergedInto;
+      } else if (c.kind === "undelete") {
+        x.deleted = true;
+      } else if (c.kind === "move") {
+        x.sceneId = o.sceneId;
+        x.order = o.order;
+      } else if (c.kind === "order") {
+        x.order = o.order;
+      }
+    }
+    rows.push(x);
+  }
+  const ids = new Set(next.rows.map((r) => r.id));
+  for (const o of prev ? prev.rows : []) if (!ids.has(o.id)) rows.push({ ...o });
+  const nl = links2.map((l) => ({ ...l }));
+  for (const c of diff.changes) {
+    if (c.kind !== "merge" || !ok(c) || !c.other) continue;
+    if (choice.relink && c.rowId in choice.relink && !choice.relink[c.rowId]) continue;
+    const to = rows.find((r) => r.id === c.other && !r.deleted);
+    if (!to) continue;
+    for (const l of nl) {
+      if (l.rowId !== c.rowId) continue;
+      l.rowId = to.id;
+      l.rev = to.rev;
+      l.seen = rowText(to);
+    }
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const links22 = nl.filter((l) => {
+    const k = l.clipId + "|" + l.rowId;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  return {
+    script: {
+      projectId: next.project.id,
+      title: next.project.title || "",
+      exportSeq: Math.max(next.exportSeq, prev ? prev.exportSeq : 0),
+      exportedAt: next.exportedAt,
+      importedAt: now,
+      scenes: next.scenes.map((s) => ({ ...s })),
+      rows
+    },
+    links: links22
+  };
+}
+function rowNumbers(s) {
+  const o = {};
+  if (!s) return o;
+  s.rows.filter((r) => !r.deleted).slice().sort((a, b) => a.order - b.order).forEach((r, i) => o[r.id] = "R-" + String(i + 1).padStart(3, "0"));
+  return o;
+}
+function scriptSettings() {
+  return P.settings && P.settings.script || {};
+}
+function setScriptSetting(k, v) {
+  var st = P.settings = Object.assign({}, P.settings || {});
+  st.script = Object.assign({}, st.script || {});
+  if (v === void 0 || v === null || v === "") delete st.script[k];
+  else st.script[k] = v;
+  saveP();
+}
+function links() {
+  return P.links || (P.links = []);
+}
+function rowById(id) {
+  return P.script ? P.script.rows.filter(function(r) {
+    return r.id === id;
+  })[0] : null;
+}
+function linksOfClip(cid) {
+  return links().filter(function(l) {
+    return l.clipId === cid;
+  });
+}
+function linksOfRow(rid) {
+  return links().filter(function(l) {
+    return l.rowId === rid && C(l.clipId);
+  });
+}
+function stateOf(l) {
+  return linkState(l, P.script);
+}
+function pruneLinks() {
+  if (!P.links) return;
+  P.links = P.links.filter(function(l) {
+    return !!C(l.clipId);
+  });
+}
+function counts() {
+  var o = { unplaced: 0, stale: 0, orphan: 0 };
+  if (!P.script) return o;
+  P.script.rows.forEach(function(r) {
+    if (!r.deleted && !linksOfRow(r.id).length) o.unplaced++;
+  });
+  links().forEach(function(l) {
+    if (!C(l.clipId)) return;
+    var s = stateOf(l);
+    if (s === "stale") o.stale++;
+    else if (s === "orphan") o.orphan++;
+  });
+  return o;
+}
+var LABEL_FIELD = { time: "時間", music: "図画・音楽", video: "映像", body: "内容", type: "種別" };
+function excerpt(s, n) {
+  s = String(s || "").replace(/\s+/g, " ");
+  return s.length > (n || 40) ? s.slice(0, n || 40) + "…" : s;
+}
+function nums() {
+  return rowNumbers(P.script);
+}
+function pickScriptFile() {
+  if (HOST) {
+    HOST.script.pick().then(function(p) {
+      if (!p) return;
+      setScriptSetting("path", p);
+      setScriptSetting("name", p.split(/[\\/]/).pop());
+      syncScriptWatch(true);
+      importScript();
+    }).catch(function(e) {
+      toast(String(e));
+    });
+    return;
+  }
+  var i = document.getElementById("scriptIn");
+  if (!i) {
+    i = document.createElement("input");
+    i.type = "file";
+    i.id = "scriptIn";
+    i.accept = ".json,application/json";
+    i.hidden = true;
+    document.body.appendChild(i);
+    i.addEventListener("change", function() {
+      var f = i.files && i.files[0];
+      if (!f) return;
+      f.text().then(function(t) {
+        setScriptSetting("name", f.name);
+        importText(t, f.name);
+      });
+      i.value = "";
+    });
+  }
+  i.click();
+}
+function importScript() {
+  var st = scriptSettings();
+  if (!HOST || !st.path) return pickScriptFile();
+  HOST.script.read(st.path).then(function(t) {
+    importText(t, st.name || st.path);
+  }).catch(function(e) {
+    toast(String(e));
+  });
+}
+function importText(text, name) {
+  var f;
+  try {
+    f = JSON.parse(text);
+  } catch (e) {
+    return toast("連携ファイルを読めませんでした（JSON ではありません）");
+  }
+  var d = diffLink(P.script, f);
+  S.scrNotice = false;
+  if (d.same) {
+    draw();
+    return toast("台本の更新はありません");
+  }
+  S.imp = { file: f, diff: d, name, accept: {}, relink: {}, force: false };
+  renderImport();
+}
+function renderImport() {
+  var im = S.imp, dl = document.getElementById("dlg");
+  if (!im) {
+    dl.hidden = true;
+    return;
+  }
+  var d = im.diff, f = im.file, all = !!scriptSettings().confirmAll, nn = rowNumbers(P.script), nx = {};
+  f.rows && f.rows.filter(function(r) {
+    return !r.deleted;
+  }).slice().sort(function(a, b) {
+    return a.order - b.order;
+  }).forEach(function(r, i) {
+    nx[r.id] = "R-" + String(i + 1).padStart(3, "0");
+  });
+  var stop = d.block === "invalid" || d.block === "project", force = d.block === "older" || d.block === "missing";
+  var auto = d.changes.filter(function(c) {
+    return CHANGE_AUTO[c.kind];
+  }), conf = d.changes.filter(function(c) {
+    return !CHANGE_AUTO[c.kind];
+  });
+  var sum = {};
+  d.changes.forEach(function(c) {
+    sum[c.kind] = (sum[c.kind] || 0) + 1;
+  });
+  var item = function(c, check) {
+    var r = c.after, no = nx[c.rowId] || nn[c.rowId] || "", on = !(c.key in im.accept) || im.accept[c.key];
+    var head2 = '<span class="chip ' + (CHANGE_AUTO[c.kind] ? "c-mu" : "c-wn") + '">' + CHANGE_LABEL[c.kind] + '</span><span class="mu">' + h(no) + '</span><span class="grow" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h(excerpt(r.body || r.video, 48)) + "</span>";
+    var more = "";
+    if (c.kind === "change") more = '<div class="impd">' + ROW_TEXT_KEYS.filter(function(k) {
+      return (c.before[k] || "") !== (r[k] || "");
+    }).map(function(k) {
+      return '<div><span class="mu">' + LABEL_FIELD[k] + "</span><del>" + h(c.before[k] || "（なし）") + "</del><ins>" + h(r[k] || "（なし）") + "</ins></div>";
+    }).join("") + "</div>";
+    var lk = linksOfRow(c.rowId).length;
+    if ((c.kind === "delete" || c.kind === "merge" || c.kind === "change") && lk) more += '<div class="mu" style="margin:2px 0 0 28px">紐づいたクリップ ' + lk + " 件</div>";
+    if (c.kind === "merge") {
+      var to = f.rows.filter(function(x) {
+        return x.id === c.other;
+      })[0], rl = !(c.rowId in im.relink) || im.relink[c.rowId];
+      more += '<div style="margin:4px 0 0 28px" class="row"><label class="row" style="gap:6px"><input type="radio" name="rl-' + c.rowId + '" data-impr="' + c.rowId + '" value="1"' + (rl ? " checked" : "") + ">結合先（" + h(nx[c.other] || "") + " " + h(excerpt(to && to.body, 20)) + '）へ付け替える</label><label class="row" style="gap:6px;margin-left:12px"><input type="radio" name="rl-' + c.rowId + '" data-impr="' + c.rowId + '" value="0"' + (rl ? "" : " checked") + ">孤立にする</label></div>";
+    }
+    return '<div class="impi">' + (check ? '<input type="checkbox" data-impc="' + h(c.key) + '"' + (on ? " checked" : "") + ' aria-label="反映する">' : '<span style="width:16px"></span>') + head2 + "</div>" + more;
+  };
+  var body = "";
+  if (d.messages.length) body += '<div class="box" style="border-left:3px solid ' + (stop ? "var(--er)" : "var(--wn)") + ';margin-bottom:12px">' + d.messages.map(h).join("<br>") + (force ? '<label class="row" style="gap:6px;margin-top:8px"><input type="checkbox" data-impf' + (im.force ? " checked" : "") + ">確認したうえで取り込む</label>" : "") + "</div>";
+  if (!stop) {
+    body += '<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">' + Object.keys(sum).map(function(k) {
+      return '<span class="chip ' + (CHANGE_AUTO[k] ? "c-mu" : "c-wn") + '">' + CHANGE_LABEL[k] + " " + sum[k] + "</span>";
+    }).join("") + (d.sceneChanges ? '<span class="chip c-mu">シーン ' + d.sceneChanges + "</span>" : "") + (d.changes.length || d.sceneChanges ? "" : '<span class="mu">行の変更はありません</span>') + "</div>";
+    if (conf.length) body += '<div class="imph">確認が必要な変更（' + conf.length + "）</div>" + conf.map(function(c) {
+      return item(c, true);
+    }).join("");
+    if (auto.length) body += '<div class="imph">' + (all ? "反映する変更" : "自動で反映する変更") + "（" + auto.length + "）</div>" + auto.map(function(c) {
+      return item(c, all);
+    }).join("");
+  }
+  var canGo = !stop && (!force || im.force);
+  dl.innerHTML = '<div class="dlg imp" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">台本の取り込み</h2>' + btn("閉じる", "impNo", "", "s") + '</div><div class="mu" style="margin:-4px 0 12px">' + h(im.name || "") + (f && f.project ? "　" + h(f.project.title || "") : "") + (typeof (f && f.exportSeq) === "number" ? "　書き出し #" + f.exportSeq : "") + (P.script ? "（前回 #" + P.script.exportSeq + "）" : "") + '</div><div class="impl">' + body + '</div><div class="row" style="justify-content:flex-end;gap:8px;margin-top:14px">' + btn("やめる", "impNo") + (stop ? "" : '<button class="b pri"' + A("impGo") + (canGo ? "" : " disabled") + ">反映する</button>") + "</div></div>";
+  dl.hidden = false;
+}
+function closeImport() {
+  S.imp = null;
+  var dl = document.getElementById("dlg");
+  dl.hidden = true;
+  dl.innerHTML = "";
+}
+function applyImport() {
+  var im = S.imp;
+  if (!im) return;
+  var d = im.diff, f = im.file, all = !!scriptSettings().confirmAll, acc = {};
+  d.changes.forEach(function(c) {
+    if (!CHANGE_AUTO[c.kind] || all) acc[c.key] = !(c.key in im.accept) || !!im.accept[c.key];
+  });
+  mark();
+  pruneLinks();
+  P.scriptBackup = { script: P.script ? JSON.parse(JSON.stringify(P.script)) : null, links: JSON.parse(JSON.stringify(links())), at: (/* @__PURE__ */ new Date()).toISOString() };
+  var r = applyLink(P.script, f, d, links(), { accept: acc, relink: im.relink });
+  P.script = r.script;
+  P.links = r.links;
+  closeImport();
+  changed();
+  var n = Object.keys(acc).filter(function(k) {
+    return !acc[k];
+  }).length;
+  toast("台本を取り込みました（書き出し #" + f.exportSeq + "）" + (n ? "。反映しなかった変更 " + n + " 件は、次の取り込みでまた表示します" : ""));
+}
+function undoImport() {
+  var b = P.scriptBackup;
+  if (!b) return;
+  mark();
+  P.script = b.script;
+  P.links = b.links || [];
+  delete P.scriptBackup;
+  changed();
+  toast("取り込みを元に戻しました");
+}
+function linkClips(rowId, clipIds) {
+  var r = rowById(rowId);
+  if (!r || r.deleted) return toast("この行には紐づけられません");
+  var ids = (clipIds || []).filter(function(id) {
+    var c = C(id);
+    return c && !links().some(function(l) {
+      return l.clipId === id && l.rowId === rowId;
+    });
+  });
+  if (!ids.length) return toast((clipIds || []).length ? "もう紐づいています" : "編集ページでクリップを選んでから押してください");
+  mark();
+  ids.forEach(function(id) {
+    links().push({ id: uid("lk"), clipId: id, rowId, rev: r.rev || 0, seen: rowText(r) });
+  });
+  changed();
+  toast(ids.length + " 件のクリップを " + (nums()[rowId] || "") + " に紐づけました");
+}
+function unlink(id) {
+  mark();
+  P.links = links().filter(function(l) {
+    return l.id !== id;
+  });
+  changed();
+}
+function confirmLink(id) {
+  var l = links().filter(function(x) {
+    return x.id === id;
+  })[0], r = l && rowById(l.rowId);
+  if (!l || !r) return;
+  mark();
+  l.rev = r.rev || 0;
+  l.seen = rowText(r);
+  changed();
+}
+function relink$1(id, rowId) {
+  var l = links().filter(function(x) {
+    return x.id === id;
+  })[0], r = rowById(rowId);
+  if (!l || !r || r.deleted) return;
+  mark();
+  l.rowId = rowId;
+  l.rev = r.rev || 0;
+  l.seen = rowText(r);
+  changed();
+}
+function gotoClip(cid) {
+  var c = C(cid);
+  if (!c) return;
+  S.sel = [cid];
+  S.t.edit = c.start;
+  go("edit");
+}
+function gotoRow(rid) {
+  S.scrRow = rid;
+  S.scrFilter = "all";
+  go("script");
+  setTimeout(function() {
+    var el = document.querySelector('[data-srow="' + rid + '"]');
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: "center" });
+  }, 30);
+}
+var WKEY = null;
+function syncScriptWatch(force) {
+  if (!HOST || !HOST.script) return;
+  var st = scriptSettings(), key = (HOST.project.current ? HOST.project.current.dir : "") + "|" + (st.path || "") + "|" + (st.watch === false ? 0 : 1);
+  if (!force && key === WKEY) return;
+  WKEY = key;
+  HOST.script.watch(st.path && st.watch !== false && HOST.project.current ? st.path : null).catch(function() {
+  });
+}
+function init$k() {
+  S.imp = null;
+  S.scrNotice = false;
+  S.scrFilter = "all";
+  S.scrRow = null;
+  if (HOST && HOST.script) HOST.script.onChanged(function(p) {
+    if (p !== scriptSettings().path) return;
+    S.scrNotice = true;
+    toast("台本が更新されました。台本ページの「取り込む」から反映できます");
+    if (S.page === "script") draw();
+  });
 }
 var VM;
 var AM;
@@ -3137,7 +3644,7 @@ function tickStep(pps) {
   return 600;
 }
 function clipHtml(c, r, pps) {
-  var m = c.m ? M(c.m) : null, on = S.sel.indexOf(c.id) >= 0, tr = T(c.tr), x = c.start * pps, w = Math.max(2, cLen(c) * pps), st = "left:" + x.toFixed(1) + "px;width:" + w.toFixed(1) + "px;top:" + r.y + "px;height:" + r.h + "px;", cls = (on ? " on" : "") + (tr.lock ? " lkd" : ""), fx = c.type === "title" || r.kind === "v" && c.type === "media" && (hasFx(c) || m && m.sample) ? '<span class="fxb" style="width:16px;height:12px;line-height:12px">fx</span>' : "", nm = h(c.type === "title" ? String(c.label || "").split("\n")[0] || "テキストを入力" : c.type === "adj" ? c.label : m ? m.n : "（素材なし）"), tip = ' title="' + nm + "　" + tc(c.start) + "〜" + tc(cEnd(c)) + (c.link ? "（リンク）" : "") + '"', tm = '<span class="trim l"></span><span class="trim r"></span>';
+  var m = c.m ? M(c.m) : null, on = S.sel.indexOf(c.id) >= 0, tr = T(c.tr), x = c.start * pps, w = Math.max(2, cLen(c) * pps), st = "left:" + x.toFixed(1) + "px;width:" + w.toFixed(1) + "px;top:" + r.y + "px;height:" + r.h + "px;", cls = (on ? " on" : "") + (tr.lock ? " lkd" : ""), fx = c.type === "title" || r.kind === "v" && c.type === "media" && (hasFx(c) || m && m.sample) ? '<span class="fxb" style="width:16px;height:12px;line-height:12px">fx</span>' : "", nm = h(c.type === "title" ? String(c.label || "").split("\n")[0] || "テキストを入力" : c.type === "adj" ? c.label : m ? m.n : "（素材なし）"), tip = ' title="' + nm + "　" + tc(c.start) + "〜" + tc(cEnd(c)) + (c.link ? "（リンク）" : "") + '"', tm = linkBadge(c) + '<span class="trim l"></span><span class="trim r"></span>';
   if (r.kind === "v") {
     if (c.type === "title") return '<div class="ci title' + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + "line-height:" + (r.h - 2) + 'px">' + fx + nm + tm + "</div>";
     if (c.type === "adj") return '<div class="ci adj' + cls + '" data-c="' + c.id + '"' + tip + ' style="' + st + "line-height:" + (r.h - 2) + 'px">' + nm + tm + "</div>";
@@ -3366,7 +3873,7 @@ function inspector() {
     return '<option value="' + x.id + '"' + (x.id === tq.k ? " selected" : "") + ">" + h(x.name) + "</option>";
   }).join("") + "</select></div>" + numRow("長さ", v, "xd") + '<div class="row" style="justify-content:flex-end;padding-top:8px">' + btn("外す", "trDel", v.id, "s") + "</div>");
   if (a) h2 += fsec("audio", "音量", null, numRow("音量", a, "vol") + numRow("フェードイン", a, "fin") + numRow("フェードアウト", a, "fout"));
-  if (m) h2 += '<div style="padding:10px 16px;border-bottom:1px solid var(--dv);line-height:1.6"><div style="font-weight:500">リンク中の台本行</div><div class="mu">' + h(m.line && m.line !== "—" ? m.line : "—") + "</div></div>";
+  h2 += scriptBox(c);
   return { name: m ? m.n : c.label || "", html: h2 };
 }
 function ms1(s) {
@@ -3491,6 +3998,32 @@ function insWidth() {
   var app = document.getElementById("app"), aw = app ? app.clientWidth : 1180;
   return Math.round(Math.max(280, Math.min(560, aw * 0.36)) * 0.85);
 }
+function scriptBox(c) {
+  if (!P.script) return "";
+  var ls = linksOfClip(c.id), nn = nums(), rows = P.script.rows.filter(function(r) {
+    return !r.deleted;
+  }).slice().sort(function(a, b) {
+    return a.order - b.order;
+  });
+  var it = ls.map(function(l) {
+    var r = rowById(l.rowId), st = stateOf(l);
+    return '<div class="row" style="gap:6px;align-items:flex-start;margin-top:6px"><span class="chip ' + (st === "ok" ? "c-ok" : st === "stale" ? "c-wn" : "c-er") + '" style="flex:none">' + (st === "ok" ? h(nn[l.rowId] || "") : st === "stale" ? "更新" : "孤立") + '</span><span class="grow" style="min-width:0">' + h(excerpt(r && (r.body || r.video), 60) || "（台本で削除された行）") + "</span>" + btn("台本", "scrRow", l.rowId, "s") + '<button class="ib" aria-label="紐づけを解除" title="紐づけを解除"' + A("scrUnlink", l.id) + ">×</button></div>";
+  }).join("");
+  return fsec("script", "台本行", null, '<div style="padding:4px 0 6px">' + (it || '<div class="mu">なし</div>') + '<select class="inp" data-in="clipLink" data-cid="' + c.id + '" aria-label="台本行に紐づける" style="width:100%;margin-top:8px"><option value="">台本行に紐づける…</option>' + rows.map(function(r) {
+    return '<option value="' + r.id + '">' + h(nn[r.id] + "　" + excerpt(r.body || r.video, 28)) + "</option>";
+  }).join("") + "</select></div>");
+}
+function linkBadge(c) {
+  if (!P.script || !P.links || !P.links.length) return "";
+  var ls = linksOfClip(c.id);
+  if (!ls.length) return "";
+  var o = ls.some(function(l) {
+    return stateOf(l) === "orphan";
+  }), st = !o && ls.some(function(l) {
+    return stateOf(l) === "stale";
+  });
+  return o ? '<span class="lkb er" title="台本で削除された行に紐づいています">孤立</span>' : st ? '<span class="lkb wn" title="台本が更新されました">更新</span>' : "";
+}
 var EPS;
 function rm(c) {
   var i = P.clips.indexOf(c);
@@ -3531,7 +4064,19 @@ function carve(tid, a, b, skip) {
   carve$1(ctx(), tid, a, b, skip);
 }
 function splitList(L, t) {
-  return splitList$1(ctx(), L, t);
+  var made = splitList$1(ctx(), L, t);
+  if (P.links && P.links.length) made.forEach(function(c2) {
+    var o = L.filter(function(c) {
+      return c.tr === c2.tr && c.m === c2.m && Math.abs(cEnd(c) - c2.start) < 1e-6;
+    })[0];
+    if (!o) return;
+    P.links.filter(function(l) {
+      return l.clipId === o.id;
+    }).forEach(function(l) {
+      P.links.push(Object.assign({}, l, { id: uid("lk"), clipId: c2.id }));
+    });
+  });
+  return made;
 }
 function splitAt(t, ids) {
   var L = splittable(P, t, ids && ids.length ? ids.map(C).filter(Boolean) : activeAt(t));
@@ -3768,6 +4313,8 @@ function checks() {
     if (xw[0] && Math.abs(xw[0] / xw[1] - sw[0] / sw[1]) > 0.01) o.push(["wn", "解像度", "シーケンスは " + sw[0] + "×" + sw[1] + "、書き出しは " + S.x.res + " です。縦横の比率が違うので、黒い帯が付きます"]);
     if (xf && sf && Math.abs(xf - sf) > 0.01) o.push(["wn", "フレームレート", "シーケンスは " + ps().fps + " fps、書き出しは " + S.x.fps + " です"]);
   }
+  var cn = counts();
+  if (P.script) o.push(cn.orphan ? ["wn", "台本", "台本で削除された行に紐づいたクリップ " + cn.orphan + "件", "台本を見る", "scrOrphan"] : ["ok", "台本", "孤立したクリップはありません"]);
   var f = xFmt();
   o.push(f ? ["ok", "書き出し形式", f[0] + (HOST ? "　FFmpeg で書き出します" : "　このブラウザで書き出せます")] : ["er", "書き出し形式", "このブラウザは書き出しに対応していません（Chrome・Edge・Safari の新しい版で開いてください）"]);
   return o;
@@ -4421,8 +4968,54 @@ function init$e() {
       go("media");
     },
     link: function() {
-      S.linked = true;
+      pickScriptFile();
+    },
+    scrPick: function() {
+      pickScriptFile();
+    },
+    scrImport: function() {
+      importScript();
+    },
+    scrUndo: function() {
+      undoImport();
+    },
+    scrFilter: function(v) {
+      S.scrFilter = v;
       draw();
+    },
+    scrOrphan: function() {
+      S.scrFilter = "orphan";
+      go("script");
+    },
+    scrLink: function(v) {
+      linkClips(v, S.sel.slice());
+    },
+    scrUnlink: function(v) {
+      unlink(v);
+    },
+    scrOk: function(v) {
+      confirmLink(v);
+    },
+    scrClip: function(v) {
+      gotoClip(v);
+    },
+    scrRow: function(v) {
+      gotoRow(v);
+    },
+    impNo: function() {
+      closeImport();
+    },
+    impGo: function() {
+      applyImport();
+    },
+    psScriptPick: function() {
+      pickScriptFile();
+    },
+    psScriptOff: function() {
+      setScriptSetting("path");
+      setScriptSetting("name");
+      syncScriptWatch(true);
+      renderProjectSettings();
     },
     save: function() {
       if (HOST) {
@@ -6317,6 +6910,7 @@ function pqLabel() {
 function applyProjectSettings() {
   var wh = seqWH(), a = document.getElementById("app");
   if (a) a.style.setProperty("--ar", wh[0] + " / " + wh[1]);
+  syncScriptWatch();
   setTcFps(parseFloat(ps().fps) || 30);
 }
 function openProjectSettings(tab) {
@@ -6337,14 +6931,17 @@ function select(key, opts, cur, label) {
 }
 function renderProjectSettings() {
   var d = document.getElementById("dlg"), t = S.pstab, s = ps(), body = "";
-  var tabs2 = [["seq", "シーケンス"], ["preview", "プレビュー"]].concat(HOST ? [["proxy", "プロキシ"]] : []).concat([["audio", "音声"]]);
+  var tabs2 = [["seq", "シーケンス"], ["preview", "プレビュー"]].concat(HOST ? [["proxy", "プロキシ"]] : []).concat([["audio", "音声"], ["script", "台本連携"]]);
   if (!tabs2.some(function(x) {
     return x[0] === t;
   })) t = S.pstab = "seq";
   if (t === "seq") body = "<h3>シーケンス</h3>" + prefRow("解像度", select("res", RES_OPTS, s.res, "解像度")) + prefRow("フレームレート", select("fps", FPS_OPTS, s.fps, "フレームレート"));
   else if (t === "preview") body = "<h3>プレビュー</h3>" + prefRow("画質", seg("pq", PQ_OPTS, s.pq));
   else if (t === "proxy") body = "<h3>プロキシ</h3>" + prefRow("プロキシの高さ", seg("proxy", PROXY_OPTS, s.proxy)) + prefRow("作り直す", btn("いまのプロキシを作り直す", "psProxy", "", "s"));
-  else body = "<h3>音声</h3>" + prefRow("サンプリング周波数", seg("ar", AR_OPTS, s.ar));
+  else if (t === "script") {
+    var sc = scriptSettings(), conf = !!sc.confirmAll;
+    body = "<h3>台本連携</h3>" + prefRow("連携ファイル", '<span class="row" style="gap:8px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px" title="' + h(sc.path || sc.name || "") + '">' + h(sc.name || "なし") + "</span>" + btn(sc.name ? "変更…" : "選ぶ…", "psScriptPick", "", "s") + (sc.path || sc.name ? btn("解除", "psScriptOff", "", "s") : "") + "</span>") + (HOST ? prefRow("更新の見張り", '<label class="row" style="gap:6px"><input type="checkbox" data-pss="watch"' + (sc.watch === false ? "" : " checked") + ">連携ファイルが書き出し直されたら知らせる</label>") : "") + prefRow("反映のしかた", '<span class="col" style="display:flex;flex-direction:column;gap:6px"><label class="row" style="gap:6px"><input type="radio" name="pssc" data-pss="confirmAll" value="auto"' + (conf ? "" : " checked") + '>追加・並べ替え・移動は自動、変更・削除は確認</label><label class="row" style="gap:6px"><input type="radio" name="pssc" data-pss="confirmAll" value="all"' + (conf ? " checked" : "") + ">すべて確認してから反映</label></span>") + prefRow("前回の取り込み", P.script ? "書き出し #" + P.script.exportSeq + "　" + h(new Date(P.script.importedAt).toLocaleString("ja-JP")) : '<span class="mu">なし</span>');
+  } else body = "<h3>音声</h3>" + prefRow("サンプリング周波数", seg("ar", AR_OPTS, s.ar));
   d.innerHTML = '<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">プロジェクト設定</h2>' + btn("閉じる", "dlgNo", "", "s") + '</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">' + tabs2.map(function(x) {
     return "<button" + (t === x[0] ? ' aria-current="true"' : "") + A("psTab", x[0]) + ">" + x[1] + "</button>";
   }).join("") + '</nav><div class="pcont">' + body + "</div></div></div>";
@@ -6524,9 +7121,78 @@ function init$7() {
   document.addEventListener("pointerup", end, true);
   document.addEventListener("pointercancel", end, true);
 }
+function clipName(c) {
+  var m = c.m && M(c.m);
+  return c.type === "title" ? String(c.label || "").split("\n")[0] || "テロップ" : m ? m.n : c.label || "クリップ";
+}
+function chipFor(l) {
+  var c = C(l.clipId), st = stateOf(l);
+  return '<span class="slc ' + st + '"><button class="lnk"' + A("scrClip", c.id) + ' title="編集ページで見る">' + h(c.tr) + "　" + h(excerpt(clipName(c), 16)) + "　" + tc(c.start) + '</button><button class="x" aria-label="紐づけを解除" title="紐づけを解除"' + A("scrUnlink", l.id) + ">×</button></span>";
+}
 function init$6() {
   R.script = function() {
-    return '<div class="pc" style="align-items:center;justify-content:center;background:var(--bg1);text-align:center"><div style="font-size:16px;font-weight:500">台本ページは、台本アプリとの紐づけ後に表示されます</div><div style="margin-top:18px">' + (S.linked ? '<span class="t-ok">紐づけました</span>' : btn("台本アプリと紐づける", "link", "", "pri")) + "</div></div>";
+    if (!P.script) return '<div class="pc" style="align-items:center;justify-content:center;background:var(--bg1);text-align:center;gap:14px"><div style="font-size:16px;font-weight:500">台本がまだありません</div><div>' + btn("台本の連携ファイルを読み込む…", "scrPick", "", "pri") + "</div></div>";
+    var s = P.script, nn = nums(), ct = counts(), f = S.scrFilter || "all", st = scriptSettings(), sel2 = S.sel.filter(function(id) {
+      return C(id);
+    });
+    var scenes = s.scenes.slice().sort(function(a, b) {
+      return a.order - b.order;
+    });
+    var rows = s.rows.slice().sort(function(a, b) {
+      return a.order - b.order;
+    });
+    var show = function(r) {
+      var ls = linksOfRow(r.id);
+      if (f === "unplaced") return !r.deleted && !ls.length;
+      if (f === "stale") return ls.some(function(l) {
+        return stateOf(l) === "stale";
+      });
+      if (f === "orphan") return ls.some(function(l) {
+        return stateOf(l) === "orphan";
+      });
+      return !r.deleted || ls.length;
+    };
+    var rowHtml = function(r) {
+      var ls = linksOfRow(r.id), stale = ls.filter(function(l) {
+        return stateOf(l) === "stale";
+      }), orph = r.deleted;
+      var opts = orph ? rows.filter(function(x) {
+        return !x.deleted;
+      }).map(function(x) {
+        return '<option value="' + x.id + '">' + h(nn[x.id] + "　" + excerpt(x.body || x.video, 24)) + "</option>";
+      }).join("") : "";
+      return '<div class="srow' + (S.scrRow === r.id ? " on" : "") + (orph ? " del" : "") + '" data-srow="' + r.id + '"><div class="sno">' + (orph ? '<span class="t-er">削除</span>' : h(nn[r.id] || "")) + '</div><div class="stm">' + h(r.time || "") + '</div><div class="smu">' + h(r.music || "") + '</div><div class="svi">' + h(r.video || "") + '</div><div class="sbd">' + h(r.body || "") + (r.type ? '<span class="chip c-mu" style="margin-left:6px">' + h(r.type) + "</span>" : "") + stale.map(function(l) {
+        var sn = l.seen || {}, diff = ROW_TEXT_KEYS.filter(function(k) {
+          return (sn[k] || "") !== (r[k] || "");
+        });
+        return '<div class="sdf"><div class="t-wn" style="font-weight:500">台本が更新されました（' + h(C(l.clipId).tr) + "　" + h(excerpt(clipName(C(l.clipId)), 14)) + "）</div>" + diff.map(function(k) {
+          return '<div><span class="mu">' + LABEL_FIELD[k] + "</span><del>" + h(sn[k] || "（なし）") + "</del><ins>" + h(r[k] || "（なし）") + "</ins></div>";
+        }).join("") + '<div class="row" style="justify-content:flex-end;margin-top:4px">' + btn("確認しました", "scrOk", l.id, "s") + "</div></div>";
+      }).join("") + '</div><div class="scl">' + ls.map(chipFor).join("") + (orph ? ls.length ? '<div class="row" style="gap:6px;margin-top:4px"><select class="inp" data-in="scrRelink" data-row="' + r.id + '" aria-label="付け替える行" style="height:26px;min-width:0;flex:1"><option value="">別の行へ付け替える…</option>' + opts + "</select></div>" : "" : '<button class="b s"' + A("scrLink", r.id) + (sel2.length ? "" : " disabled") + ' title="編集ページで選んでいるクリップを、この行に紐づける">＋ 選んだクリップ</button>') + "</div></div>";
+    };
+    var body = "", any = false;
+    scenes.forEach(function(sc, i) {
+      var L = rows.filter(function(r) {
+        return r.sceneId === sc.id && show(r);
+      });
+      if (!L.length) return;
+      any = true;
+      body += '<div class="shd"><b>S' + (i + 1) + "</b>　" + h(sc.title || "") + '<span class="mu" style="margin-left:10px">' + h(sc.time || "") + "</span></div>" + L.map(rowHtml).join("");
+    });
+    var lost = rows.filter(function(r) {
+      return !scenes.some(function(sc) {
+        return sc.id === r.sceneId;
+      }) && show(r);
+    });
+    if (lost.length) {
+      any = true;
+      body += '<div class="shd">シーンなし</div>' + lost.map(rowHtml).join("");
+    }
+    if (!any) body = '<div class="mu" style="padding:28px">該当する行はありません</div>';
+    var seg2 = [["all", "すべて", ""], ["unplaced", "未配置の行", ct.unplaced], ["stale", "更新された行", ct.stale], ["orphan", "台本で削除された行", ct.orphan]];
+    return '<div class="pc" style="background:var(--bg1)"><div class="row" style="height:50px;flex:none;gap:10px;padding:0 16px;border-bottom:1px solid var(--dv)"><b style="font-size:14px">' + h(s.title || "台本") + '</b><span class="mu">書き出し #' + s.exportSeq + "　取り込み " + h(new Date(s.importedAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })) + "</span>" + (S.scrNotice ? '<span class="chip c-wn">台本が更新されました</span>' : "") + '<span class="grow"></span>' + (P.scriptBackup ? btn("取り込みを元に戻す", "scrUndo", "", "s") : "") + btn(HOST && st.path ? "取り込む" : "取り込む…", "scrImport", "", S.scrNotice ? "pri" : "") + '</div><div class="row" style="flex:none;gap:6px;padding:8px 16px;border-bottom:1px solid var(--dv)"><span class="seg">' + seg2.map(function(x) {
+      return btn(x[1] + (x[2] !== "" ? " " + x[2] : ""), "scrFilter", x[0], "s" + (f === x[0] ? " on" : ""));
+    }).join("") + '</span></div><div class="srh"><div>番号</div><div>時間</div><div>図画・音楽</div><div>映像</div><div>内容</div><div>クリップ</div></div><div class="scroll">' + body + "</div></div>";
   };
 }
 function roughStrip() {
@@ -7578,6 +8244,15 @@ function init$1() {
         if (fontById(tf.font).weight) delete tf.weight;
         changed();
       }
+    } else if (k === "scrRelink") {
+      if (e.target.value) {
+        var lsr = linksOfRow(e.target.dataset.row);
+        lsr.forEach(function(l) {
+          relink$1(l.id, e.target.value);
+        });
+      }
+    } else if (k === "clipLink") {
+      if (e.target.value) linkClips(e.target.value, [e.target.dataset.cid]);
     } else if (k === "mbin") {
       moveToBin(e.target.dataset.mid, e.target.value);
     } else if (k === "ebin") {
@@ -7733,6 +8408,32 @@ document.addEventListener("focusout", function(e) {
   var t = e.target;
   if (t && t.dataset && t.dataset.in === "binname" && S.binEdit) renameBin(t.dataset.bid, t.value);
 });
+document.addEventListener("change", function(e) {
+  var t = e.target, d = t && t.dataset;
+  if (!d) return;
+  if (d.impc !== void 0 && S.imp) {
+    S.imp.accept[d.impc] = t.checked;
+    return;
+  }
+  if (d.impr !== void 0 && S.imp) {
+    S.imp.relink[d.impr] = t.value === "1";
+    return;
+  }
+  if (d.impf !== void 0 && S.imp) {
+    S.imp.force = t.checked;
+    renderImport();
+    return;
+  }
+  if (d.pss === "watch") {
+    setScriptSetting("watch", t.checked ? null : false);
+    syncScriptWatch(true);
+    return;
+  }
+  if (d.pss === "confirmAll") {
+    setScriptSetting("confirmAll", t.value === "all" ? true : null);
+    return;
+  }
+});
 function init() {
   window.__matsuko = { E, P: function() {
     return P;
@@ -7783,15 +8484,15 @@ function init() {
   });
 }
 init$7();
+init$t();
 init$s();
 init$r();
-init$q();
 init$9();
-init$p();
-init$n();
+init$q();
+init$o();
 init$b();
 init$a();
-init$o();
+init$p();
 init$g();
 init$j();
 init$i();
@@ -7804,10 +8505,11 @@ init$f();
 init$8();
 init$c();
 init$d();
-init$m();
+init$n();
 init$e();
 init$2();
 init$1();
+init$m();
 init$l();
 init$k();
 init();

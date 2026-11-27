@@ -27,7 +27,9 @@ export function primary(){var L=S.sel.map(C).filter(Boolean);var v=L.filter(func
 export function carve(tid,a,b,skip){K.carve(ctx(),tid,a,b,skip);}
 export function splitClip(c,t){return K.splitClip(ctx(),c,t);}
 /* 時刻 t で分割。リンクした組は、分けたあとも組のまま */
-export function splitList(L,t){return K.splitList(ctx(),L,t);}
+/* 分けたら、台本行との紐づけ（P.links）を後ろ半分にも付ける */
+export function splitList(L,t){var made=K.splitList(ctx(),L,t);if(P.links&&P.links.length)made.forEach(function(c2){var o=L.filter(function(c){return c.tr===c2.tr&&c.m===c2.m&&Math.abs(cEnd(c)-c2.start)<1e-6;})[0];if(!o)return;
+  P.links.filter(function(l){return l.clipId===o.id;}).forEach(function(l){P.links.push(Object.assign({},l,{id:uid('lk'),clipId:c2.id}));});});return made;}
 export function splitAt(t,ids){var L=K.splittable(P,t,ids&&ids.length?ids.map(C).filter(Boolean):activeAt(t));
   if(!L.length)return toast('再生ヘッドの位置に、分割できるクリップがありません');mark();var made=splitList(L,t);S.sel=made.map(function(c){return c.id;});changed();toast('分割しました');}
 /* [a,b) を詰める。自分のトラックは必ず、ほかのトラックはその範囲が空いていれば詰める */

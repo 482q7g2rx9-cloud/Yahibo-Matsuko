@@ -15,6 +15,7 @@ import { E, TST, audible, redrawProg, sync, trPairs } from '../engine';
 import { TRANSITIONS, transitionById } from '../transitions';
 import { transGallery } from '../transPreview';
 import { binOptions, inBin } from '../bins';
+import { excerpt, linksOfClip, nums, rowById, stateOf } from '../scriptLink';
 import { fitZoom, primary, zoomVal } from '../editOps';
 import { num } from '../exporter';
 import { R } from './media';
@@ -30,7 +31,7 @@ export function clipHtml(c,r,pps){var m=c.m?M(c.m):null,on=S.sel.indexOf(c.id)>=
     st='left:'+x.toFixed(1)+'px;width:'+w.toFixed(1)+'px;top:'+r.y+'px;height:'+r.h+'px;',cls=(on?' on':'')+(tr.lock?' lkd':''),
     fx=(c.type==='title'||r.kind==='v'&&c.type==='media'&&(hasFx(c)||m&&m.sample))?'<span class="fxb" style="width:16px;height:12px;line-height:12px">fx</span>':'',
     nm=h(c.type==='title'?(String(c.label||'').split('\n')[0]||'テキストを入力'):c.type==='adj'?c.label:m?m.n:'（素材なし）'),
-    tip=' title="'+nm+'　'+tc(c.start)+'〜'+tc(cEnd(c))+(c.link?'（リンク）':'')+'"',tm='<span class="trim l"></span><span class="trim r"></span>';
+    tip=' title="'+nm+'　'+tc(c.start)+'〜'+tc(cEnd(c))+(c.link?'（リンク）':'')+'"',tm=linkBadge(c)+'<span class="trim l"></span><span class="trim r"></span>';
   if(r.kind==='v'){
     if(c.type==='title')return '<div class="ci title'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'line-height:'+(r.h-2)+'px">'+fx+nm+tm+'</div>';
     if(c.type==='adj')return '<div class="ci adj'+cls+'" data-c="'+c.id+'"'+tip+' style="'+st+'line-height:'+(r.h-2)+'px">'+nm+tm+'</div>';
@@ -132,7 +133,7 @@ export function inspector(){var L=S.sel.map(C).filter(Boolean),c=primary();
   var tq=v&&trPairs().filter(function(q){return q.b===v;})[0];
   if(tq)h2+=fsec('trans','トランジション',null,'<div class="fg"><span>種類</span><select class="inp" data-in="trk" aria-label="トランジションの種類">'+TRANSITIONS.map(function(x){return '<option value="'+x.id+'"'+(x.id===tq.k?' selected':'')+'>'+h(x.name)+'</option>';}).join('')+'</select></div>'+numRow('長さ',v,'xd')+'<div class="row" style="justify-content:flex-end;padding-top:8px">'+btn('外す','trDel',v.id,'s')+'</div>');
   if(a)h2+=fsec('audio','音量',null,numRow('音量',a,'vol')+numRow('フェードイン',a,'fin')+numRow('フェードアウト',a,'fout'));
-  if(m)h2+='<div style="padding:10px 16px;border-bottom:1px solid var(--dv);line-height:1.6"><div style="font-weight:500">リンク中の台本行</div><div class="mu">'+h(m.line&&m.line!=='—'?m.line:'—')+'</div></div>';
+  h2+=scriptBox(c);
   return {name:m?m.n:c.label||'',html:h2};}
 export function ms1(s){var m=Math.floor(s/60),x=s-m*60;return m+':'+(x<10?'0':'')+x.toFixed(1);}
 /* 無音の検出：音量のピークがしきい値より小さい部分が、最短の長さ以上続いたところ */
@@ -205,3 +206,13 @@ export function insClosed(){try{return localStorage.getItem('matsuko.inspector')
 export function toggleInspector(){var c=!insClosed();S.insClosed=c;try{localStorage.setItem('matsuko.inspector',c?'closed':'open');}catch(e){}draw();}
 /* インスペクタの幅：前に端をドラッグして広げられた最大の幅（画面の幅の 36%、280〜560px）の 85% */
 export function insWidth(){var app=document.getElementById('app'),aw=app?app.clientWidth:1180;return Math.round(Math.max(280,Math.min(560,aw*0.36))*0.85);}
+
+/* インスペクタ：このクリップに紐づいた台本行（台本連携）。行を選んで紐づける・台本ページで見る・解除する */
+function scriptBox(c){if(!P.script)return '';var ls=linksOfClip(c.id),nn=nums(),rows=P.script.rows.filter(function(r){return !r.deleted;}).slice().sort(function(a,b){return a.order-b.order;});
+  var it=ls.map(function(l){var r=rowById(l.rowId),st=stateOf(l);return '<div class="row" style="gap:6px;align-items:flex-start;margin-top:6px"><span class="chip '+(st==='ok'?'c-ok':st==='stale'?'c-wn':'c-er')+'" style="flex:none">'+(st==='ok'?h(nn[l.rowId]||''):st==='stale'?'更新':'孤立')+'</span><span class="grow" style="min-width:0">'+h(excerpt(r&&(r.body||r.video),60)||'（台本で削除された行）')+'</span>'+
+    btn('台本','scrRow',l.rowId,'s')+'<button class="ib" aria-label="紐づけを解除" title="紐づけを解除"'+A('scrUnlink',l.id)+'>×</button></div>';}).join('');
+  return fsec('script','台本行',null,'<div style="padding:4px 0 6px">'+(it||'<div class="mu">なし</div>')+
+    '<select class="inp" data-in="clipLink" data-cid="'+c.id+'" aria-label="台本行に紐づける" style="width:100%;margin-top:8px"><option value="">台本行に紐づける…</option>'+rows.map(function(r){return '<option value="'+r.id+'">'+h(nn[r.id]+'　'+excerpt(r.body||r.video,28))+'</option>';}).join('')+'</select></div>');}
+/* タイムラインのクリップの印：台本が更新された（更新）・台本で削除された（孤立） */
+function linkBadge(c){if(!P.script||!P.links||!P.links.length)return '';var ls=linksOfClip(c.id);if(!ls.length)return '';var o=ls.some(function(l){return stateOf(l)==='orphan';}),st=!o&&ls.some(function(l){return stateOf(l)==='stale';});
+  return o?'<span class="lkb er" title="台本で削除された行に紐づいています">孤立</span>':st?'<span class="lkb wn" title="台本が更新されました">更新</span>':'';}

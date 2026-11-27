@@ -287,6 +287,17 @@ pub fn open_at(app: &AppHandle, path: &Path) -> Result<Opened, String> {
             }
         }
     }
+    // 台本連携：紐づけてある連携ファイルは、読んで見張ってよい
+    if let Some(sp) = project
+        .pointer("/settings/script/path")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+    {
+        st.allowed
+            .lock()
+            .unwrap()
+            .insert(std::path::PathBuf::from(sp));
+    }
     // フォルダーごと移したなどで素材の場所が変わったら、すぐ書き直しておく
     if moved {
         let _ = write_project(&dir, &project);

@@ -28,6 +28,7 @@ import { init as i24 } from './drag';
 import { init as i25 } from './fit';
 import { init as i26 } from './boot';
 import { init as iTrans } from './transPreview';
+import { init as iScript } from './scriptLink';
 
 initPanels(); // パネルの幅（最初に描く前に読み込む）
 i0();
@@ -57,4 +58,5 @@ i23();
 i24();
 i25();
 iTrans();
+iScript();
 i26();

@@ -14,6 +14,7 @@ import { E, dropEl } from './engine';
 import { draw } from './render';
 import { closeMenu, toast } from './menus';
 import { prefRow } from './prefs';
+import { scriptSettings, syncScriptWatch } from './scriptLink';
 
 export var RES_OPTS = [['1920×1080', '1920 × 1080（フル HD）'], ['3840×2160', '3840 × 2160（4K）'], ['1280×720', '1280 × 720（HD）'], ['1080×1920', '1080 × 1920（縦長・SNS）'], ['1080×1080', '1080 × 1080（正方形）']];
 export var FPS_OPTS = ['23.976', '24', '25', '29.97', '30', '50', '59.94', '60'];
@@ -43,6 +44,7 @@ export function pqLabel() { return { high: '高画質', std: '標準画質', lig
 export function applyProjectSettings() {
   var wh = seqWH(), a = document.getElementById('app');
   if (a) a.style.setProperty('--ar', wh[0] + ' / ' + wh[1]);
+  syncScriptWatch();
   setTcFps(parseFloat(ps().fps) || 30);
 }
 
@@ -58,7 +60,7 @@ function select(key, opts, cur, label) {
 
 export function renderProjectSettings() {
   var d = document.getElementById('dlg'), t = S.pstab, s = ps(), body = '';
-  var tabs = [['seq', 'シーケンス'], ['preview', 'プレビュー']].concat(HOST ? [['proxy', 'プロキシ']] : []).concat([['audio', '音声']]);
+  var tabs = [['seq', 'シーケンス'], ['preview', 'プレビュー']].concat(HOST ? [['proxy', 'プロキシ']] : []).concat([['audio', '音声'], ['script', '台本連携']]);
   if (!tabs.some(function (x) { return x[0] === t; })) t = S.pstab = 'seq';
   if (t === 'seq') body = '<h3>シーケンス</h3>' +
     prefRow('解像度', select('res', RES_OPTS, s.res, '解像度')) +
@@ -68,6 +70,14 @@ export function renderProjectSettings() {
   else if (t === 'proxy') body = '<h3>プロキシ</h3>' +
     prefRow('プロキシの高さ', seg('proxy', PROXY_OPTS, s.proxy)) +
     prefRow('作り直す', btn('いまのプロキシを作り直す', 'psProxy', '', 's'));
+  else if (t === 'script') {
+    var sc = scriptSettings(), conf = !!sc.confirmAll;
+    body = '<h3>台本連携</h3>' +
+      prefRow('連携ファイル', '<span class="row" style="gap:8px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px" title="' + h(sc.path || sc.name || '') + '">' + h(sc.name || 'なし') + '</span>' + btn(sc.name ? '変更…' : '選ぶ…', 'psScriptPick', '', 's') + (sc.path || sc.name ? btn('解除', 'psScriptOff', '', 's') : '') + '</span>') +
+      (HOST ? prefRow('更新の見張り', '<label class="row" style="gap:6px"><input type="checkbox" data-pss="watch"' + (sc.watch === false ? '' : ' checked') + '>連携ファイルが書き出し直されたら知らせる</label>') : '') +
+      prefRow('反映のしかた', '<span class="col" style="display:flex;flex-direction:column;gap:6px"><label class="row" style="gap:6px"><input type="radio" name="pssc" data-pss="confirmAll" value="auto"' + (conf ? '' : ' checked') + '>追加・並べ替え・移動は自動、変更・削除は確認</label><label class="row" style="gap:6px"><input type="radio" name="pssc" data-pss="confirmAll" value="all"' + (conf ? ' checked' : '') + '>すべて確認してから反映</label></span>') +
+      prefRow('前回の取り込み', P.script ? '書き出し #' + P.script.exportSeq + '　' + h(new Date(P.script.importedAt).toLocaleString('ja-JP')) : '<span class="mu">なし</span>');
+  }
   else body = '<h3>音声</h3>' +
     prefRow('サンプリング周波数', seg('ar', AR_OPTS, s.ar));
   d.innerHTML = '<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">プロジェクト設定</h2>' + btn('閉じる', 'dlgNo', '', 's') + '</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">' +

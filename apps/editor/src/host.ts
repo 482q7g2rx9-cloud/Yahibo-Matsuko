@@ -119,6 +119,13 @@ export interface Host {
     cancel(id: string): Promise<void>;
     onJob(fn: (e: { id: string; state: 'progress' | 'done' | 'error'; p: number; data: Record<string, unknown> | null }) => void): Promise<UnlistenFn>;
   };
+  /** 台本連携：連携ファイル（○○.link.json）を選ぶ・読む・更新を見張る */
+  script: {
+    pick(): Promise<string | null>;
+    read(path: string): Promise<string>;
+    watch(path: string | null): Promise<void>;
+    onChanged(fn: (path: string) => void): Promise<UnlistenFn>;
+  };
   /** 書き出したファイルを、ダイアログで選んだ場所に保存する。やめたら false */
   saveFile(name: string, ext: string, data: Blob): Promise<boolean>;
   /** OS からのドラッグ：入った・動いた・離れた・落とした */
@@ -176,6 +183,12 @@ const host: Host = {
     start: (req) => invoke('export_start', { req }),
     cancel: (id) => invoke('export_cancel', { id }),
     onJob: (fn) => listen('export-job', (e) => fn(e.payload as Parameters<typeof fn>[0])),
+  },
+  script: {
+    pick: () => invoke('script_pick'),
+    read: (path) => invoke('script_read', { path }),
+    watch: (path) => invoke('script_watch', { path }),
+    onChanged: (fn) => listen<{ path: string }>('script-changed', (e) => fn(e.payload.path)),
   },
   async saveFile(name, ext, data) {
     const path = await invoke<string | null>('save_pick', { name, ext });

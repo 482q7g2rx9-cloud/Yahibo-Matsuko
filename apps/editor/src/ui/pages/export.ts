@@ -11,6 +11,7 @@ import { R } from './media';
 import { xRange } from './edit';
 import { toast } from '../menus';
 import { HOST } from '../desktop';
+import { counts } from '../scriptLink';
 
 /* ---- 出力 ---- */
 export function checks(){var o=[],d=progDur(),used={};P.clips.forEach(function(c){if(c.m)used[c.m]=1;});
@@ -27,6 +28,8 @@ export function checks(){var o=[],d=progDur(),used={};P.clips.forEach(function(c
   if(S.x&&!S.x.audio){var sw=seqWH(),xw=String(S.x.res).split('×').map(Number),sf=parseFloat(ps().fps),xf=parseFloat(S.x.fps);
     if(xw[0]&&Math.abs(xw[0]/xw[1]-sw[0]/sw[1])>0.01)o.push(['wn','解像度','シーケンスは '+sw[0]+'×'+sw[1]+'、書き出しは '+S.x.res+' です。縦横の比率が違うので、黒い帯が付きます']);
     if(xf&&sf&&Math.abs(xf-sf)>0.01)o.push(['wn','フレームレート','シーケンスは '+ps().fps+' fps、書き出しは '+S.x.fps+' です']);}
+  /* 台本連携：台本で削除された行に紐づいたクリップ（孤立） */
+  var cn=counts();if(P.script)o.push(cn.orphan?['wn','台本','台本で削除された行に紐づいたクリップ '+cn.orphan+'件','台本を見る','scrOrphan']:['ok','台本','孤立したクリップはありません']);
   var f=xFmt();o.push(f?['ok','書き出し形式',f[0]+(HOST?'　FFmpeg で書き出します':'　このブラウザで書き出せます')]:['er','書き出し形式','このブラウザは書き出しに対応していません（Chrome・Edge・Safari の新しい版で開いてください）']);
   return o;}
 export function newJob(){var f=xFmt(),rg=xRange();if(S.x.range==='イン点〜アウト点'&&P.pin==null&&P.pout==null){toast('編集ページで I・O キーを押して範囲を決めてください');return null;}if(rg[1]-rg[0]<0.5&&P.clips.length){toast('書き出す範囲が短すぎます');return null;}if(!f){toast('このブラウザでは書き出せません');return null;}if(!P.clips.length){toast('タイムラインにクリップがありません');return null;}
