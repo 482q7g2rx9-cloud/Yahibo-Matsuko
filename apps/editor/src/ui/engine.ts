@@ -32,7 +32,7 @@ export function elFor(c,m,audio){var e=E.els[c.id];if(e&&e._src===m.url&&!!e._au
 /* 再生できなかった素材は、1回だけ知らせる（デスクトップ版の Linux で GStreamer のプラグインが足りないときなど） */
 export var PLAYERR;
 export function playErr(m,e){if(!m||!e.error||PLAYERR[m.id+'|'+m.url])return;PLAYERR[m.id+'|'+m.url]=1;var c=e.error.code;
-  toast('「'+m.n+'」を再生できませんでした'+(c===4?'（この形式を再生する機能がありません'+(HOST&&/Linux/.test(navigator.userAgent)?'。gstreamer1.0-libav を入れてください':'')+'）':c===2?'（ファイルを読めませんでした）':'（'+(e.error.message||'コード '+c)+'）'));}
+  toast('「'+m.n+'」を再生できませんでした'+(c===4?'（この形式を再生する機能がありません'+(HOST&&/Linux/.test(navigator.userAgent)?'。gstreamer1.0-libav をインストールしてください':'')+'）':c===2?'（ファイルを読めませんでした）':'（'+(e.error.message||'コード '+c)+'）'));}
 /* 止まっているときの位置合わせ（トラックバーを動かしているとき）。
    位置を変えるたびに読み込みをやり直すと、いつまでも絵が出ないので、前の位置合わせが終わるまで待ち、
    終わったら（seeked）、その間に来た最後の位置へ合わせる */

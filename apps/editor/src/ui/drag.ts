@@ -45,7 +45,7 @@ export function cutNear(e){var i=dropInfo(e),pps=S.pps||10;if(!i.row||i.row.kind
 export function ghostTrans(e){var g=document.querySelector('[data-ghost]'),q=cutNear(e),pps=S.pps||10;if(!g)return;if(!q){g.hidden=true;S.dropCut=null;return;}
   var d=(q.b.xin&&q.b.xin.d)||1;S.dropCut=q.b.id;g.hidden=false;g.style.cssText='left:'+((q.b.start-d/2)*pps)+'px;top:'+q.row.y+'px;width:'+Math.max(6,d*pps)+'px;height:'+q.row.h+'px';}
 export function dropTrans(e,id){var g=document.querySelector('[data-ghost]');if(g)g.hidden=true;var b=S.dropCut&&C(S.dropCut),def=transitionById(id);S.dropCut=null;if(!b||!def||locked(b))return;
-  mark();b.xin={k:id,d:(b.xin&&b.xin.d)||1};S.sel=[b.id];changed();toast('「'+def.name+'」を付けました');}
+  mark();b.xin={k:id,d:(b.xin&&b.xin.d)||1};S.sel=[b.id];changed();toast('「'+def.name+'」を適用しました');}
 export var PD;
 export function pdUnder(e,sel){var f=document.getElementById('dragf');if(f)f.style.display='none';var el=document.elementFromPoint(e.clientX,e.clientY);if(f)f.style.display='';return el&&el.closest&&el.closest(sel);}
 export function pdMarks(){[].forEach.call(document.querySelectorAll('.dragl,.dragr'),function(x){x.classList.remove('dragl','dragr');});}

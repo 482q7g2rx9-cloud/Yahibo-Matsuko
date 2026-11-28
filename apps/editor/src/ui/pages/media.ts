@@ -21,7 +21,7 @@ export function mediaList(){var q=S.mq.trim(),L=P.media.filter(function(m){
   return L;}
 export function binCount(id){return P.media.filter(function(m){return inBin(m,id);}).length;}
 export function mthumb(m,w,hh){var sz=w==='fill'?'width:100%;aspect-ratio:16/9':'width:'+w+'px;height:'+hh+'px';
-  if(m.loading)return '<div class="th" style="'+sz+';background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:10px">読込中</div>';
+  if(m.loading)return '<div class="th" style="'+sz+';background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--mu);font-size:10px">読み込み中</div>';
   if(m.thumb)return '<div class="th" style="'+sz+';background:#000 url('+m.thumb+') center / cover"></div>';
   if(m.k==='音声'||m.k==='テイク')return '<div class="th" style="'+sz+';background:#2f78b7;border-color:#8cc4ee">'+waveOf(m,0,m.d||1,22)+'</div>';
   if(m.k==='台本')return '<div class="th" style="'+sz+';background:var(--chip);border-color:#555;display:flex;align-items:center;justify-content:center;color:var(--tx2)">台本</div>';

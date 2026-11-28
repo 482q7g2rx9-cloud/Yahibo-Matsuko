@@ -18,7 +18,7 @@ import { scriptSettings, syncScriptWatch } from './scriptLink';
 
 export var RES_OPTS = [['1920×1080', '1920 × 1080（フル HD）'], ['3840×2160', '3840 × 2160（4K）'], ['1280×720', '1280 × 720（HD）'], ['1080×1920', '1080 × 1920（縦長・SNS）'], ['1080×1080', '1080 × 1080（正方形）']];
 export var FPS_OPTS = ['23.976', '24', '25', '29.97', '30', '50', '59.94', '60'];
-export var PQ_OPTS = [['high', '高画質', '1920 × 1080 の細かさで描く（重い）'], ['std', '標準', '960 × 540 の細かさで描く'], ['light', '軽量', '480 × 270 の細かさで描く（古いパソコン向け）']];
+export var PQ_OPTS = [['high', '高画質', '1920 × 1080 で表示（重い）'], ['std', '標準', '960 × 540 で表示'], ['light', '軽量', '480 × 270 で表示（性能の低いパソコン向け）']];
 export var PROXY_OPTS = [[540, '540p（軽い）'], [720, '720p（標準）'], [1080, '1080p（きれい）']];
 export var AR_OPTS = [[48000, '48 kHz（動画の標準）'], [44100, '44.1 kHz（音楽 CD と同じ）']];
 
@@ -74,7 +74,7 @@ export function renderProjectSettings() {
     var sc = scriptSettings(), conf = !!sc.confirmAll;
     body = '<h3>台本連携</h3>' +
       prefRow('連携ファイル', '<span class="row" style="gap:8px;min-width:0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px" title="' + h(sc.path || sc.name || '') + '">' + h(sc.name || 'なし') + '</span>' + btn(sc.name ? '変更…' : '選ぶ…', 'psScriptPick', '', 's') + (sc.path || sc.name ? btn('解除', 'psScriptOff', '', 's') : '') + '</span>') +
-      (HOST ? prefRow('更新の見張り', '<label class="row" style="gap:6px"><input type="checkbox" data-pss="watch"' + (sc.watch === false ? '' : ' checked') + '>連携ファイルが書き出し直されたら知らせる</label>') : '') +
+      (HOST ? prefRow('更新の監視', '<label class="row" style="gap:6px"><input type="checkbox" data-pss="watch"' + (sc.watch === false ? '' : ' checked') + '>連携ファイルが更新されたら知らせる</label>') : '') +
       prefRow('反映のしかた', '<span class="col" style="display:flex;flex-direction:column;gap:6px"><label class="row" style="gap:6px"><input type="radio" name="pssc" data-pss="confirmAll" value="auto"' + (conf ? '' : ' checked') + '>追加・並べ替え・移動は自動、変更・削除は確認</label><label class="row" style="gap:6px"><input type="radio" name="pssc" data-pss="confirmAll" value="all"' + (conf ? ' checked' : '') + '>すべて確認してから反映</label></span>') +
       prefRow('前回の取り込み', P.script ? '書き出し #' + P.script.exportSeq + '　' + h(new Date(P.script.importedAt).toLocaleString('ja-JP')) : '<span class="mu">なし</span>');
   }

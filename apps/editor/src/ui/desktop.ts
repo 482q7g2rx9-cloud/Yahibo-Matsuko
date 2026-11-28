@@ -29,7 +29,7 @@ export function forDisk(){return JSON.parse(JSON.stringify(P,function(k,v){retur
 /* プロジェクトがまだなければ「無題のプロジェクト」を書類フォルダーに作る（素材を読み込んだときなど） */
 export function ensureProject(){if(!HOST)return Promise.resolve();if(HOST.project.current)return Promise.resolve(HOST.project.current);
   if(P.sample)resetProject(emptyProject());
-  return HOST.project.create('無題のプロジェクト',null,forDisk()).then(function(o){historyReset();historyTick('open');S.savedAt=hm();head();refreshRecent();toast('プロジェクト「'+o.name+'」を作りました（書類 › Matsuko Editor）');return o;});}
+  return HOST.project.create('無題のプロジェクト',null,forDisk()).then(function(o){historyReset();historyTick('open');S.savedAt=hm();head();refreshRecent();toast('プロジェクト「'+o.name+'」を作成しました（書類 › Matsuko Editor）');return o;});}
 export function saveNow(){if(!HOST||!HOST.project.current)return Promise.resolve(false);clearTimeout(saveTimer);
   return HOST.project.save(forDisk()).then(function(){S.savedAt=hm();var e=document.querySelector('[data-saved]');if(e)e.textContent='● 自動保存済み '+S.savedAt;return true;}).catch(function(e){toast('保存できませんでした：'+e);return false;});}
 export function refreshRecent(){if(HOST)HOST.project.recent().then(function(r){RECENT=r||[];syncNativeMenu();}).catch(function(){});}
@@ -60,7 +60,7 @@ export function importPaths(paths){if(!paths||!paths.length)return;var have={};P
       m.url=mediaUrl(m);P.media.push(m);added.push(m);});
     IMP.total=IMP.done=0;
     if(bad.length)toast(bad.length+'件は読み込めませんでした：'+bad.slice(0,2).join('、'));
-    if(added.length){S.media=added[0].id;S.bin='all';if(!bad.length)toast(added.length+'件を読み込みました。サムネイルや波形は裏で作ります');saveP();draw();added.forEach(function(m){queueJobs(m);});}else draw();
+    if(added.length){S.media=added[0].id;S.bin='all';if(!bad.length)toast(added.length+'件を読み込みました。サムネイルと波形はバックグラウンドで作成します');saveP();draw();added.forEach(function(m){queueJobs(m);});}else draw();
   }).catch(function(e){IMP.total=IMP.done=0;toast('読み込めませんでした：'+e);draw();});}
 /* 作業の進み具合：作業中は該当の表示だけ書き換え、終わったら画面を描き直す（ドラッグや入力の邪魔をしない） */
 export function jobText(m,short){var j=JOBS[m.id]||{};if(m.missing)return '<span class="t-wn">'+(short?'見つかりません':'ファイルが見つかりません')+'</span>';
@@ -100,7 +100,7 @@ export function newProjectDlg(){var d=document.getElementById('dlg'),loc=null;
   newProjectDlg.pick=function(){var name=d.querySelector('#npName').value;HOST.project.pickLocation().then(function(p){if(p){loc=p;newProjectDlg.loc=p;render(newProjectDlg.def);d.querySelector('#npName').value=name;}});};
   newProjectDlg.loc=null;}
 export function createProject(){var d=document.getElementById('dlg'),name=(d.querySelector('#npName').value||'').trim()||'無題のプロジェクト';
-  saveNow().then(function(){var np=emptyProject();return HOST.project.create(name,newProjectDlg.loc,np);}).then(function(o){d.hidden=true;loadOpened(o);go('media');toast('プロジェクト「'+o.name+'」を作りました');}).catch(function(e){toast(String(e));});}
+  saveNow().then(function(){var np=emptyProject();return HOST.project.create(name,newProjectDlg.loc,np);}).then(function(o){d.hidden=true;loadOpened(o);go('media');toast('プロジェクト「'+o.name+'」を作成しました');}).catch(function(e){toast(String(e));});}
 export function openProject(fn){saveNow().then(fn).then(function(o){if(o){loadOpened(o);toast('「'+o.name+'」を開きました');}}).catch(function(e){toast(String(e));});}
 export function fileItems(){var o=[['新規プロジェクト…','new'],['開く…','open']];
   if(HOST){var r=RECENT.filter(function(x){return !HOST.project.current||x.dir!==HOST.project.current.dir;}).slice(0,5);if(r.length){o.push('-',{h:'最近使ったプロジェクト'});r.forEach(function(x,i){o.push([h(x.name),'orec:'+i]);});}}

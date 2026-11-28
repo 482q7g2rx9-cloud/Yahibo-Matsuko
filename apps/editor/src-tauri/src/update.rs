@@ -83,7 +83,7 @@ pub async fn update_check(app: AppHandle) -> Result<Option<Available>, String> {
         date: u.date.map(|d| d.to_string()),
     });
     if let Some(a) = &out {
-        log::info!("新しい版があります：{}", a.version);
+        log::info!("新しいバージョンがあります：{}", a.version);
     }
     *app.state::<Updates>().0.lock().unwrap() = u;
     Ok(out)
@@ -99,7 +99,11 @@ pub async fn update_install(app: AppHandle) -> Result<(), String> {
         .unwrap()
         .take()
         .ok_or("先に更新を確認してください")?;
-    log::info!("更新を入れます：{} → {}", u.current_version, u.version);
+    log::info!(
+        "更新をインストールします：{} → {}",
+        u.current_version,
+        u.version
+    );
     let (a, b) = (app.clone(), app.clone());
     let mut got: u64 = 0;
     u.download_and_install(
@@ -114,10 +118,10 @@ pub async fn update_install(app: AppHandle) -> Result<(), String> {
     )
     .await
     .map_err(|e| {
-        log::error!("更新を入れられませんでした：{e}");
-        format!("更新を入れられませんでした：{e}")
+        log::error!("更新をインストールできませんでした：{e}");
+        format!("更新をインストールできませんでした：{e}")
     })?;
-    log::info!("更新を入れました。起動し直します");
+    log::info!("更新をインストールしました。再起動します");
     app.restart();
 }
 

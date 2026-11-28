@@ -47,7 +47,7 @@ export function lutOff(cid) { var c = C(cid); if (!c) return; mark(); delete c.c
 /** エフェクトページの一覧から付ける：cc:色補正のプリセット、blur・mosaic・vig、mo:動きのプリセット */
 export function fxApply(c, id) {
   if (!c) return toast('クリップを選んでください');
-  if (!canFx(c, id)) return toast('このクリップには付けられません');
+  if (!canFx(c, id)) return toast('このクリップには適用できません');
   if (id.indexOf('cc:') === 0) return colorPreset(c.id, id.slice(3));
   mark();
   if (id === 'blur') c.fxBlur = c.fxBlur || 8;

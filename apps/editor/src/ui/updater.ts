@@ -19,14 +19,14 @@ function dlgHtml(inner) {
 }
 function render(state, extra) {
   var cur = U ? U.current : '';
-  if (state === 'checking') return dlgHtml('<p>確認しています…</p>');
-  if (state === 'none') return dlgHtml('<p>お使いの版（' + h(cur) + '）が最新です。</p><div class="row" style="justify-content:flex-end">' + btn('閉じる', 'dlgNo', '', 'pri') + '</div>');
+  if (state === 'checking') return dlgHtml('<p>確認中…</p>');
+  if (state === 'none') return dlgHtml('<p>お使いのバージョン（' + h(cur) + '）は最新です。</p><div class="row" style="justify-content:flex-end">' + btn('閉じる', 'dlgNo', '', 'pri') + '</div>');
   if (state === 'error') return dlgHtml('<p class="t-er">' + h(extra || '') + '</p><div class="row" style="justify-content:flex-end">' + btn('閉じる', 'dlgNo', '', 'pri') + '</div>');
-  if (state === 'off') return dlgHtml('<p>このビルドには、更新の機能が入っていません。</p><div class="row" style="justify-content:flex-end">' + btn('閉じる', 'dlgNo', '', 'pri') + '</div>');
-  if (state === 'found') return dlgHtml('<p>新しい版 <b>' + h(AV.version) + '</b> があります（いまの版 ' + h(cur) + '）。</p>' +
+  if (state === 'off') return dlgHtml('<p>このビルドには更新機能がありません。</p><div class="row" style="justify-content:flex-end">' + btn('閉じる', 'dlgNo', '', 'pri') + '</div>');
+  if (state === 'found') return dlgHtml('<p>新しいバージョン <b>' + h(AV.version) + '</b> があります（現在のバージョン ' + h(cur) + '）。</p>' +
     (AV.notes ? '<div class="box" style="max-height:220px;overflow:auto;white-space:pre-wrap;margin:10px 0">' + h(AV.notes) + '</div>' : '') +
-    '<div class="row" style="justify-content:flex-end;gap:8px">' + btn('あとで', 'dlgNo', '', 'sec') + btn('更新して起動し直す', 'updInstall', '', 'pri') + '</div>');
-  if (state === 'installing') return dlgHtml('<p>' + h(AV.version) + ' を入れています…</p><div class="prog" style="width:100%"><i data-updp style="width:' + Math.round((extra || 0) * 100) + '%"></i></div>');
+    '<div class="row" style="justify-content:flex-end;gap:8px">' + btn('あとで', 'dlgNo', '', 'sec') + btn('更新して再起動', 'updInstall', '', 'pri') + '</div>');
+  if (state === 'installing') return dlgHtml('<p>' + h(AV.version) + ' をインストール中…</p><div class="prog" style="width:100%"><i data-updp style="width:' + Math.round((extra || 0) * 100) + '%"></i></div>');
 }
 
 /* ヘルプ → 更新を確認… */
@@ -37,7 +37,7 @@ export function checkUpdate(quiet) {
     if (!quiet) render('checking');
     HOST.update.check().then(function (a) {
       AV = a;
-      if (a) { if (quiet) toast('新しい版 ' + a.version + ' があります（ヘルプ → 更新を確認…）'); else render('found'); }
+      if (a) { if (quiet) toast('新しいバージョン ' + a.version + ' があります（ヘルプ → 更新を確認…）'); else render('found'); }
       else if (!quiet) render('none');
     }).catch(function (e) { if (!quiet) render('error', String(e)); });
   };

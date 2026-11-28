@@ -77,7 +77,7 @@ function libPanel(c) {
     return '<button' + A('fxg', g[0]) + ' aria-expanded="' + !closed + '" style="width:100%;height:30px;display:flex;align-items:center;gap:10px;padding:0 16px;border:0;border-top:1px solid var(--dv);border-bottom:1px solid var(--dv);background:var(--bg2);color:var(--tx2)">' + (closed ? TRI.rr : TRI.d) + '<span>' + h(g[0]) + '</span></button>' +
       (closed ? '' : items.map(function (e) {
         var ok = canFx(c, e[0]);
-        return '<div class="li' + (S.fx === e[0] ? ' selr' : '') + '" role="button" tabindex="0"' + A('fxApply', e[0]) + ' title="' + h(ok ? e[1] + ' を付ける' : 'このクリップには付けられません') + '" style="display:flex;align-items:center;gap:10px;height:34px;padding:0 16px' + (ok ? '' : ';opacity:.45') + '"><span style="width:24px;height:24px;border-radius:3px;background:' + e[2] + ';border:1px solid var(--bd2);flex:none"></span><span>' + h(e[1]) + '</span></div>';
+        return '<div class="li' + (S.fx === e[0] ? ' selr' : '') + '" role="button" tabindex="0"' + A('fxApply', e[0]) + ' title="' + h(ok ? e[1] + ' を適用' : 'このクリップには適用できません') + '" style="display:flex;align-items:center;gap:10px;height:34px;padding:0 16px' + (ok ? '' : ';opacity:.45') + '"><span style="width:24px;height:24px;border-radius:3px;background:' + e[2] + ';border:1px solid var(--bd2);flex:none"></span><span>' + h(e[1]) + '</span></div>';
       }).join(''));
   }).join('');
 }
@@ -133,7 +133,7 @@ function trackForm(c) {
   var others = P.clips.filter(function (x) { var t = T(x.tr); return x !== c && t && t.kind === 'v' && x.type !== 'adj' && x.start < cEnd(c) && cEnd(x) > c.start; });
   var name = function (x) { return x.type === 'title' ? 'テロップ：' + String(x.label || '').split('\n')[0] : (M(x.m) || {}).n || x.id; };
   return '<div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">' +
-    '<div class="row" style="gap:6px;flex-wrap:wrap">' + btn('範囲を囲む', 'trSel', '', 's' + (S.trSel ? ' on' : ''), 'プレビューで追うものを囲む') + (box ? '<span class="t-ok">囲みました</span>' : '') + '</div>' +
+    '<div class="row" style="gap:6px;flex-wrap:wrap">' + btn('範囲を囲む', 'trSel', '', 's' + (S.trSel ? ' on' : ''), 'プレビューで追跡する対象を囲む') + (box ? '<span class="t-ok">囲みました</span>' : '') + '</div>' +
     '<div class="row" style="gap:6px">' + btn(TRI.l + '後方へ', 'trGo', 'back', 's', '後方へ追跡') + btn('止める', 'trStop', '', 's') + btn('前方へ' + TRI.r, 'trGo', 'fwd', 's', '前方へ追跡') + '</div>' +
     (run ? '<div class="row" style="gap:8px"><span class="prog" style="flex:1"><i data-trbar style="width:' + Math.round(TRK.job.p * 100) + '%"></i></span><span class="t-ac">追跡中</span></div>' :
       '<div class="fg"><span>状態</span><span>' + (has ? '<span class="t-ok">追跡済み</span>　' + range : '<span class="mu">なし</span>') + '</span></div>') +

@@ -128,7 +128,7 @@ export function renderImport() {
     var lk = linksOfRow(c.rowId).length;
     if ((c.kind === 'delete' || c.kind === 'merge' || c.kind === 'change') && lk) more += '<div class="mu" style="margin:2px 0 0 28px">紐づいたクリップ ' + lk + ' 件</div>';
     if (c.kind === 'merge') { var to = f.rows.filter(function (x) { return x.id === c.other; })[0], rl = !(c.rowId in im.relink) || im.relink[c.rowId];
-      more += '<div style="margin:4px 0 0 28px" class="row"><label class="row" style="gap:6px"><input type="radio" name="rl-' + c.rowId + '" data-impr="' + c.rowId + '" value="1"' + (rl ? ' checked' : '') + '>結合先（' + h(nx[c.other] || '') + ' ' + h(excerpt(to && to.body, 20)) + '）へ付け替える</label><label class="row" style="gap:6px;margin-left:12px"><input type="radio" name="rl-' + c.rowId + '" data-impr="' + c.rowId + '" value="0"' + (rl ? '' : ' checked') + '>孤立にする</label></div>'; }
+      more += '<div style="margin:4px 0 0 28px" class="row"><label class="row" style="gap:6px"><input type="radio" name="rl-' + c.rowId + '" data-impr="' + c.rowId + '" value="1"' + (rl ? ' checked' : '') + '>結合先（' + h(nx[c.other] || '') + ' ' + h(excerpt(to && to.body, 20)) + '）へ付け替える</label><label class="row" style="gap:6px;margin-left:12px"><input type="radio" name="rl-' + c.rowId + '" data-impr="' + c.rowId + '" value="0"' + (rl ? '' : ' checked') + '>孤立させる</label></div>'; }
     return '<div class="impi">' + (check ? '<input type="checkbox" data-impc="' + h(c.key) + '"' + (on ? ' checked' : '') + ' aria-label="反映する">' : '<span style="width:16px"></span>') + head + '</div>' + more;
   };
   var body = '';

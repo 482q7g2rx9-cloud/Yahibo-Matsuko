@@ -125,7 +125,7 @@ export function recStop() {
   var nm = RC.name, at = RC.at, row = RC.row;
   var p = HOST ? HOST.rec.stop() : webStop();
   p.then(function (r) {
-    if (r.seconds < 0.2) { toast('短すぎるため、残しませんでした'); if (HOST) { /* ファイルは残る（録音フォルダー） */ } draw(); return; }
+    if (r.seconds < 0.2) { toast('短すぎるため保存しませんでした'); if (HOST) { /* ファイルは残る（録音フォルダー） */ } draw(); return; }
     var m = { id: uid('m'), n: nm.name, k: 'テイク', d: r.seconds, c: 'NA-' + String(nm.no).padStart(2, '0'), r: 'own', sr: row ? (nums()[row] || '—') : '—', res: '録音', px: -1, ho: '自分たち', src: '録音', pm: '—', ex: '—', line: '—', rate: '—', file: 1,
       col: ['#5a4a8a', '#3a2e5e'], added: new Date().toTimeString().slice(0, 5), take: { row: row, at: at, no: nm.no } };
     if (HOST) { m.path = r.path; m.f = r.path.split(/[\\/]/).pop(); m.pl = 1; m.np = 0; m.url = mediaUrl(m); }
@@ -135,7 +135,7 @@ export function recStop() {
     if (!rowTakes(row).some(function (x) { return x !== m && x.adopt; })) m.adopt = 1;
     S.takeSel = m.id; changed();
     if (HOST) queueJobs(m);
-    toast('「' + m.n + '」を録りました（' + r.seconds.toFixed(1) + ' 秒）');
+    toast('「' + m.n + '」を録音しました（' + r.seconds.toFixed(1) + ' 秒）');
   }).catch(function (e) { toast(String(e && e.message || e)); draw(); });
 }
 /** 録音を始める前の位置へ（動画に合わせて録音：選んだ台本行の映像のクリップの頭、なければ 0） */

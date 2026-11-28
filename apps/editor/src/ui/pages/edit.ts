@@ -190,7 +190,7 @@ PROPS={fsz:{min:12,max:300,step:1,unit:'px',def:59,dec:0},lh:{min:80,max:300,ste
 R.edit=function(){
   var left;
   if(S.etab!=='text'&&S.etab!=='trans'){var L=P.media.filter(function(m){return (m.k==='映像'||m.k==='音声'||m.k==='画像'||m.k==='テイク')&&inBin(m,S.ebin||'all')&&(!S.eq||m.n.indexOf(S.eq)>=0);}),av=S.aview||'grid';
-    left='<div class="row" style="padding:12px 16px 8px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="'+h(S.eq||'')+'" style="height:28px">'+btn('＋ 読込','imp')+'</div>'+
+    left='<div class="row" style="padding:12px 16px 8px;gap:6px"><input class="inp grow" type="search" placeholder="素材を検索" aria-label="素材を検索" data-in="eq" value="'+h(S.eq||'')+'" style="height:28px">'+btn('＋ 読み込み','imp')+'</div>'+
 
       '<div class="scroll"><div class="'+(av==='list'?'asl':av==='large'?'asg lg':'asg')+'">'+L.map(function(m){return assetItem(m,av);}).join('')+'</div></div>'+
       /* ビンと表示の切り替え（パネルの下） */

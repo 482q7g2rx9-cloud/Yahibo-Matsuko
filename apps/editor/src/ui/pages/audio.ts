@@ -69,7 +69,7 @@ export function init() {
     var sync = S.rmode !== 'free', nn = nums();
     var dest = (row ? (nn[row.id] || '') : '台本行なし');
     return '<div class="pn l" style="width:330px">' + ph('台本') + '<div class="scroll">' + scriptList() + '</div>' +
-      (P.script ? '<div style="padding:10px 16px;border-top:1px solid var(--dv)">' + btn('行を選ばずに録る', 'recRow', '', 's' + (S.recRow ? '' : ' on')) + '</div>' : '') + '</div>' +
+      (P.script ? '<div style="padding:10px 16px;border-top:1px solid var(--dv)">' + btn('行を選ばずに録音', 'recRow', '', 's' + (S.recRow ? '' : ' on')) + '</div>' : '') + '</div>' +
       '<div class="pc">' +
       '<div class="row" style="height:42px;flex:none;padding:0 16px;border-bottom:1px solid var(--dv);background:var(--bg1)"><span class="seg">' + btn('動画に合わせて録音', 'rmode', 'sync', sync ? 'on' : '') + btn('自由に録音', 'rmode', 'free', sync ? '' : 'on') + '</span><span class="grow"></span><span class="mu">録音先：' + h(dest) + '</span></div>' +
       '<div class="row" style="height:200px;flex:none;gap:12px;padding:14px;align-items:flex-start;background:var(--bg0)">' +
@@ -80,7 +80,7 @@ export function init() {
       '<div style="height:116px;flex:none;padding:8px 10px;background:var(--bg1);border-bottom:1px solid var(--dv)"><div style="height:100%;background:#2f78b7;border:1px solid #8cc4ee">' + (sel ? waveOf(sel, 0, sel.d || 1, 360) : '') + '</div></div>' +
       ph('テイク一覧') + '<div class="scroll" style="flex:1">' + takeList(L) + '</div>' +
       '<div class="row" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv)">' + btn('タイムラインに配置', 'takePlace', sel ? sel.id : '') +
-      '<span class="grow"></span>' + (sel && sel.take && sel.take.at != null ? '<span class="mu">録った位置：' + tc(sel.take.at) + '</span>' : '') + '</div></div>' +
+      '<span class="grow"></span>' + (sel && sel.take && sel.take.at != null ? '<span class="mu">録音した位置：' + tc(sel.take.at) + '</span>' : '') + '</div></div>' +
       '<div class="pn r" style="width:300px">' + ph('ミキサー') + mixer() + '</div>';
   };
 }

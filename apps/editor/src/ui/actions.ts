@@ -53,7 +53,7 @@ ACT={
   rsel:function(v){S.sel=selIds(v);draw();},
   rate:function(v){var m=M(S.src);if(m){mark();m.rate=v;saveP();}draw();},
   mark:function(v){var k=D.clip.marks[+v];k.done=!k.done;draw();},
-  delAll:function(){var m=M(S.src);if(m&&!m.sample&&m.marks&&m.marks.length){mark();m.marks.forEach(function(k){k.done=true;});saveP();draw();return toast('見つかった無音 '+m.marks.length+'件をすべて削除にしました');}if(!(m&&m.sample&&m.id==='v03'))return toast('先に「無音を検出」を押してください');D.clip.marks.forEach(function(k){k.done=true;});draw();toast('不要部分を削除しました');},
+  delAll:function(){var m=M(S.src);if(m&&!m.sample&&m.marks&&m.marks.length){mark();m.marks.forEach(function(k){k.done=true;});saveP();draw();return toast('見つかった無音 '+m.marks.length+'件をすべて削除しました');}if(!(m&&m.sample&&m.id==='v03'))return toast('先に「無音を検出」を押してください');D.clip.marks.forEach(function(k){k.done=true;});draw();toast('不要部分を削除しました');},
   setIn:function(){var m=M(S.src);if(!m||m.k==='画像')return;mark();m.inP=Math.min(S.t.cut,(m.outP!=null?m.outP:m.d)-0.1);saveP();draw();},
   setOut:function(){var m=M(S.src);if(!m||m.k==='画像')return;mark();m.outP=Math.max(S.t.cut,(m.inP||0)+0.1);saveP();draw();},
   cutIns:function(){var m=M(S.src);if(!m)return toast('ソースの素材を選んでください');if(m.loading)return;if(T('V1')&&T('V1').lock)return toast('V1 がロックされています');var a=m.k==='画像'?0:(m.inP||0),b=m.k==='画像'?5:(m.outP!=null?m.outP:m.d);
@@ -74,7 +74,7 @@ ACT={
   dup:function(){var L=copySel();if(!L)return;var end=Math.max.apply(null,L.map(cEnd));pasteAt(end);},
   selAll:function(){S.sel=P.clips.filter(function(c){return !locked(c);}).map(function(c){return c.id;});draw();},
   lnk:function(){toggleLink();},
-  snapT:function(){S.snap=!S.snap;draw();toast('スナップを'+(S.snap?'入れました':'切りました'));},
+  snapT:function(){S.snap=!S.snap;draw();toast('スナップを'+(S.snap?'オンにしました':'オフにしました'));},
   zin:function(){zoomTo((S.pps||10)*1.5);},zout:function(){zoomTo((S.pps||10)/1.5);},zfit:function(){fitZoom();drawTL();},
   addTrk:function(){var b=document.querySelector('[data-a="addTrk"]'),r=b?b.getBoundingClientRect():{left:300,bottom:300};openCx(r.left,r.bottom,[['映像トラックを追加','addV'],['音声トラックを追加','addA']]);},
   addV:function(){mark();var t=addTrack('v');changed();toast(t.id+' を追加しました');},addA:function(){mark();var t=addTrack('a');changed();toast(t.id+' を追加しました');},
@@ -134,8 +134,8 @@ ACT={
   sample:function(){ask('見本プロジェクトを開く','いまのプロジェクトを消して、見本プロジェクトに戻します。','開く',function(){resetProject(sampleProject());});},
   about:function(){var host=window.MatsukoHost;
     var show=function(rows){infoDlg('Matsuko Editor',rows.map(function(r){return '<div class="kv" style="padding:0"><span>'+h(r[0])+'</span><span style="word-break:break-all">'+h(r[1])+'</span></div>';}).join(''));};
-    if(host&&host.envInfo)host.envInfo().then(function(i){show([['版',i.appVersion+'（デスクトップ版）'],['OS',i.os+' / '+i.arch],['FFmpeg',i.ffmpeg||'見つかりません'],['FFprobe',i.ffprobe||'見つかりません']]);}).catch(function(e){show([['版','デスクトップ版'],['エラー',String(e)]]);});
-    else show([['版','ブラウザ版（試作）'],['動作環境',navigator.userAgent]]);},
+    if(host&&host.envInfo)host.envInfo().then(function(i){show([['バージョン',i.appVersion+'（デスクトップ版）'],['OS',i.os+' / '+i.arch],['FFmpeg',i.ffmpeg||'見つかりません'],['FFprobe',i.ffprobe||'見つかりません']]);}).catch(function(e){show([['バージョン','デスクトップ版'],['エラー',String(e)]]);});
+    else show([['バージョン','ブラウザ版（試作）'],['動作環境',navigator.userAgent]]);},
   help:function(){toast('メディアで読み込み → カットでイン・アウトを決めて追加 → 編集で並べ替え・分割 → 出力で書き出し');},
   dlgOk:function(){document.getElementById('dlg').hidden=true;var f=ask.fn;ask.fn=null;if(f)f();},dlgNo:function(){document.getElementById('dlg').hidden=true;ask.fn=null;S.capture=null;if(S.page==='edit')draw();},
   hist:function(){openHistory();},hRestore:function(v){restoreHistory(v);},

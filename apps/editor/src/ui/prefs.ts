@@ -17,14 +17,14 @@ export function renderPrefs(){var d=document.getElementById('dlg'),t=S.ptab,body
     prefRow('アクセントカラー','<span class="row" style="gap:8px">'+[['blue','青','#378ef0'],['green','緑','#2d9d78'],['orange','オレンジ','#e68619'],['purple','紫','#9256d9']].map(function(x){return '<button class="sw'+(S.accent===x[0]?' on':'')+'" aria-label="'+x[1]+'" aria-pressed="'+(S.accent===x[0])+'" title="'+x[1]+'"'+A('pAcc',x[0])+' style="background:'+x[2]+'"></button>';}).join('')+'</span>')+
     (window.MatsukoHost&&window.MatsukoHost.desktop?prefRow('更新','<span class="row" style="gap:10px"><label class="row" style="gap:6px"><input type="checkbox" data-in="pAutoUpd"'+(PREF.autoUpdate?' checked':'')+'>起動したときに確認する</label>'+btn('今すぐ確認','updCheck','','s')+'</span>'):'');
   else if(t==='timeline')body='<h3>タイムライン</h3>'+
-    prefRow('スナップ','<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"'+(PREF.snap?' checked':'')+'>最初から入れておく</label>')+
-    prefRow('再生中の表示','<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"'+(PREF.follow?' checked':'')+'>再生ヘッドを追いかける</label>');
+    prefRow('スナップ','<label class="row" style="gap:6px"><input type="checkbox" data-in="pSnap"'+(PREF.snap?' checked':'')+'>起動時にオンにする</label>')+
+    prefRow('再生中の表示','<label class="row" style="gap:6px"><input type="checkbox" data-in="pFollow"'+(PREF.follow?' checked':'')+'>再生ヘッドに合わせてスクロール</label>');
   else{var groups=[];KB.forEach(function(k){if(groups.indexOf(k[1])<0)groups.push(k[1]);});
     body='<h3>ショートカット</h3>'+
     groups.map(function(g){return '<div class="pgrp">'+g+'</div>'+KB.filter(function(k){return k[1]===g;}).map(function(k){var cap=S.capture===k[0],keys=KEYMAP[k[0]],custom=JSON.stringify(keys)!==JSON.stringify(k[3]);
       return '<div class="krow'+(cap?' cap':'')+'" data-krow="'+k[0]+'"><span>'+h(k[2])+'</span><span class="row" style="gap:4px;flex-wrap:wrap">'+(cap?'<span class="t-ac">キーを押してください…</span>':keys.length?keys.map(function(c){return '<kbd>'+h(keyLabel(c))+'</kbd>';}).join(''):'<span class="mu">なし</span>')+'</span>'+
         '<span class="row" style="gap:4px;justify-content:flex-end">'+(cap?btn('取り消し','kCancel','','s'):btn('変更','kSet',k[0],'s'))+(custom&&!cap?btn('戻す','kReset',k[0],'s'):'')+'</span></div>';}).join('');}).join('')+
-    '<div class="pgrp">マウスなど（変えられません）</div>'+MOUSE.map(function(m){return '<div class="krow"><span>'+h(m[1])+'</span><span><kbd>'+h(m[0])+'</kbd></span><span></span></div>';}).join('')+
+    '<div class="pgrp">マウス操作（変更できません）</div>'+MOUSE.map(function(m){return '<div class="krow"><span>'+h(m[1])+'</span><span><kbd>'+h(m[0])+'</kbd></span><span></span></div>';}).join('')+
     '<div class="row" style="justify-content:flex-end;margin-top:12px">'+btn('すべて初期設定に戻す','kResetAll','','s')+'</div>';}
   d.innerHTML='<div class="dlg prefs" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">環境設定</h2>'+btn('閉じる','dlgNo','','s')+'</div><div class="pbody"><nav class="pnav" aria-label="設定の分類">'+
     [['general','一般'],['timeline','タイムライン'],['keys','ショートカット']].map(function(x){return '<button'+(t===x[0]?' aria-current="true"':'')+A('ptab',x[0])+'>'+x[1]+'</button>';}).join('')+'</nav><div class="pcont">'+body+'</div></div></div>';

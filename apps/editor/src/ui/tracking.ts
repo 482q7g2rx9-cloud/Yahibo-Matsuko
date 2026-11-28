@@ -56,7 +56,7 @@ export function trackStart(c, back) {
   var m = M(c.m), s = srcTime(c, S.t.edit), box = S.trBox && S.trBox.cid === c.id ? S.trBox : null;
   /* 囲んでいなければ、前の結果のその時刻の四角から続ける */
   if (!box) { var p = trackAt(c, s); if (p && c.track.box) box = { u: p[0], v: p[1], w: c.track.box[0], h: c.track.box[1] }; }
-  if (!box) return toast('先にプレビューで追うものを囲んでください');
+  if (!box) return toast('先にプレビューで追跡する対象を囲んでください');
   var d = srcDims(c), id = uid('trk');
   TRK.job = { id: id, cid: c.id, p: 0, back: !!back, box: [box.w, box.h] };
   HOST.track.start({ id: id, path: m.path, at: s, box: [box.u - box.w / 2, box.v - box.h / 2, box.w, box.h], until: back ? c.in : c.out, back: !!back, fps: fpsNum(ps().fps), ar: d[0] / d[1] })
@@ -67,17 +67,17 @@ function onJob(e) {
   var j = TRK.job; if (!j || e.id !== j.id) return;
   if (e.state === 'progress') { j.p = e.p; var b = document.querySelector('[data-trbar]'); if (b) b.style.width = Math.round(e.p * 100) + '%'; return; }
   TRK.job = null;
-  if (e.state === 'error') { toast(String(e.data && e.data.message || '追えませんでした')); draw(); return; }
+  if (e.state === 'error') { toast(String(e.data && e.data.message || '追跡できませんでした')); draw(); return; }
   var c = C(j.cid); if (!c) { draw(); return; }
   var pts = (e.data.pts || []).slice().sort(function (a, b) { return a[0] - b[0]; });
-  if (!pts.length) { toast('追えませんでした'); draw(); return; }
+  if (!pts.length) { toast('追跡できませんでした'); draw(); return; }
   mark();
   /* 前の結果のうち、今回追った範囲は置き換える */
   var lo = pts[0][0], hi = pts[pts.length - 1][0], old = c.track && c.track.pts || [];
   c.track = { box: j.box, pts: old.filter(function (q) { return q[0] < lo - 1e-4 || q[0] > hi + 1e-4; }).concat(pts).sort(function (a, b) { return a[0] - b[0]; }) };
   S.trBox = null; S.trSel = false;
   changed();
-  if (e.data.lost != null) toast('見失いました（' + tc(c.start + (e.data.lost - c.in)) + '）。四角を囲み直して、続きから追えます');
+  if (e.data.lost != null) toast('対象を見失いました（' + tc(c.start + (e.data.lost - c.in)) + '）。範囲を囲み直すと、続きから追跡できます');
   else toast('追跡しました（' + pts.length + ' フレーム）');
 }
 export function trackClear(c) { if (!c || !c.track) return; mark(); delete c.track; changed(); }

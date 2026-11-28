@@ -45,7 +45,7 @@ export function applyTransition(id) {
   mark();
   b.xin = { k: id, d: (b.xin && b.xin.d) || TRANSITION_DEFAULT_D };
   changed();
-  toast('「' + def.name + '」を付けました');
+  toast('「' + def.name + '」を適用しました');
 }
 
 /* マウスを乗せている間：つなぎ目の前後をくり返し再生して見せる（音は出さない） */
