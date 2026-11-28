@@ -31,7 +31,7 @@ export function probe(m,f){
   var to=setTimeout(function(){probeDone(m,false);},20000);
   el.onerror=function(){clearTimeout(to);probeDone(m,false);};
   el.onloadedmetadata=function(){m.d=isFinite(el.duration)?el.duration:0;
-    if(m.k==='音声'){clearTimeout(to);m.res='音声';peaksOf(m,f);probeDone(m,m.d>0);return;}
+    if(m.k==='音声'||m.k==='テイク'){clearTimeout(to);m.res=m.k==='テイク'?'録音':'音声';peaksOf(m,f);probeDone(m,m.d>0);return;}
     m.res=el.videoWidth+'×'+el.videoHeight;if(!el.videoWidth){clearTimeout(to);probeDone(m,false);return;}
     el.currentTime=Math.min(1,m.d/3);};
   el.onseeked=function(){if(m.k!=='映像'||!m.loading)return;clearTimeout(to);m.thumb=thumbOf(el,el.videoWidth,el.videoHeight);m.col=grabColor(el)||m.col;m.inP=0;m.outP=m.d;peaksOf(m,f);probeDone(m,true);el.removeAttribute('src');el.load();};}

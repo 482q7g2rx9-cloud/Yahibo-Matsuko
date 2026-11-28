@@ -22,6 +22,7 @@ import { ACT } from './actions';
 import { bodyPos, rowAt, snapBy, snapPts } from './pointer';
 import { SCALE } from './fit';
 import { colorPreset } from './colorUI';
+import { RC } from './recorder';
 
 /* 画面の中のドラッグ（仮編集の並べ替え・素材をタイムラインへ）はマウス操作だけで行う。
    デスクトップ版（Windows）では OS からのファイルのドロップを受けると HTML のドラッグ＆ドロップが使えなくなるため。
@@ -124,6 +125,7 @@ document.addEventListener('change',function(e){var k=e.target.dataset&&e.target.
   else if(k==='mbin'){moveToBin(e.target.dataset.mid,e.target.value);}
   else if(k==='ebin'){S.ebin=e.target.value;saveAview();draw();}
   else if(k==='binname'){renameBin(e.target.dataset.bid,e.target.value);}
+  else if(k==='recDev'){RC.dev=e.target.value;}
   else if(k==='ccPreset'){if(e.target.value)colorPreset(e.target.dataset.cid,e.target.value);}
   else if(k==='trk'){var tc=selClipXin();if(tc){mark();tc.xin.k=e.target.value;changed();}}
   else if(k==='tfontname'){var tn=selTitle(),fn=e.target.value.replace(/["\\]/g,'').trim();if(tn&&fn){mark();tn.font=SYS_PREFIX+fn;changed();}}

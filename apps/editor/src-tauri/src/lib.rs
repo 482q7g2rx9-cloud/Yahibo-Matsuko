@@ -16,6 +16,7 @@ mod history;
 mod media;
 mod menu;
 mod project;
+mod rec;
 mod script;
 #[cfg(target_os = "linux")]
 mod server;
@@ -39,6 +40,7 @@ pub fn run() {
         .manage(state::AppState::default())
         .manage(history::History::default())
         .manage(export::Exports::default())
+        .manage(rec::Recorder::default())
         .setup(|app| {
             // 開発版だけ：MATSUKO_DEVTOOLS=1 で開発者ツールを開く（画面の不具合を調べるため）
             #[cfg(debug_assertions)]
@@ -98,6 +100,10 @@ pub fn run() {
             script::script_watch,
             color::lut_pick,
             color::lut_read,
+            rec::rec_devices,
+            rec::rec_start,
+            rec::rec_stop,
+            rec::rec_cancel,
             update::update_info,
             update::update_check,
             update::update_install,
@@ -112,6 +118,7 @@ pub fn run() {
             // 作りかけのプロキシなどの FFmpeg を止める
             app.state::<state::AppState>().cancel_all();
             export::cancel_all(app);
+            rec::stop_all(app);
             std::thread::sleep(std::time::Duration::from_millis(300));
         }
     });

@@ -517,7 +517,7 @@ var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 var D;
-function init$u() {
+function init$v() {
   D = {
     title: "地元商店街 密着ドキュメント（8分）",
     people: [["佐", "var(--ac)", "#0b1220"], ["田", "#ffb454", "#1b1204"], ["山", "var(--ok)", "#0b1a10"]],
@@ -1047,7 +1047,7 @@ var hasFx = hasFx$1;
 function setP(v) {
   P = v;
 }
-function init$t() {
+function init$u() {
   P = sampleProject();
   uid = uid$1;
 }
@@ -1083,7 +1083,7 @@ function persist() {
   } catch (e) {
   }
 }
-function init$s() {
+function init$t() {
   S = {
     page: "edit",
     theme: "system",
@@ -1816,7 +1816,7 @@ function setHIST(v) {
 function setREDO(v) {
   REDO = v;
 }
-function init$r() {
+function init$s() {
   IDB = {
     db: null,
     open: function() {
@@ -2181,24 +2181,7 @@ function syncPlayBtn() {
   });
 }
 var REC;
-function rec() {
-  if (REC) {
-    clearInterval(REC);
-    REC = null;
-    draw();
-    return;
-  }
-  REC = setInterval(function() {
-    S.rec += 0.1;
-    var e = document.querySelector("[data-rec]");
-    if (e) e.textContent = tc(S.rec);
-  }, 100);
-  draw();
-}
-function setREC(v) {
-  REC = v;
-}
-function init$q() {
+function init$r() {
   SRC = { el: null, id: null, playing: false, raf: 0 };
   SIM = null;
   FXP = null;
@@ -2443,9 +2426,9 @@ function probe(m, f) {
   };
   el.onloadedmetadata = function() {
     m.d = isFinite(el.duration) ? el.duration : 0;
-    if (m.k === "音声") {
+    if (m.k === "音声" || m.k === "テイク") {
       clearTimeout(to);
-      m.res = "音声";
+      m.res = m.k === "テイク" ? "録音" : "音声";
       peaksOf(m, f);
       probeDone(m, m.d > 0);
       return;
@@ -2523,7 +2506,7 @@ function openPicker() {
   i.value = "";
   i.click();
 }
-function init$p() {
+function init$q() {
   IMP = { total: 0, done: 0, cur: "" };
 }
 var PREF;
@@ -2596,7 +2579,7 @@ function assignKey(id, c) {
   KEYMAP[id] = [c];
   saveKeys();
 }
-function init$o() {
+function init$p() {
   PREF = { snap: true, follow: true, ui: 0.75, uiv: 2, autoUpdate: true };
   try {
     var pf = JSON.parse(localStorage.getItem("matsuko.pref") || "{}");
@@ -2642,7 +2625,7 @@ function fit() {
   }
 }
 var ZOOM;
-function init$n() {
+function init$o() {
   SCALE = 1;
   ZOOM = null;
   BASE_W = 1180;
@@ -2783,7 +2766,7 @@ function startPreview(id) {
     })();
   })();
 }
-function init$m() {
+function init$n() {
   PV = null;
   document.addEventListener("mouseover", function(e) {
     var el = e.target.closest && e.target.closest("[data-trn]");
@@ -2940,7 +2923,7 @@ function installUpdate() {
     render("error", String(e));
   });
 }
-function init$l() {
+function init$m() {
   if (!HOST || !HOST.update) return;
   HOST.update.onProgress(function(e) {
     var i = document.querySelector("[data-updp]");
@@ -3237,9 +3220,9 @@ function xStart(j) {
     tracks = tracks.concat(cv.captureStream(set.fps).getVideoTracks());
   }
   tracks = tracks.concat(dest.stream.getAudioTracks());
-  var rec2;
+  var rec;
   try {
-    rec2 = new MediaRecorder(new MediaStream(tracks), { mimeType: set.mime, videoBitsPerSecond: set.v || void 0, audioBitsPerSecond: set.a });
+    rec = new MediaRecorder(new MediaStream(tracks), { mimeType: set.mime, videoBitsPerSecond: set.v || void 0, audioBitsPerSecond: set.a });
   } catch (e) {
     E.master.disconnect(dest);
     j.st = "err";
@@ -3248,10 +3231,10 @@ function xStart(j) {
     return;
   }
   var chunks = [];
-  rec2.ondataavailable = function(ev) {
+  rec.ondataavailable = function(ev) {
     if (ev.data && ev.data.size) chunks.push(ev.data);
   };
-  rec2.onstop = function() {
+  rec.onstop = function() {
     E.master.disconnect(dest);
     E.mon.gain.value = 1;
     if (X.cancel) {
@@ -3273,13 +3256,13 @@ function xStart(j) {
   E.mon.gain.value = 0;
   j.st = "run";
   j.p = 0;
-  X = { j, run: true, rec: rec2, cv, cx, t: set.from || 0, from: set.from || 0, dur: set.to != null ? set.to : progDur(), paused: false };
+  X = { j, run: true, rec, cv, cx, t: set.from || 0, from: set.from || 0, dur: set.to != null ? set.to : progDur(), paused: false };
   S.xplay = null;
   sync(X.t, false);
   draw();
   setTimeout(function() {
     if (!X || X.j !== j) return;
-    rec2.start(1e3);
+    rec.start(1e3);
     X.last = performance.now();
     X.iv = setInterval(xTick, 1e3 / set.fps);
   }, 400);
@@ -3470,7 +3453,7 @@ function saveJob(j) {
   a.click();
   a.remove();
 }
-function init$k() {
+function init$l() {
   VM = [["MP4（H.264）", "video/mp4;codecs=avc1.640028,mp4a.40.2", "mp4"], ["MP4（H.264）", "video/mp4;codecs=avc1.42E01E,mp4a.40.2", "mp4"], ["MP4（H.264）", "video/mp4;codecs=avc1,mp4a.40.2", "mp4"], ["MP4", "video/mp4", "mp4"], ["WebM（VP9）", "video/webm;codecs=vp9,opus", "webm"], ["WebM（VP8）", "video/webm;codecs=vp8,opus", "webm"], ["WebM", "video/webm", "webm"]];
   AM = [["MP4（AAC 音声）", "audio/mp4", "mp4"], ["WebM（Opus 音声）", "audio/webm;codecs=opus", "webm"], ["WebM（音声）", "audio/webm", "webm"]];
   X = null;
@@ -3532,7 +3515,7 @@ function tlText(m) {
   });
   return o.length ? o.slice(0, 4).join(" / ") + (o.length > 4 ? " ほか" : "") : "—";
 }
-function init$j() {
+function init$k() {
   R = {};
   R.media = function() {
     var ub = bins(), bins$1 = D.bins.map(binRow).join("") + '<div class="row" style="padding:12px 8px 6px 16px"><span class="mu grow">ビン</span><button class="ib" aria-label="ビンを作る" title="ビンを作る"' + A("binAdd") + ">" + ic("plus", 14) + "</button></div>" + ub.map(function(b) {
@@ -3646,7 +3629,7 @@ function newJob() {
   if (!HOST) S.queue.push(j);
   return j;
 }
-function init$i() {
+function init$j() {
   R.export = function() {
     if (!S.x) S.x = presetX(S.preset);
     var x = S.x, f = xFmt(), bits = xBits(), dur = progDur(), rg = xRange(), est = (bits.v + bits.a) * (rg[1] - rg[0]) / 8, ck = checks(), nw = ck.filter(function(c) {
@@ -3776,6 +3759,356 @@ function lutOff(cid) {
   delete c.ccLut;
   delete c.ccLutAmt;
   changed();
+}
+var RC = { on: false, count: 0, t: 0, lv: [0, 0], devs: null, dev: "", at: null, row: null, play: null, playId: null, web: null };
+function loadDevices() {
+  if (RC.devs) return;
+  RC.devs = [];
+  var done = function(L) {
+    RC.devs = L;
+    if (!RC.dev) {
+      var d = L.filter(function(x) {
+        return x.default;
+      })[0] || L[0];
+      RC.dev = d ? d.id : "";
+    }
+    if (S.page === "audio") draw();
+  };
+  if (HOST) {
+    HOST.rec.devices().then(function(L) {
+      done((L || []).map(function(d) {
+        return { id: d.name, name: d.name, default: d.default };
+      }));
+    }).catch(function() {
+      done([]);
+    });
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return done([]);
+  navigator.mediaDevices.enumerateDevices().then(function(L) {
+    done(L.filter(function(d) {
+      return d.kind === "audioinput";
+    }).map(function(d, i) {
+      return { id: d.deviceId, name: d.label || "マイク " + (i + 1), default: d.deviceId === "default" || i === 0 };
+    }));
+  }).catch(function() {
+    done([]);
+  });
+}
+function webStart(devId) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.reject(new Error("このブラウザでは録音できません"));
+  return navigator.mediaDevices.getUserMedia({ audio: { deviceId: devId ? { exact: devId } : void 0, echoCancellation: false, noiseSuppression: false, autoGainControl: false } }).then(function(st) {
+    var AC = window.AudioContext || window.webkitAudioContext, ac = new AC(), src = ac.createMediaStreamSource(st), sp = ac.createScriptProcessor(4096, 2, 2), sink = ac.createGain();
+    var w = { st, ac, sp, bufs: [[], []], n: 0, rate: ac.sampleRate, t0: performance.now() };
+    sink.gain.value = 0;
+    sp.onaudioprocess = function(e) {
+      var ib = e.inputBuffer, l = ib.getChannelData(0), r = ib.numberOfChannels > 1 ? ib.getChannelData(1) : l, pl = 0, pr = 0;
+      w.bufs[0].push(new Float32Array(l));
+      w.bufs[1].push(new Float32Array(r));
+      w.n += l.length;
+      for (var i = 0; i < l.length; i += 4) {
+        var a = Math.abs(l[i]), b = Math.abs(r[i]);
+        if (a > pl) pl = a;
+        if (b > pr) pr = b;
+      }
+      level({ l: pl, r: pr, t: w.n / w.rate });
+    };
+    src.connect(sp);
+    sp.connect(sink);
+    sink.connect(ac.destination);
+    if (ac.state === "suspended") ac.resume();
+    RC.web = w;
+    loadDevices.again = true;
+  });
+}
+function webStop() {
+  var w = RC.web;
+  RC.web = null;
+  if (!w) return Promise.reject(new Error("録音していません"));
+  try {
+    w.sp.disconnect();
+    w.st.getTracks().forEach(function(t) {
+      t.stop();
+    });
+    w.ac.close();
+  } catch (e) {
+  }
+  return Promise.resolve({ blob: wav(w.bufs, w.n, w.rate), seconds: w.n / w.rate });
+}
+function wav(bufs, n, rate) {
+  var ch = 2, b = new ArrayBuffer(44 + n * ch * 2), v = new DataView(b), s = function(o2, t) {
+    for (var i2 = 0; i2 < t.length; i2++) v.setUint8(o2 + i2, t.charCodeAt(i2));
+  };
+  s(0, "RIFF");
+  v.setUint32(4, 36 + n * ch * 2, true);
+  s(8, "WAVE");
+  s(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, ch, true);
+  v.setUint32(24, rate, true);
+  v.setUint32(28, rate * ch * 2, true);
+  v.setUint16(32, ch * 2, true);
+  v.setUint16(34, 16, true);
+  s(36, "data");
+  v.setUint32(40, n * ch * 2, true);
+  var o = 44;
+  for (var k = 0; k < bufs[0].length; k++) {
+    var L = bufs[0][k], R2 = bufs[1][k];
+    for (var i = 0; i < L.length; i++) {
+      v.setInt16(o, Math.max(-1, Math.min(1, L[i])) * 32767, true);
+      v.setInt16(o + 2, Math.max(-1, Math.min(1, R2[i])) * 32767, true);
+      o += 4;
+    }
+  }
+  return new Blob([b], { type: "audio/wav" });
+}
+function lvPct(v) {
+  if (!(v > 0)) return 0;
+  return Math.max(0, Math.min(100, (20 * Math.log10(v) + 60) / 60 * 100));
+}
+function level(e) {
+  RC.lv = [Math.max(e.l, RC.lv[0] * 0.8), Math.max(e.r, RC.lv[1] * 0.8)];
+  RC.t = e.t;
+  [0, 1].forEach(function(i) {
+    var el = document.querySelector('[data-lvl="' + i + '"]');
+    if (el) el.style.width = lvPct(RC.lv[i]) + "%";
+  });
+  var t = document.querySelector("[data-rec]");
+  if (t) t.textContent = tc(e.t);
+}
+function recRow() {
+  var r = S.recRow && rowById(S.recRow);
+  return r && !r.deleted ? r : null;
+}
+function rowTakes(rowId) {
+  rowId = rowId || null;
+  return P.media.filter(function(m) {
+    return m.k === "テイク" && (m.take && m.take.row || null) === rowId;
+  });
+}
+function takeName(row) {
+  var L = rowTakes(row ? row.id : null), no = L.reduce(function(a, m) {
+    return Math.max(a, m.take && m.take.no || 0);
+  }, 0) + 1;
+  return { no, name: (row ? (nums()[row.id] || "台本行") + " " : "ナレーション ") + "テイク" + no };
+}
+function recToggle() {
+  if (RC.on || RC.count) return recStop();
+  recStart();
+}
+function recStart() {
+  if (RC.on || RC.count) return;
+  if (E.playing) progStop();
+  playTake(null);
+  var ready2 = HOST ? ensureProject() : Promise.resolve();
+  var count = S.countin ? 3 : 0;
+  RC.row = S.recRow || null;
+  ready2.then(function() {
+    if (!count) return go2();
+    RC.cancel = false;
+    RC.count = count;
+    draw();
+    var iv = setInterval(function() {
+      if (RC.cancel) {
+        clearInterval(iv);
+        RC.cancel = false;
+        RC.count = 0;
+        draw();
+        return;
+      }
+      RC.count--;
+      if (RC.count <= 0) {
+        clearInterval(iv);
+        go2();
+      } else draw();
+    }, 1e3);
+  }).catch(function(e) {
+    toast(String(e));
+  });
+  function go2() {
+    RC.count = 0;
+    var nm = takeName(recRow());
+    RC.name = nm;
+    var p = HOST ? HOST.rec.start(RC.dev || null, nm.name) : webStart(RC.dev);
+    p.then(function() {
+      RC.on = true;
+      RC.t = 0;
+      RC.at = S.rmode === "sync" ? S.t.edit : null;
+      if (RC.at != null && P.clips.length) progPlay();
+      draw();
+    }).catch(function(e) {
+      toast("録音を始められませんでした：" + (e && e.message || e));
+      draw();
+    });
+  }
+}
+function recStop() {
+  if (RC.count) {
+    RC.cancel = true;
+    return;
+  }
+  if (!RC.on) return;
+  RC.on = false;
+  if (E.playing) progStop();
+  var nm = RC.name, at = RC.at, row = RC.row;
+  var p = HOST ? HOST.rec.stop() : webStop();
+  p.then(function(r) {
+    if (r.seconds < 0.2) {
+      toast("短すぎるため、残しませんでした");
+      draw();
+      return;
+    }
+    var m = {
+      id: uid("m"),
+      n: nm.name,
+      k: "テイク",
+      d: r.seconds,
+      c: "NA-" + String(nm.no).padStart(2, "0"),
+      r: "own",
+      sr: row ? nums()[row] || "—" : "—",
+      res: "録音",
+      px: -1,
+      ho: "自分たち",
+      src: "録音",
+      pm: "—",
+      ex: "—",
+      line: "—",
+      rate: "—",
+      file: 1,
+      col: ["#5a4a8a", "#3a2e5e"],
+      added: (/* @__PURE__ */ new Date()).toTimeString().slice(0, 5),
+      take: { row, at, no: nm.no }
+    };
+    if (HOST) {
+      m.path = r.path;
+      m.f = r.path.split(/[\\/]/).pop();
+      m.pl = 1;
+      m.np = 0;
+      m.url = mediaUrl(m);
+    } else {
+      var f = new File([r.blob], nm.name + ".wav", { type: "audio/wav" });
+      m.f = f.name;
+      m.size = f.size;
+      m.url = URL.createObjectURL(f);
+      IDB.put("files", m.id, f);
+      peaksOf(m, f);
+    }
+    mark();
+    P.media.push(m);
+    if (!rowTakes(row).some(function(x) {
+      return x !== m && x.adopt;
+    })) m.adopt = 1;
+    S.takeSel = m.id;
+    changed();
+    if (HOST) queueJobs(m);
+    toast("「" + m.n + "」を録りました（" + r.seconds.toFixed(1) + " 秒）");
+  }).catch(function(e) {
+    toast(String(e && e.message || e));
+    draw();
+  });
+}
+function recTop() {
+  var row = recRow(), t = 0;
+  if (row) {
+    var cs = linksOfRow(row.id).map(function(l) {
+      return C(l.clipId);
+    }).filter(function(c) {
+      return c && T(c.tr) && T(c.tr).kind === "v";
+    });
+    if (cs.length) t = Math.min.apply(null, cs.map(function(c) {
+      return c.start;
+    }));
+  }
+  S.t.edit = t;
+  draw();
+}
+function playTake(id) {
+  if (RC.play) {
+    try {
+      RC.play.pause();
+    } catch (e) {
+    }
+    RC.play = null;
+    var was = RC.playId;
+    RC.playId = null;
+    if (was === id || !id) {
+      draw();
+      return;
+    }
+  }
+  var m = id && M(id);
+  if (!m || !m.url) {
+    draw();
+    return;
+  }
+  var a = new Audio(m.url);
+  RC.play = a;
+  RC.playId = id;
+  a.onended = function() {
+    RC.play = null;
+    RC.playId = null;
+    draw();
+  };
+  a.play().catch(function() {
+    RC.play = null;
+    RC.playId = null;
+    draw();
+  });
+  draw();
+}
+function adopt(id) {
+  var m = M(id);
+  if (!m) return;
+  mark();
+  rowTakes(m.take && m.take.row).forEach(function(x) {
+    delete x.adopt;
+  });
+  m.adopt = 1;
+  S.takeSel = id;
+  changed();
+}
+function narrationTrack(a, b) {
+  var L = P.tracks.filter(function(t) {
+    return t.kind === "a" && !t.lock;
+  });
+  var na = L.filter(function(t) {
+    return /^(NA|ナレーション)/.test(t.name || "");
+  });
+  var free = na.concat(L).filter(function(t) {
+    return !busy(P, t.id, a, b);
+  })[0];
+  return free ? free.id : addTrack("a").id;
+}
+function placeTake(id) {
+  var m = M(id);
+  if (!m || !m.url) return toast("テイクを選んでください");
+  var t = m.take && m.take.at != null ? m.take.at : S.t.edit, len = m.d || 1;
+  mark();
+  var tr = narrationTrack(t, t + len), c = { id: uid("c"), tr, type: "media", m: m.id, start: t, in: 0, out: len, link: null };
+  P.clips.push(c);
+  var row = m.take && m.take.row && rowById(m.take.row);
+  if (row && !row.deleted) (P.links || (P.links = [])).push({ id: uid("lk"), clipId: c.id, rowId: row.id, rev: row.rev || 0, seen: { time: row.time || "", music: row.music || "", video: row.video || "", body: row.body || "", type: row.type || "" } });
+  S.sel = [c.id];
+  changed();
+  toast("「" + m.n + "」を " + tr + " の " + tc(t) + " に置きました");
+}
+function delTake(id) {
+  var m = M(id);
+  if (!m) return;
+  if (P.clips.some(function(c) {
+    return c.m === id;
+  })) return toast("タイムラインで使っているテイクは消せません");
+  mark();
+  P.media = P.media.filter(function(x) {
+    return x !== m;
+  });
+  if (!HOST) IDB.del("files", id);
+  if (S.takeSel === id) S.takeSel = null;
+  changed();
+}
+function init$i() {
+  if (HOST && HOST.rec) HOST.rec.onLevel(level);
 }
 var ACT;
 function jump(dir) {
@@ -4276,6 +4609,7 @@ function init$h() {
       draw();
     },
     rmode: function(v) {
+      if (RC.on || RC.count) return;
       S.rmode = v;
       draw();
     },
@@ -4300,18 +4634,36 @@ function init$h() {
       S.solo[v] = !S.solo[v];
       draw();
     },
-    rec,
-    stop: function() {
-      if (REC) {
-        clearInterval(REC);
-        setREC(null);
-        draw();
-      }
+    recGo: function() {
+      recToggle();
+    },
+    recStop: function() {
+      recStop();
     },
     recTop: function() {
-      S.rec = 0;
-      var e = document.querySelector("[data-rec]");
-      if (e) e.textContent = tc(0);
+      recTop();
+    },
+    recRow: function(v) {
+      if (RC.on || RC.count) return;
+      S.recRow = v || null;
+      S.takeSel = null;
+      draw();
+    },
+    takeSel: function(v) {
+      S.takeSel = v;
+      draw();
+    },
+    takePlay: function(v) {
+      playTake(v);
+    },
+    takeAdopt: function(v) {
+      adopt(v);
+    },
+    takePlace: function(v) {
+      placeTake(v);
+    },
+    takeDel: function(v) {
+      delTake(v);
     },
     play: function() {
       if (S.page === "cut") srcPlay();
@@ -6519,7 +6871,7 @@ function loadOpened(o) {
 }
 function queueJobs(m, force) {
   if (!HOST || !m.file || m.missing || !m.path || !HOST.project.current) return;
-  var r = { id: m.id, path: m.path, kind: m.k, duration: m.d || 0, thumb: m.k !== "音声" && (force || !m.thumb), peaks: m.k !== "画像" && !m.noAudio && (force || !m.peaks || !m.wf), proxy: !!m.np && (force || !m.proxyPath), proxyHeight: ps().proxy };
+  var r = { id: m.id, path: m.path, kind: m.k === "テイク" ? "音声" : m.k, duration: m.d || 0, thumb: (m.k === "映像" || m.k === "画像") && (force || !m.thumb), peaks: m.k !== "画像" && !m.noAudio && (force || !m.peaks || !m.wf), proxy: !!m.np && (force || !m.proxyPath), proxyHeight: ps().proxy };
   if (!r.thumb && !r.peaks && !r.proxy) return;
   JOBS[m.id] = JOBS[m.id] || {};
   ["thumb", "peaks", "proxy"].forEach(function(k) {
@@ -7487,22 +7839,6 @@ var TRI;
 function diamond(on) {
   return on ? '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><polygon points="6,1 11,6 6,11 1,6" fill="var(--ac)" stroke="var(--lb)" stroke-width="1.4"/></svg>' : '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><polygon points="6,1 11,6 6,11 1,6" fill="none" stroke="#8a8a8a" stroke-width="1.2"/></svg>';
 }
-function wave(n, seed, fill) {
-  var r = rng(seed), a = [];
-  for (var i = 0; i < n; i++) {
-    var v = r();
-    a.push(0.1 + (v > 0.85 ? 0.7 : v * 0.55) + r() * 0.15);
-  }
-  return waveSvg(a, fill);
-}
-function waveSvg(a, fill) {
-  var b = "";
-  for (var i = 0; i < a.length; i++) {
-    var hh = Math.max(2, Math.min(96, a[i] * 100));
-    b += '<rect x="' + (i + 0.3).toFixed(1) + '" y="' + (50 - hh / 2).toFixed(1) + '" width=".4" height="' + hh.toFixed(1) + '"/>';
-  }
-  return '<svg class="wv" viewBox="0 0 ' + Math.max(1, a.length) + ' 100" preserveAspectRatio="none" aria-hidden="true" fill="' + (fill || "#a9d6f5") + '">' + b + "</svg>";
-}
 var WCACHE = {}, WKEYS = [];
 function waveOf(m, a, b, n, fill, opt) {
   opt = opt || {};
@@ -8178,23 +8514,55 @@ function init$4() {
     }).join("") : "") + "</div></div>" + transport("fx", ibtn("toStart", "前のカットへ", "todo") + playBtn(!!FXP) + ibtn("nextCut", "次のカットへ", "todo"), "") + '<div class="row" style="height:40px;flex:none;gap:6px;padding:0 12px;border-bottom:1px solid var(--dv)"><span style="font-weight:500;margin-right:4px;white-space:nowrap">キーフレーム</span>' + kfBtns + '<span class="grow"></span>' + sel("対象プロパティ", ["拡大率", "位置", "回転", "透明度"], "拡大率", "height:26px") + "</div>" + timeline(D.fxtl, "fx", { kf: 1, noTc: 1 }) + '</div><div class="pn r" style="width:' + pw("fxR") + 'px">' + splitter("fxR", "r") + ph("エフェクトコントロール", '<span class="x">店主 インタビュー</span>') + '<div class="scroll">' + fsec("track", "トラッキング", true, '<div class="fg"><span>追跡対象</span>' + sel("追跡対象", ["被写体1（店主）", "被写体2"], "被写体1（店主）") + '</div><div class="row" style="gap:6px;height:42px">' + btn(TRI.l + "後方", "todo", "", "", "後方") + btn(ic("stop", 12) + "停止", "todo", "", "", "停止") + btn(TRI.r + "前方", "todo", "", "on", "前方") + '</div><div class="fg"><span>状態</span><span class="row" style="gap:8px"><span class="prog" style="flex:1"><i style="width:100%;background:var(--ok)"></i></span><span class="t-ok">解析済み</span></span></div><div class="fg"><span>追従先</span>' + sel("追従先", ["テロップを追従（質問テロップ）", "なし"], "テロップを追従（質問テロップ）") + "</div>" + prop(["滑らかさ", 40, "40"]), 1) + fsec("color", "色補正", true, [["明るさ", 55, "8.0"], ["コントラスト", 58, "12.0"], ["彩度", 60, "110", 1]].map(prop).join(""), 1) + fsec("blur", "ぼかし", false, "", 1) + fsec("tin", "開始トランジション", true, "", 1) + fsec("motion", "モーション", true, "", 1) + "</div></div>";
   };
 }
+function scriptList() {
+  if (!P.script) return '<div class="mu" style="padding:16px">台本がまだありません</div>';
+  var nn = nums(), rows = P.script.rows.filter(function(r) {
+    return !r.deleted;
+  }).sort(function(a, b) {
+    return a.order - b.order;
+  });
+  if (!rows.length) return '<div class="mu" style="padding:16px">行がありません</div>';
+  return rows.map(function(r) {
+    var L = rowTakes(r.id), done = L.some(function(m) {
+      return m.adopt;
+    }), on = S.recRow === r.id;
+    return '<div class="li' + (on ? " selr" : "") + '" role="button" tabindex="0"' + A("recRow", r.id) + ' style="display:grid;grid-template-columns:52px 1fr 24px;padding:12px 10px;border-bottom:1px solid var(--dv)"><span class="t2">' + h(nn[r.id] || "") + '</span><span style="min-width:0"><span style="display:block;font-size:14px;' + (done ? "color:var(--mu)" : "") + '">' + h(excerpt(r.body, 60)) + "</span>" + (r.video ? '<span class="t2" style="display:block;margin-top:6px">映像：' + h(excerpt(r.video, 30)) + "</span>" : "") + "</span><span>" + (done ? '<span class="t-ok">済</span>' : L.length ? '<span class="mu">' + L.length + "</span>" : on ? '<span style="display:block;width:11px;height:11px;border-radius:50%;background:#f06060;margin-top:4px" aria-label="録音する行"></span>' : "") + "</span></div>";
+  }).join("");
+}
+function recPanel() {
+  var devs = RC.devs || [], live = RC.on || RC.count;
+  var devSel = '<select class="inp" data-in="recDev" aria-label="入力"' + (live ? " disabled" : "") + ">" + (devs.length ? devs.map(function(d) {
+    return '<option value="' + h(d.id) + '"' + (d.id === RC.dev ? " selected" : "") + ">" + h(d.name) + "</option>";
+  }).join("") : '<option value="">' + (RC.devs ? HOST ? "マイクが見つかりません" : "既定のマイク" : "読み込み中…") + "</option>") + "</select>";
+  var big = RC.count ? '<span style="color:var(--wn)">' + RC.count + "</span>" : tc(RC.on ? RC.t : 0);
+  return '<div class="grow" style="display:flex;flex-direction:column;gap:6px;min-width:0"><div class="fg" style="grid-template-columns:64px 1fr;min-height:30px"><span>入力</span>' + devSel + '</div><div class="row" style="gap:10px"><span class="t2" style="width:54px">レベル L</span><span class="lvl"><i data-lvl="0" style="width:' + (RC.on ? lvPct(RC.lv[0]) : 0) + '%"></i></span></div><div class="row" style="gap:10px"><span class="t2" style="width:54px">レベル R</span><span class="lvl"><i data-lvl="1" style="width:' + (RC.on ? lvPct(RC.lv[1]) : 0) + '%"></i></span></div><div data-rec style="font-size:24px;color:' + (RC.on ? "var(--er)" : "var(--ac)") + '">' + big + '</div><div class="row" style="gap:8px"><button class="b" aria-label="' + (live ? "停止" : "録音") + '" title="' + (live ? "停止" : "録音") + '"' + A("recGo") + ' style="width:48px;height:34px;color:var(--er)' + (live ? ";background:var(--erb);border-color:var(--er)" : "") + '">' + ic(live ? "stop" : "rec", 14) + '</button><button class="b" aria-label="停止" title="停止"' + A("recStop") + (live ? "" : " disabled") + ' style="width:40px;height:34px">' + ic("stop", 14) + '</button><button class="b" aria-label="先頭へ" title="先頭へ"' + A("recTop") + (live ? " disabled" : "") + ' style="width:40px;height:34px">' + ic("toStart", 14) + '</button><label class="row" style="gap:6px;margin-left:6px"><input type="checkbox" data-in="countin"' + (S.countin ? " checked" : "") + (live ? " disabled" : "") + ' style="margin:0">カウントイン</label></div></div>';
+}
+function takeList(L) {
+  if (!L.length) return '<div class="mu" style="padding:14px">テイクはまだありません</div>';
+  return '<div class="tk h"><span>テイク</span><span>波形</span><span>長さ</span><span>試聴</span><span>削除</span><span>採用</span></div>' + L.map(function(m, i) {
+    var on = S.takeSel === m.id, pl = RC.playId === m.id;
+    return '<div class="tk r li' + (on ? " selr" : "") + '"' + A("takeSel", m.id) + ' style="' + (on ? "box-shadow:none" : "") + '"><b style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + h(m.n) + '">テイク' + (m.take && m.take.no || i + 1) + '</b><span class="mw">' + waveOf(m, 0, m.d || 1, 60, "currentColor") + "</span><span>" + (m.d || 0).toFixed(1) + ' 秒</span><span><button class="b s" style="width:40px;padding:0" aria-label="' + h(m.n) + "を" + (pl ? "止める" : "試聴") + '"' + A("takePlay", m.id) + ">" + ic(pl ? "stop" : "play", 12) + '</button></span><span><button class="b s" style="width:40px;padding:0" aria-label="' + h(m.n) + 'を削除"' + A("takeDel", m.id) + ">" + ic("trash", 12) + '</button></span><span><input type="radio" name="take" aria-label="' + h(m.n) + 'を採用"' + (m.adopt ? " checked" : "") + A("takeAdopt", m.id) + "></span></div>";
+  }).join("");
+}
+function mixer() {
+  var L = P.tracks.filter(function(t) {
+    return t.kind === "a";
+  });
+  return '<div style="padding:8px 12px;display:flex;flex-direction:column;gap:4px">' + L.map(function(t) {
+    return '<div class="row" style="gap:8px;height:34px;padding:0 10px;border-radius:4px;background:var(--bg2)"><b style="font-weight:500;width:34px">' + h(t.id) + '</b><span class="grow mu" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h(t.name || "") + '</span><span class="ms"><button aria-pressed="' + !!t.mute + '" aria-label="' + h(t.id) + ' ミュート"' + A("tmute", t.id) + '>M</button><button aria-pressed="' + !!t.solo + '" aria-label="' + h(t.id) + ' ソロ"' + A("tsolo", t.id) + ">S</button></span></div>";
+  }).join("") + "</div>";
+}
 function init$3() {
   R.audio = function() {
-    var ln = D.lines[S.line], tk = D.takes[S.tsel];
-    return '<div class="pn l" style="width:330px">' + ph("台本", '<span class="chip c-in" style="padding:4px 10px">自動スクロール ON</span>') + '<div class="scroll">' + D.lines.map(function(l, i) {
-      return '<div class="li' + (S.line === i ? " selr" : "") + '" role="button" tabindex="0"' + A("line", i) + ' style="display:grid;grid-template-columns:44px 1fr 24px;gap:0;padding:14px 10px 12px;border-bottom:1px solid var(--dv)"><span class="t2">' + l.t + '</span><span><span style="display:block;font-size:15px;' + (l.st === "done" ? "color:var(--mu)" : "") + '">' + h(l.tx) + '</span><span class="t2" style="display:block;margin-top:6px">映像：' + h(l.v) + "</span></span><span>" + (l.st === "done" ? '<span class="t-ok">済</span>' : i === S.line ? '<span style="display:block;width:11px;height:11px;border-radius:50%;background:#f06060;margin-top:4px" aria-label="録音対象"></span>' : "") + "</span></div>";
-    }).join("") + '</div><div style="padding:12px 16px;border-top:1px solid var(--dv)"><div style="font-weight:500;margin-bottom:8px">共有制作メモ</div>' + D.memos.map(function(m) {
-      return '<div class="box" style="margin-top:4px"><span class="t-lb">' + h(m[0]) + "</span>　" + h(m[1]) + "</div>";
-    }).join("") + '</div></div><div class="pc"><div class="row" style="height:42px;flex:none;padding:0 16px;border-bottom:1px solid var(--dv);background:var(--bg1)"><span class="seg">' + btn("動画に合わせて録音", "rmode", "sync", S.rmode === "sync" ? "on" : "") + btn("自由に録音", "rmode", "free", S.rmode === "free" ? "on" : "") + '</span><span class="grow"></span><span class="mu">録音先：ナレーション / 台本行 SR-000' + (S.line + 1) + '</span></div><div class="row" style="height:200px;flex:none;gap:12px;padding:14px;align-items:flex-start;background:var(--bg0)"><div style="width:290px;height:172px;flex:none;background:#000;position:relative;display:flex;align-items:center;justify-content:center">' + (S.rmode === "sync" ? '<div class="frame" style="width:260px;height:146px;background:#333;border:0">' + h(ln.v) + '（プロキシ）</div><span style="position:absolute;left:6px;bottom:2px;color:#9a9a9a">映像再生に同期</span>' : '<span style="color:#9a9a9a">自由録音（映像なし）</span>') + '</div><div class="grow" style="display:flex;flex-direction:column;gap:6px"><div class="fg" style="grid-template-columns:64px 1fr;min-height:30px"><span>入力</span>' + sel("入力", ["マイク入力 1（USBマイク）", "内蔵マイク"], "マイク入力 1（USBマイク）") + '</div><div class="row" style="gap:10px"><span class="t2" style="width:54px">レベル L</span><span class="lvl"><i style="width:60%"></i></span></div><div class="row" style="gap:10px"><span class="t2" style="width:54px">レベル R</span><span class="lvl"><i style="width:56%"></i></span></div><div data-rec style="font-size:24px;color:var(--ac)">' + tc(S.rec) + '</div><div class="row" style="gap:8px"><button class="b" aria-label="録音" title="録音"' + A("rec") + ' style="width:48px;height:34px;color:var(--er)' + (REC ? ";background:var(--erb);border-color:var(--er)" : "") + '">' + ic("rec", 14) + '</button><button class="b" aria-label="停止" title="停止"' + A("stop") + ' style="width:40px;height:34px">' + ic("stop", 14) + '</button><button class="b" aria-label="再生" title="再生"' + A("todo") + ' style="width:40px;height:34px">' + ic("play", 14) + '</button><button class="b" aria-label="先頭へ" title="先頭へ"' + A("recTop") + ' style="width:40px;height:34px">' + ic("toStart", 14) + '</button><label class="row" style="gap:6px;margin-left:6px"><input type="checkbox" data-in="countin"' + (S.countin ? " checked" : "") + ' style="margin:0">カウントイン</label></div></div></div>' + ph(h(tk[0]) + " の波形", '<span class="x">' + tc(tk[2]) + "</span>") + '<div style="height:116px;flex:none;padding:8px 10px;background:var(--bg1);border-bottom:1px solid var(--dv)"><div style="height:100%;background:#2f78b7;border:1px solid #8cc4ee">' + wave(180, S.tsel + 11) + "</div></div>" + ph("テイク一覧") + '<div class="tk h"><span>テイク</span><span>波形</span><span>長さ</span><span>試聴</span><span>比較</span><span>採用</span></div>' + D.takes.map(function(t, i) {
-      return '<div class="tk r li' + (S.tsel === i ? " selr" : "") + '"' + A("tsel", i) + ' style="' + (S.tsel === i ? "box-shadow:none" : "") + '"><b style="font-weight:500">' + t[0] + '</b><span class="mw">' + wave(60, i + 21, "currentColor") + "</span><span>" + t[1] + '</span><span><button class="b s" style="width:40px;padding:0" aria-label="' + t[0] + 'を試聴">' + ic("play", 12) + '</button></span><span><input type="checkbox" aria-label="' + t[0] + 'を比較"></span><span><input type="radio" name="take" aria-label="' + t[0] + 'を採用"' + (S.take === i ? " checked" : "") + A("take", i) + "></span></div>";
-    }).join("") + '<div class="row" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv)">' + btn("メディアに保存", "todo") + btn("タイムラインに配置", "todo") + '<span class="grow"></span><span class="t-ok">' + D.takes[S.take][0] + ' はメディア登録済み</span></div></div><div class="pn r" style="width:300px">' + ph("ミキサー") + '<div class="mx">' + D.mixer.map(function(c) {
-      var m = S.mute[c[0]], s = S.solo[c[0]];
-      return '<div class="ch"><span class="t2">' + c[0] + '</span><div class="fd"><span class="rail"><i style="top:' + c[1] + '%"></i></span><span class="met"><i style="height:' + (m ? 0 : c[2]) + '%"></i></span></div><span class="nv" style="justify-self:center">' + c[3] + '</span><span class="ms"><button aria-pressed="' + !!m + '" aria-label="' + c[0] + ' ミュート"' + A("mute", c[0]) + '>M</button><button aria-pressed="' + !!s + '" aria-label="' + c[0] + ' ソロ"' + A("solo", c[0]) + ">S</button></span></div>";
-    }).join("") + "</div>" + ph("インサート（ナレーション）") + '<div style="padding:12px 16px;display:flex;flex-direction:column;gap:4px">' + D.inserts.map(function(x, i) {
-      return '<div class="row" style="gap:8px;height:30px;padding:0 10px;border-radius:4px;background:var(--bg2)"><input type="checkbox"' + (x[1] ? " checked" : "") + ' aria-label="' + h(x[0]) + 'を有効" style="margin:0"><span>' + (i + 1) + '</span><span class="grow">' + h(x[0]) + "</span>" + (x[2] ? btn("開く", "todo", "", "s") : "") + "</div>";
-    }).join("") + '<button class="b dash" style="width:100%;justify-content:flex-start"' + A("todo") + ">＋ VST3 を追加</button></div>" + ph("基本ノイズ処理") + '<div style="padding:12px 16px">' + D.noise.map(function(n) {
-      return '<div style="display:grid;grid-template-columns:70px 1fr 34px 50px;gap:6px;align-items:center;height:30px"><button class="b s" style="padding:0 6px">' + n[0] + '</button><div class="slr" style="--p:' + n[1] + '%"><i style="left:' + n[1] + '%"></i></div><span class="stp"><button aria-label="減らす ' + n[0] + '">' + TRI.l + '</button><button aria-label="増やす ' + n[0] + '">' + TRI.r + '</button></span><span class="nv">' + n[2] + "</span></div>";
-    }).join("") + "</div></div>";
+    loadDevices();
+    var row = recRow(), L = rowTakes(row ? row.id : null), sel2 = L.filter(function(m) {
+      return m.id === S.takeSel;
+    })[0] || L.filter(function(m) {
+      return m.adopt;
+    })[0] || L[L.length - 1];
+    var sync2 = S.rmode !== "free", nn = nums();
+    var dest = row ? nn[row.id] || "" : "台本行なし";
+    return '<div class="pn l" style="width:330px">' + ph("台本") + '<div class="scroll">' + scriptList() + "</div>" + (P.script ? '<div style="padding:10px 16px;border-top:1px solid var(--dv)">' + btn("行を選ばずに録る", "recRow", "", "s" + (S.recRow ? "" : " on")) + "</div>" : "") + '</div><div class="pc"><div class="row" style="height:42px;flex:none;padding:0 16px;border-bottom:1px solid var(--dv);background:var(--bg1)"><span class="seg">' + btn("動画に合わせて録音", "rmode", "sync", sync2 ? "on" : "") + btn("自由に録音", "rmode", "free", sync2 ? "" : "on") + '</span><span class="grow"></span><span class="mu">録音先：' + h(dest) + '</span></div><div class="row" style="height:200px;flex:none;gap:12px;padding:14px;align-items:flex-start;background:var(--bg0)"><div style="width:290px;height:172px;flex:none;background:#000;position:relative;display:flex;align-items:center;justify-content:center">' + (sync2 ? '<canvas data-prog width="640" height="360" style="width:290px;height:163px"></canvas><span style="position:absolute;left:6px;bottom:2px;color:#9a9a9a;font-size:11px" data-time="edit">' + tc(S.t.edit) + "</span>" : '<span style="color:#9a9a9a">自由録音（映像なし）</span>') + "</div>" + recPanel() + "</div>" + ph(sel2 ? h(sel2.n) + " の波形" : "波形", sel2 ? '<span class="x">' + tc(sel2.d || 0) + "</span>" : "") + '<div style="height:116px;flex:none;padding:8px 10px;background:var(--bg1);border-bottom:1px solid var(--dv)"><div style="height:100%;background:#2f78b7;border:1px solid #8cc4ee">' + (sel2 ? waveOf(sel2, 0, sel2.d || 1, 360) : "") + "</div></div>" + ph("テイク一覧") + '<div class="scroll" style="flex:1">' + takeList(L) + '</div><div class="row" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv)">' + btn("タイムラインに配置", "takePlace", sel2 ? sel2.id : "") + '<span class="grow"></span>' + (sel2 && sel2.take && sel2.take.at != null ? '<span class="mu">録った位置：' + tc(sel2.take.at) + "</span>" : "") + '</div></div><div class="pn r" style="width:300px">' + ph("ミキサー") + mixer() + "</div>";
   };
 }
 var DRAG;
@@ -9114,6 +9482,8 @@ function init$1() {
       draw();
     } else if (k === "binname") {
       renameBin(e.target.dataset.bid, e.target.value);
+    } else if (k === "recDev") {
+      RC.dev = e.target.value;
     } else if (k === "ccPreset") {
       if (e.target.value) colorPreset(e.target.dataset.cid, e.target.value);
     } else if (k === "trk") {
@@ -9342,34 +9712,35 @@ function init() {
   });
 }
 init$7();
+init$v();
 init$u();
 init$t();
-init$s();
 init$9();
-init$r();
-init$p();
+init$s();
+init$q();
 init$b();
 init$a();
-init$q();
+init$r();
 init$e();
+init$l();
 init$k();
-init$j();
 init$6();
 init$5();
 init$f();
 init$4();
 init$3();
-init$i();
+init$j();
 init$8();
 init$c();
 init$d();
-init$o();
+init$p();
 init$h();
 init$2();
 init$1();
+init$o();
 init$n();
-init$m();
 init$g();
-init$l();
+init$m();
+init$i();
 init();
 </script>

@@ -30,6 +30,7 @@ import { init as i26 } from './boot';
 import { init as iTrans } from './transPreview';
 import { init as iScript } from './scriptLink';
 import { init as iUpd } from './updater';
+import { init as iRec } from './recorder';
 
 initPanels(); // パネルの幅（最初に描く前に読み込む）
 i0();
@@ -61,4 +62,5 @@ i25();
 iTrans();
 iScript();
 iUpd();
+iRec();
 i26();

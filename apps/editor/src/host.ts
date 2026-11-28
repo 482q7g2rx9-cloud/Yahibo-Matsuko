@@ -131,6 +131,16 @@ export interface Host {
     pickLut(): Promise<string | null>;
     readLut(path: string): Promise<string>;
   };
+  /** 録音（M6）：マイクの音を WAV でプロジェクトフォルダーの「録音」に書く */
+  rec: {
+    devices(): Promise<{ name: string; default: boolean }[]>;
+    /** 始める。書くファイルの場所を返す */
+    start(device: string | null, name: string): Promise<string>;
+    stop(): Promise<{ path: string; seconds: number }>;
+    cancel(): Promise<void>;
+    /** 音の大きさ（0〜1 のピーク）と、始めてからの秒 */
+    onLevel(fn: (e: { l: number; r: number; t: number }) => void): Promise<UnlistenFn>;
+  };
   /** 自動更新（M5）。enabled は、更新の署名の公開鍵を埋め込んだビルドか */
   update: {
     info(): Promise<{ enabled: boolean; current: string }>;
@@ -211,6 +221,13 @@ const host: Host = {
   color: {
     pickLut: () => invoke('lut_pick'),
     readLut: (path) => invoke('lut_read', { path }),
+  },
+  rec: {
+    devices: () => invoke('rec_devices'),
+    start: (device, name) => invoke('rec_start', { device, name }),
+    stop: () => invoke('rec_stop'),
+    cancel: () => invoke('rec_cancel'),
+    onLevel: (fn) => listen<{ l: number; r: number; t: number }>('rec-level', (e) => fn(e.payload)),
   },
   update: {
     info: () => invoke('update_info'),

@@ -26,6 +26,7 @@ import { KB, KEYMAP, loadKeys, saveKeys } from './keys';
 import { PREF, openPrefs, renderPrefs, savePref } from './prefs';
 import { fit } from './fit';
 import { colorReset, lutOff, pickLut } from './colorUI';
+import { RC, adopt, delTake, placeTake, playTake, recStop, recToggle, recTop as recToTop } from './recorder';
 
 /* ---------- 操作 ---------- */
 export var ACT;
@@ -90,9 +91,10 @@ ACT={
   etab:function(v){S.etab=v;draw();},tool:function(v){S.tool=v;draw();if(v==='text')toast('タイムラインをクリックした位置にテロップを追加します');},
   sec:function(v){S.open[v]=!S.open[v];draw();},
   fxg:function(v){S.fxClosed[v]=!S.fxClosed[v];draw();},fxi:function(v){S.fx=v;draw();},ba:function(v){S.ba=v;draw();},kfm:function(v){S.kfMode=v;draw();},
-  rmode:function(v){S.rmode=v;draw();},line:function(v){S.line=+v;draw();},tsel:function(v){S.tsel=+v;draw();},take:function(v){S.take=+v;S.tsel=+v;draw();},
+  rmode:function(v){if(RC.on||RC.count)return;S.rmode=v;draw();},line:function(v){S.line=+v;draw();},tsel:function(v){S.tsel=+v;draw();},take:function(v){S.take=+v;S.tsel=+v;draw();},
   mute:function(v){S.mute[v]=!S.mute[v];draw();},solo:function(v){S.solo[v]=!S.solo[v];draw();},
-  rec:rec,stop:function(){if(REC){clearInterval(REC);setREC(null);draw();}},recTop:function(){S.rec=0;var e=document.querySelector('[data-rec]');if(e)e.textContent=tc(0);},
+  recGo:function(){recToggle();},recStop:function(){recStop();},recTop:function(){recToTop();},recRow:function(v){if(RC.on||RC.count)return;S.recRow=v||null;S.takeSel=null;draw();},
+  takeSel:function(v){S.takeSel=v;draw();},takePlay:function(v){playTake(v);},takeAdopt:function(v){adopt(v);},takePlace:function(v){placeTake(v);},takeDel:function(v){delTake(v);},
   play:function(){if(S.page==='cut')srcPlay();else if(S.page==='fx')fxPlay();else progPlay();},
   prev:function(){jump(-1);},next:function(){jump(1);},fb:function(){if(E.playing)progStop();setProg(S.t.edit-frameSec());},ff:function(){if(E.playing)progStop();setProg(S.t.edit+frameSec());},
   top:function(){setProg(0);},end:function(){setProg(progDur());},
