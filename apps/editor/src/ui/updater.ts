@@ -14,7 +14,7 @@ var BUSY = false;
 
 function dlgHtml(inner) {
   var d = document.getElementById('dlg');
-  d.innerHTML = '<div class="dlg upd" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">更新</h2>' + (BUSY ? '' : btn('閉じる', 'dlgNo', '', 's')) + '</div>' + inner + '</div>';
+  d.innerHTML = '<div class="dlg upd" role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="ph2"><h2 id="dlgT">更新</h2></div>' + inner + '</div>';
   d.hidden = false;
 }
 function render(state, extra) {
@@ -25,7 +25,7 @@ function render(state, extra) {
   if (state === 'off') return dlgHtml('<p>このビルドには、更新の機能が入っていません。</p><div class="row" style="justify-content:flex-end">' + btn('閉じる', 'dlgNo', '', 'pri') + '</div>');
   if (state === 'found') return dlgHtml('<p>新しい版 <b>' + h(AV.version) + '</b> があります（いまの版 ' + h(cur) + '）。</p>' +
     (AV.notes ? '<div class="box" style="max-height:220px;overflow:auto;white-space:pre-wrap;margin:10px 0">' + h(AV.notes) + '</div>' : '') +
-    '<div class="row" style="justify-content:flex-end;gap:8px">' + btn('あとで', 'dlgNo') + btn('更新して起動し直す', 'updInstall', '', 'pri') + '</div>');
+    '<div class="row" style="justify-content:flex-end;gap:8px">' + btn('あとで', 'dlgNo', '', 'sec') + btn('更新して起動し直す', 'updInstall', '', 'pri') + '</div>');
   if (state === 'installing') return dlgHtml('<p>' + h(AV.version) + ' を入れています…</p><div class="prog" style="width:100%"><i data-updp style="width:' + Math.round((extra || 0) * 100) + '%"></i></div>');
 }
 

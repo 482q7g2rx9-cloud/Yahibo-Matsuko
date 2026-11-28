@@ -111,7 +111,7 @@ body.fit{overflow:hidden}
 /* 主ボタン（丸型） */
 .b.pri{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:500;border-radius:16px;padding:0 18px}
 .b.pri:hover{background:var(--ach);border-color:var(--ach)}
-.b.sec{border-radius:16px;border-width:2px;background:none;color:var(--tx2);border-color:var(--bd);font-weight:500}
+.b.sec{border-radius:16px;padding:0 18px;border-width:2px;background:none;color:var(--tx2);border-color:var(--bd);font-weight:500}
 .b.sec:hover{background:var(--bg3);color:var(--tx)}
 .b.dash{border-style:dashed;background:none;color:var(--mu)}
 .seg{display:flex}.seg>.b{border-radius:0}.seg>.b+.b{margin-left:-1px}
