@@ -8,7 +8,7 @@ import { SRC } from '../source';
 import { primary } from '../editOps';
 import { R, mthumb } from './media';
 import { silPanel } from './edit';
-import { cutRow, excerpt, linksOfRow, nums, rowsOfScene, sceneMedia, scenesSorted } from '../scriptLink';
+import { cutRow, excerpt, linksOfRow, nums, rowsOfScene, sceneCard, sceneMedia, scenesSorted } from '../scriptLink';
 
 /* ---- カット ---- */
 export function roughStrip(){var L=v1Clips(),sum=L.reduce(function(a,c){return a+cLen(c);},0)||1;
@@ -66,9 +66,10 @@ R.cut=function(){
 function boardFromScript(){var s=P.script,sm=sceneMedia();
   return '<div class="row" style="height:56px;flex:none;gap:8px;padding:0 16px;border-bottom:1px solid var(--dv)"><div class="grow" style="line-height:1.5;min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+h(s.title||'台本')+'</div><div class="mu">書き出し #'+s.exportSeq+'　取り込み '+h(new Date(s.importedAt).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}))+'</div></div>'+
     (S.scrNotice?'<span class="chip c-wn">更新あり</span>':'')+btn('取り込む','scrImport','','s'+(S.scrNotice?' pri':''))+'</div><div class="scroll">'+
-    scenesSorted().map(function(sc,i){var m=sm[sc.id]&&M(sm[sc.id]),rs=rowsOfScene(sc.id),done=rs.filter(function(r){return linksOfRow(r.id).length;}).length;
+    scenesSorted().map(function(sc,i){var m=sm[sc.id]&&M(sm[sc.id]),rs=rowsOfScene(sc.id),done=rs.filter(function(r){return linksOfRow(r.id).length;}).length,cd=sceneCard(sc.id);
       return '<div class="li'+(S.scene===sc.id?' selr':'')+'" role="button" tabindex="0"'+A('scene',sc.id)+' style="display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;min-height:82px;padding:8px 16px;border-bottom:1px solid var(--dv)">'+
-        (m?mthumb(m,96,54):'<div style="width:96px;height:54px;border:1px solid var(--dv);border-radius:4px;background:var(--bg0)"></div>')+
+        /* 台本アプリの絵コンテの画像（.swdx から取り込んだとき）、なければ割り当てた素材 */
+        (cd?'<img src="'+cd.img+'" alt="'+h(cd.caption||'')+'" title="'+h(cd.caption||'')+'" style="width:96px;height:54px;object-fit:contain;border:1px solid var(--dv);border-radius:4px;background:#fff">':m?mthumb(m,96,54):'<div style="width:96px;height:54px;border:1px solid var(--dv);border-radius:4px;background:var(--bg0)"></div>')+
         '<div style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="font-weight:500;color:var(--lb)">S'+(i+1)+'</b>　'+h(sc.title||'')+'</span><span class="mu" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+h(sc.time||'')+(sc.note?'　'+h(sc.note):'')+'</span>'+
         '<span class="row" style="gap:6px;flex-wrap:wrap">'+(m?chip('素材 '+(m.c||m.n),'c-ok'):chip('素材 未割り当て','c-wn'))+(rs.length?chip('カット '+done+' / '+rs.length+' 行',done===rs.length?'c-ok':'c-mu'):'')+'</span></div></div>';}).join('')+'</div>';}
 /* ソースの見出し：選んでいるシーンに、この素材を割り当てる */

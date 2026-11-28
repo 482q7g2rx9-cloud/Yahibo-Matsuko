@@ -4816,6 +4816,94 @@ function rowNumbers(s) {
   s.rows.filter((r) => !r.deleted).slice().sort((a, b) => a.order - b.order).forEach((r, i) => o[r.id] = "R-" + String(i + 1).padStart(3, "0"));
   return o;
 }
+const SWDX_MIME = "application/vnd.yahibo.swdx";
+function isSwdxProject(o) {
+  const x = o;
+  return !!x && typeof x === "object" && x.app === "Yahibo Scenario Writer" && Array.isArray(x.rows) && Array.isArray(x.scenes);
+}
+const ROW_EXTRA = ["deletedAt", "modifiedAt", "splitFrom", "mergedInto", "copiedFrom", "legacyNo"];
+function swdxToLink(s) {
+  const plan = s.plan || {};
+  if (!plan.pid)
+    throw new Error("この .swdx には台本の固有の番号がありません。台本アプリで一度「連携用に書き出し」をしてから、保存し直してください");
+  const scenes = s.scenes || [], rows = s.rows || [];
+  if (scenes.some((x) => !x.id) || rows.some((r) => !r.id || /^SR-/.test(r.id)))
+    throw new Error("この .swdx は古い形式です（行に固有の番号がありません）。台本アプリで一度「連携用に書き出し」をしてから、保存し直してください");
+  const file = {
+    app: "Scenario Writer",
+    schema: 1,
+    project: { id: plan.pid, title: plan.title || "" },
+    exportSeq: plan.xseq || 0,
+    scenes: scenes.map((x, i) => ({ id: x.id, order: i + 1, title: x.t, time: x.m, note: x.n })),
+    rows: rows.map((r, i) => {
+      const q = {
+        id: r.id,
+        sceneId: r.sceneId,
+        order: i + 1,
+        rev: r.rev || 1,
+        time: r.tm,
+        music: r.mu,
+        video: r.vi,
+        body: r.bd,
+        type: r.ty,
+        deleted: !!r.deleted
+      };
+      for (const k of ROW_EXTRA) if (r[k] !== void 0) q[k] = r[k];
+      return q;
+    }),
+    cards: (s.cards || []).map((c) => ({ id: c.id, sceneId: c.sceneId || "", caption: c.cap || "", hasImage: !!c.img })),
+    memos: (s.memos || []).map((m) => ({ id: m.id, text: m.t, author: m.w, authorUid: m.uid || "", createdAt: m.ts, target: m.tgt || "all" }))
+  };
+  const cards = (s.cards || []).filter((c) => c.id).map((c) => {
+    const o = { id: c.id, sceneId: c.sceneId || "", caption: c.cap || c.name || "" };
+    if (c.img && c.img.indexOf("data:image/") === 0) o.img = c.img;
+    return o;
+  });
+  return { file, cards };
+}
+function readZip(b) {
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  let eocd = -1;
+  for (let i = b.length - 22; i >= Math.max(0, b.length - 22 - 65535); i--)
+    if (dv.getUint32(i, true) === 101010256) {
+      eocd = i;
+      break;
+    }
+  if (eocd < 0) throw new Error("ZIP ではありません");
+  const n = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const out = [];
+  const dec = new TextDecoder();
+  for (let k = 0; k < n; k++) {
+    if (dv.getUint32(p, true) !== 33639248) throw new Error("ZIP が壊れています");
+    const method = dv.getUint16(p + 10, true), size = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lo = dv.getUint32(p + 42, true);
+    const name = dec.decode(b.subarray(p + 46, p + 46 + nl));
+    if (dv.getUint32(lo, true) !== 67324752) throw new Error("ZIP が壊れています");
+    const start = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true);
+    out.push({ name, method, data: b.subarray(start, start + size) });
+    p += 46 + nl + el + cl;
+  }
+  return out;
+}
+async function unzipSwdx(b, inflate) {
+  const list = readZip(b);
+  const get = async (name) => {
+    const e = list.find((x) => x.name === name);
+    if (!e) return null;
+    if (e.method === 0) return e.data;
+    if (e.method === 8) return inflate(e.data);
+    throw new Error("この圧縮の形式には対応していません");
+  };
+  const dec = new TextDecoder();
+  const m = await get("mimetype");
+  if (!m || dec.decode(m).trim() !== SWDX_MIME) throw new Error("台本アプリの .swdx ではありません");
+  const p = await get("project.json");
+  if (!p) throw new Error(".swdx の中に project.json がありません");
+  return dec.decode(p);
+}
+function looksZip(b) {
+  return b.length > 4 && b[0] === 80 && b[1] === 75 && b[2] === 3 && b[3] === 4;
+}
 function scriptSettings() {
   return P.settings && P.settings.script || {};
 }
@@ -4893,20 +4981,31 @@ function pickScriptFile() {
     i = document.createElement("input");
     i.type = "file";
     i.id = "scriptIn";
-    i.accept = ".json,application/json";
+    i.accept = ".json,.swdx,.zip,application/json";
     i.hidden = true;
     document.body.appendChild(i);
     i.addEventListener("change", function() {
       var f = i.files && i.files[0];
       if (!f) return;
-      f.text().then(function(t) {
+      i.value = "";
+      f.arrayBuffer().then(function(buf) {
+        var u = new Uint8Array(buf);
+        return looksZip(u) ? unzipSwdx(u, inflateRaw) : new TextDecoder().decode(u);
+      }).then(function(t) {
         setScriptSetting("name", f.name);
         importText(t, f.name);
+      }).catch(function(e) {
+        toast(String(e && e.message || e));
       });
-      i.value = "";
     });
   }
   i.click();
+}
+function inflateRaw(d) {
+  if (typeof DecompressionStream === "undefined") return Promise.reject(new Error("このブラウザでは .swdx を読めません"));
+  return new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer().then(function(b) {
+    return new Uint8Array(b);
+  });
 }
 function importScript() {
   var st = scriptSettings();
@@ -4924,14 +5023,77 @@ function importText(text, name) {
   } catch (e) {
     return toast("連携ファイルを読めませんでした（JSON ではありません）");
   }
+  if (isSwdxProject(f)) {
+    var r;
+    try {
+      r = swdxToLink(f);
+    } catch (e) {
+      return toast(e.message);
+    }
+    return shrinkCards(r.cards).then(function(cs) {
+      importFile(r.file, name, cs);
+    });
+  }
+  importFile(f, name, null);
+}
+function importFile(f, name, cards) {
   var d = diffLink(P.script, f);
   S.scrNotice = false;
   if (d.same) {
+    if (cards && JSON.stringify(cards) !== JSON.stringify(P.script.cards || [])) {
+      P.script.cards = cards;
+      saveP();
+    }
     draw();
     return toast("台本の更新はありません");
   }
-  S.imp = { file: f, diff: d, name, accept: {}, relink: {}, force: false };
+  S.imp = { file: f, diff: d, name, accept: {}, relink: {}, force: false, cards };
   renderImport();
+}
+function shrinkCards(cards) {
+  return Promise.all(cards.map(function(c) {
+    var o = { id: c.id, sceneId: c.sceneId, caption: c.caption };
+    if (!c.img) return o;
+    return new Promise(function(ok) {
+      var im = new Image();
+      im.onload = function() {
+        try {
+          var k = Math.min(1, 320 / Math.max(im.naturalWidth, im.naturalHeight)), cv = document.createElement("canvas");
+          cv.width = Math.max(1, Math.round(im.naturalWidth * k));
+          cv.height = Math.max(1, Math.round(im.naturalHeight * k));
+          var x = cv.getContext("2d");
+          x.fillStyle = "#fff";
+          x.fillRect(0, 0, cv.width, cv.height);
+          x.drawImage(im, 0, 0, cv.width, cv.height);
+          o.img = cv.toDataURL("image/jpeg", 0.8);
+        } catch (e) {
+        }
+        ok(o);
+      };
+      im.onerror = function() {
+        ok(o);
+      };
+      im.src = c.img;
+    });
+  }));
+}
+function mergeCards(prev, f) {
+  var old = {};
+  (prev || []).forEach(function(c) {
+    old[c.id] = c;
+  });
+  return (f.cards || []).filter(function(c) {
+    return c && c.id;
+  }).map(function(c) {
+    var o = { id: c.id, sceneId: c.sceneId || "", caption: c.caption || "" };
+    if (c.hasImage && old[c.id] && old[c.id].img) o.img = old[c.id].img;
+    return o;
+  });
+}
+function sceneCard(sid) {
+  var L = P.script && P.script.cards || [];
+  for (var i = 0; i < L.length; i++) if (L[i].sceneId === sid && L[i].img) return L[i];
+  return null;
 }
 function renderImport() {
   var im = S.imp, dl = document.getElementById("dlg");
@@ -5009,9 +5171,11 @@ function applyImport() {
   mark();
   pruneLinks();
   P.scriptBackup = { script: P.script ? JSON.parse(JSON.stringify(P.script)) : null, links: JSON.parse(JSON.stringify(links())), at: (/* @__PURE__ */ new Date()).toISOString() };
+  var prevCards = P.script && P.script.cards;
   var r = applyLink(P.script, f, d, links(), { accept: acc, relink: im.relink });
   P.script = r.script;
   P.links = r.links;
+  P.script.cards = im.cards || mergeCards(prevCards, f);
   closeImport();
   changed();
   var n = Object.keys(acc).filter(function(k) {
@@ -7931,8 +8095,9 @@ function boardFromScript() {
   return '<div class="row" style="height:56px;flex:none;gap:8px;padding:0 16px;border-bottom:1px solid var(--dv)"><div class="grow" style="line-height:1.5;min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h(s.title || "台本") + '</div><div class="mu">書き出し #' + s.exportSeq + "　取り込み " + h(new Date(s.importedAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })) + "</div></div>" + (S.scrNotice ? '<span class="chip c-wn">更新あり</span>' : "") + btn("取り込む", "scrImport", "", "s" + (S.scrNotice ? " pri" : "")) + '</div><div class="scroll">' + scenesSorted().map(function(sc, i) {
     var m = sm[sc.id] && M(sm[sc.id]), rs = rowsOfScene(sc.id), done = rs.filter(function(r) {
       return linksOfRow(r.id).length;
-    }).length;
-    return '<div class="li' + (S.scene === sc.id ? " selr" : "") + '" role="button" tabindex="0"' + A("scene", sc.id) + ' style="display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;min-height:82px;padding:8px 16px;border-bottom:1px solid var(--dv)">' + (m ? mthumb(m, 96, 54) : '<div style="width:96px;height:54px;border:1px solid var(--dv);border-radius:4px;background:var(--bg0)"></div>') + '<div style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="font-weight:500;color:var(--lb)">S' + (i + 1) + "</b>　" + h(sc.title || "") + '</span><span class="mu" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h(sc.time || "") + (sc.note ? "　" + h(sc.note) : "") + '</span><span class="row" style="gap:6px;flex-wrap:wrap">' + (m ? chip("素材 " + (m.c || m.n), "c-ok") : chip("素材 未割り当て", "c-wn")) + (rs.length ? chip("カット " + done + " / " + rs.length + " 行", done === rs.length ? "c-ok" : "c-mu") : "") + "</span></div></div>";
+    }).length, cd = sceneCard(sc.id);
+    return '<div class="li' + (S.scene === sc.id ? " selr" : "") + '" role="button" tabindex="0"' + A("scene", sc.id) + ' style="display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;min-height:82px;padding:8px 16px;border-bottom:1px solid var(--dv)">' + /* 台本アプリの絵コンテの画像（.swdx から取り込んだとき）、なければ割り当てた素材 */
+    (cd ? '<img src="' + cd.img + '" alt="' + h(cd.caption || "") + '" title="' + h(cd.caption || "") + '" style="width:96px;height:54px;object-fit:contain;border:1px solid var(--dv);border-radius:4px;background:#fff">' : m ? mthumb(m, 96, 54) : '<div style="width:96px;height:54px;border:1px solid var(--dv);border-radius:4px;background:var(--bg0)"></div>') + '<div style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="font-weight:500;color:var(--lb)">S' + (i + 1) + "</b>　" + h(sc.title || "") + '</span><span class="mu" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h(sc.time || "") + (sc.note ? "　" + h(sc.note) : "") + '</span><span class="row" style="gap:6px;flex-wrap:wrap">' + (m ? chip("素材 " + (m.c || m.n), "c-ok") : chip("素材 未割り当て", "c-wn")) + (rs.length ? chip("カット " + done + " / " + rs.length + " 行", done === rs.length ? "c-ok" : "c-mu") : "") + "</span></div></div>";
   }).join("") + "</div>";
 }
 function assignBtn(m) {

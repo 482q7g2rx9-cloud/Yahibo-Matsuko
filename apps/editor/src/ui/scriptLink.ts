@@ -11,6 +11,7 @@ import { draw, go } from './render';
 import { A, btn, h, tc } from './util';
 import { ACT } from './actions';
 import { CHANGE_AUTO, CHANGE_LABEL, ROW_TEXT_KEYS, applyLink, diffLink, linkState, rowNumbers, rowText } from '../core/link';
+import { isSwdxProject, looksZip, swdxToLink, unzipSwdx } from '../core/swdx';
 
 export function scriptSettings() { return (P.settings && P.settings.script) || {}; }
 export function setScriptSetting(k, v) {
@@ -50,9 +51,17 @@ export function pickScriptFile() {
     return;
   }
   var i = document.getElementById('scriptIn');
-  if (!i) { i = document.createElement('input'); i.type = 'file'; i.id = 'scriptIn'; i.accept = '.json,application/json'; i.hidden = true; document.body.appendChild(i);
-    i.addEventListener('change', function () { var f = i.files && i.files[0]; if (!f) return; f.text().then(function (t) { setScriptSetting('name', f.name); importText(t, f.name); }); i.value = ''; }); }
+  if (!i) { i = document.createElement('input'); i.type = 'file'; i.id = 'scriptIn'; i.accept = '.json,.swdx,.zip,application/json'; i.hidden = true; document.body.appendChild(i);
+    i.addEventListener('change', function () { var f = i.files && i.files[0]; if (!f) return; i.value = '';
+      /* 台本アプリのプロジェクトファイル（.swdx。ZIP）なら、中の project.json を取り出す */
+      f.arrayBuffer().then(function (buf) { var u = new Uint8Array(buf); return looksZip(u) ? unzipSwdx(u, inflateRaw) : new TextDecoder().decode(u); })
+        .then(function (t) { setScriptSetting('name', f.name); importText(t, f.name); }).catch(function (e) { toast(String(e && e.message || e)); }); }); }
   i.click();
+}
+/* deflate（ヘッダーなし）を戻す：ブラウザの DecompressionStream */
+function inflateRaw(d) {
+  if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('このブラウザでは .swdx を読めません'));
+  return new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer().then(function (b) { return new Uint8Array(b); });
 }
 /* 紐づけてある連携ファイルを読み直す（ブラウザ版は、毎回選ぶ） */
 export function importScript() {
@@ -61,14 +70,45 @@ export function importScript() {
   HOST.script.read(st.path).then(function (t) { importText(t, st.name || st.path); }).catch(function (e) { toast(String(e)); });
 }
 export function importText(text, name) {
-  var f;
+  var f, cards = null;
   try { f = JSON.parse(text); } catch (e) { return toast('連携ファイルを読めませんでした（JSON ではありません）'); }
+  /* 台本アプリのプロジェクトファイル（.swdx）：連携ファイルの形に直し、絵コンテの画像を縮めて持つ（core/swdx.ts） */
+  if (isSwdxProject(f)) {
+    var r; try { r = swdxToLink(f); } catch (e) { return toast(e.message); }
+    return shrinkCards(r.cards).then(function (cs) { importFile(r.file, name, cs); });
+  }
+  importFile(f, name, null);
+}
+function importFile(f, name, cards) {
   var d = diffLink(P.script, f);
   S.scrNotice = false;
-  if (d.same) { draw(); return toast('台本の更新はありません'); }
-  S.imp = { file: f, diff: d, name: name, accept: {}, relink: {}, force: false };
+  if (d.same) {
+    if (cards && JSON.stringify(cards) !== JSON.stringify(P.script.cards || [])) { P.script.cards = cards; saveP(); }
+    draw(); return toast('台本の更新はありません');
+  }
+  S.imp = { file: f, diff: d, name: name, accept: {}, relink: {}, force: false, cards: cards };
   renderImport();
 }
+/* 絵コンテ（Project.script.cards）：.swdx の画像は、長い辺 320px の JPEG に縮める。連携ファイル（画像なし）のときは、前の画像を id で引き継ぐ */
+function shrinkCards(cards) {
+  return Promise.all(cards.map(function (c) {
+    var o = { id: c.id, sceneId: c.sceneId, caption: c.caption };
+    if (!c.img) return o;
+    return new Promise(function (ok) {
+      var im = new Image();
+      im.onload = function () { try { var k = Math.min(1, 320 / Math.max(im.naturalWidth, im.naturalHeight)), cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(im.naturalWidth * k)); cv.height = Math.max(1, Math.round(im.naturalHeight * k));
+        var x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height); x.drawImage(im, 0, 0, cv.width, cv.height); o.img = cv.toDataURL('image/jpeg', 0.8); } catch (e) {} ok(o); };
+      im.onerror = function () { ok(o); };
+      im.src = c.img;
+    });
+  }));
+}
+function mergeCards(prev, f) {
+  var old = {}; (prev || []).forEach(function (c) { old[c.id] = c; });
+  return (f.cards || []).filter(function (c) { return c && c.id; }).map(function (c) { var o = { id: c.id, sceneId: c.sceneId || '', caption: c.caption || '' }; if (c.hasImage && old[c.id] && old[c.id].img) o.img = old[c.id].img; return o; });
+}
+/** シーンの絵コンテの画像（最初の 1 枚） */
+export function sceneCard(sid) { var L = P.script && P.script.cards || []; for (var i = 0; i < L.length; i++) if (L[i].sceneId === sid && L[i].img) return L[i]; return null; }
 
 /* ---------- 取り込みの確認画面 ---------- */
 export function renderImport() {
@@ -113,8 +153,10 @@ export function applyImport() {
   mark();
   pruneLinks();
   P.scriptBackup = { script: P.script ? JSON.parse(JSON.stringify(P.script)) : null, links: JSON.parse(JSON.stringify(links())), at: new Date().toISOString() };
+  var prevCards = P.script && P.script.cards;
   var r = applyLink(P.script, f, d, links(), { accept: acc, relink: im.relink });
   P.script = r.script; P.links = r.links;
+  P.script.cards = im.cards || mergeCards(prevCards, f);
   closeImport();
   changed();
   var n = Object.keys(acc).filter(function (k) { return !acc[k]; }).length;
