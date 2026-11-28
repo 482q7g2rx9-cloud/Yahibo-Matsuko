@@ -20,8 +20,11 @@ import { COLOR_PRESETS } from '../../core/color';
 import { KF_PROPS, MOTION_PRESETS, kfIndex, kfList, kfTimes, srcTime, valueAt } from '../../core/keyframes';
 import { TRANSITIONS } from '../transitions';
 import { primary } from '../editOps';
-import { PROPS, colorForm, numRow } from './edit';
+import { PROPS, colorForm, maskForm, numRow, titleAnimForm } from './edit';
 import { R } from './media';
+import { TITLE_IN, TITLE_OUT } from '../titleAnim';
+import { HOST } from '../desktop';
+import { TRK, isVideoClip } from '../tracking';
 
 export var KF_LABEL = { x: '位置 X', y: '位置 Y', scale: '拡大率', rot: '回転', op: '不透明度' };
 
@@ -31,6 +34,8 @@ export function fxLib() {
     ['色補正', COLOR_PRESETS.map(function (p) { return ['cc:' + p.id, p.name, { warm: 'linear-gradient(135deg,#f6c27a,#e07b39)', cool: 'linear-gradient(135deg,#9fd3f5,#3b7bd1)', vivid: 'linear-gradient(135deg,#ff5f6d,#ffc371)', soft: 'linear-gradient(135deg,#c9bfb2,#8e8a84)', bright: 'linear-gradient(135deg,#fff3c4,#f5c542)', night: 'linear-gradient(135deg,#3a4a7a,#141a33)', mono: 'linear-gradient(135deg,#eee,#333)' }[p.id]]; })],
     ['ぼかし・モザイク', [['blur', 'ぼかし', 'radial-gradient(circle,#9ab 0,#cde 70%)'], ['mosaic', 'モザイク', 'repeating-conic-gradient(#889 0 25%,#bbc 0 50%) 0 0/8px 8px']]],
     ['スタイル', [['vig', '周辺を暗く', 'radial-gradient(circle,#ddd 30%,#222 100%)']]],
+    ['テロップの登場', TITLE_IN.slice(1).map(function (x) { return ['ti:' + x[0], x[1], 'linear-gradient(90deg,transparent 0 20%,var(--ac) 20% 80%,transparent 80%),var(--bg4)']; })],
+    ['テロップの退場', TITLE_OUT.slice(1).map(function (x) { return ['to:' + x[0], x[1], 'linear-gradient(90deg,var(--ac) 0 60%,transparent 60%),var(--bg4)']; })],
     ['動き（キーフレーム）', MOTION_PRESETS.map(function (p) { return ['mo:' + p.id, p.name, 'linear-gradient(90deg,var(--bg4) 0 38%,var(--ac) 38% 62%,var(--bg4) 62%)']; })],
   ];
 }
@@ -53,9 +58,14 @@ export function canFx(c, id) {
   if (!c) return false;
   var m = c.m && M(c.m), pic = c.type === 'media' && m && (m.k === '映像' || m.k === '画像');
   if (id.indexOf('mo:') === 0) return pic || c.type === 'title' && c.st !== 'credit';
+  if (id.indexOf('ti:') === 0 || id.indexOf('to:') === 0) return c.type === 'title' && c.st !== 'credit';
   return pic || c.type === 'adj';
 }
-export function canKf(c) { return !!c && (c.type === 'media' || c.type === 'title' && c.st !== 'credit'); }
+export function canKf(c) { return kfPropsOf(c).length > 0; }
+/** 選んでいるプロパティ（そのクリップで選べないものなら最初のもの） */
+export function curProp(c) { var L = kfPropsOf(c); return L.indexOf(S.kfProp) >= 0 ? S.kfProp : L[0] || 'scale'; }
+/** キーフレームを付けられるプロパティ（調整レイヤーは、範囲があるときの位置だけ） */
+export function kfPropsOf(c) { if (!c) return []; if (c.type === 'media' || c.type === 'title' && c.st !== 'credit') return KF_PROPS.slice(); if (c.type === 'adj' && ((c.maskW != null && c.maskW < 100) || (c.maskH != null && c.maskH < 100))) return ['x', 'y']; return []; }
 
 /* 左：エフェクトの一覧 */
 function libPanel(c) {
@@ -76,7 +86,7 @@ function libPanel(c) {
 function kfTimeline(c) {
   if (!c) return '<div class="tl" style="display:flex;align-items:center;justify-content:center"><span class="mu">クリップがありません</span></div>';
   var a = c.start, b = cEnd(c), len = Math.max(0.01, b - a), pct = function (t) { return Math.max(0, Math.min(100, (t - a) / len * 100)); };
-  var y = 36, hd = '<div class="hd tch" data-time="fx">' + tc(S.t.edit) + '</div>', ar = '', ru = '<div class="ru"></div>', props = canKf(c) ? KF_PROPS : [], cur = S.kfProp || 'scale';
+  var y = 36, hd = '<div class="hd tch" data-time="fx">' + tc(S.t.edit) + '</div>', ar = '', ru = '<div class="ru"></div>', props = kfPropsOf(c), cur = curProp(c);
   for (var i = 0; i <= 4; i++) ru += '<div class="rl" style="left:' + (i * 25) + '%">' + tc(a + len * i / 4) + '</div>';
   props.forEach(function (p) {
     var on = p === cur, hgt = on ? 64 : 28, L = kfList(c, p) || [];
@@ -103,7 +113,7 @@ function kfTimeline(c) {
 
 /* キーフレームの操作の列 */
 function kfBar(c) {
-  var ok = canKf(c), p = S.kfProp || 'scale', i = ok ? kfIndex(c, p, srcTime(c, S.t.edit)) : -1, k = i >= 0 ? kfList(c, p)[i] : null, e = k ? k.e || 'linear' : null;
+  var ok = canKf(c), p = curProp(c), i = ok ? kfIndex(c, p, srcTime(c, S.t.edit)) : -1, k = i >= 0 ? kfList(c, p)[i] : null, e = k ? k.e || 'linear' : null;
   var dis = ok ? '' : ' disabled';
   var mode = function (v, l, aria) { return '<button class="b s' + (e === v ? ' on' : '') + '"' + A('kfEase', v) + (k ? '' : ' disabled') + ' aria-label="' + aria + '" title="' + aria + '">' + l + '</button>'; };
   return '<div class="row" style="height:40px;flex:none;gap:6px;padding:0 12px;border-bottom:1px solid var(--dv)"><span style="font-weight:500;margin-right:4px;white-space:nowrap">キーフレーム</span>' +
@@ -112,15 +122,33 @@ function kfBar(c) {
     '<button class="b s" aria-label="次のキーフレーム" title="次のキーフレーム"' + A('kfNext') + dis + '>' + TRI.r + '</button><span class="vsep"></span>' +
     mode('linear', 'リニア', '一定の速さで変える') + mode('ease', 'ベジェ', '始めと終わりをゆっくり') + mode('hold', '停止', '次のキーフレームまで変えない') + '<span class="vsep"></span>' +
     mode('in', 'イン', 'だんだん速く') + mode('out', 'アウト', 'だんだん遅く') +
-    '<span class="grow"></span><select class="inp" data-in="kfProp" aria-label="対象プロパティ" style="height:26px"' + dis + '>' + KF_PROPS.map(function (q) { return '<option value="' + q + '"' + (q === p ? ' selected' : '') + '>' + KF_LABEL[q] + '</option>'; }).join('') + '</select>' +
+    '<span class="grow"></span><select class="inp" data-in="kfProp" aria-label="対象プロパティ" style="height:26px"' + dis + '>' + kfPropsOf(c).map(function (q) { return '<option value="' + q + '"' + (q === p ? ' selected' : '') + '>' + KF_LABEL[q] + '</option>'; }).join('') + '</select>' +
     btn('すべて外す', 'kfClear', '', 's', 'このプロパティのキーフレームをすべて外す') + '</div>';
+}
+
+/* トラッキング（デスクトップ版・映像のクリップ）：囲む → 追う → 追従させる・隠す */
+function trackForm(c) {
+  var run = TRK.job && TRK.job.cid === c.id, L = c.track && c.track.pts || [], has = L.length > 1, box = S.trBox && S.trBox.cid === c.id;
+  var range = has ? tc(c.start + (L[0][0] - c.in)) + '〜' + tc(c.start + (L[L.length - 1][0] - c.in)) : '';
+  var others = P.clips.filter(function (x) { var t = T(x.tr); return x !== c && t && t.kind === 'v' && x.type !== 'adj' && x.start < cEnd(c) && cEnd(x) > c.start; });
+  var name = function (x) { return x.type === 'title' ? 'テロップ：' + String(x.label || '').split('\n')[0] : (M(x.m) || {}).n || x.id; };
+  return '<div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">' +
+    '<div class="row" style="gap:6px;flex-wrap:wrap">' + btn('範囲を囲む', 'trSel', '', 's' + (S.trSel ? ' on' : ''), 'プレビューで追うものを囲む') + (box ? '<span class="t-ok">囲みました</span>' : '') + '</div>' +
+    '<div class="row" style="gap:6px">' + btn(TRI.l + '後方へ', 'trGo', 'back', 's', '後方へ追跡') + btn('止める', 'trStop', '', 's') + btn('前方へ' + TRI.r, 'trGo', 'fwd', 's', '前方へ追跡') + '</div>' +
+    (run ? '<div class="row" style="gap:8px"><span class="prog" style="flex:1"><i data-trbar style="width:' + Math.round(TRK.job.p * 100) + '%"></i></span><span class="t-ac">追跡中</span></div>' :
+      '<div class="fg"><span>状態</span><span>' + (has ? '<span class="t-ok">追跡済み</span>　' + range : '<span class="mu">なし</span>') + '</span></div>') +
+    (has ? '<div class="fg"><span>追従先</span><select class="inp" data-in="trTarget" aria-label="追従させるクリップ"><option value="">選ぶ…</option>' + others.map(function (x) { return '<option value="' + x.id + '"' + (S.trTarget === x.id ? ' selected' : '') + '>' + h(name(x)) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">' + btn('追従させる', 'trFollow', '', 's') + btn('モザイクで隠す', 'trHide', 'mosaic', 's') + btn('ぼかしで隠す', 'trHide', 'blur', 's') + btn('追跡を消す', 'trClear', '', 's') + '</div>' : '') + '</div>';
 }
 
 /* 右：エフェクトコントロール */
 function controls(c) {
   if (!c) return '<div class="mu" style="padding:16px">再生ヘッドの位置にクリップがありません</div>';
   var m = c.m && M(c.m), pic = c.type === 'media' && m && (m.k === '映像' || m.k === '画像'), out = '';
-  if (canKf(c)) out += fsec('fxmotion', 'モーション', null, ['x', 'y', 'scale', 'rot', 'op'].map(function (p) { return numRow(KF_LABEL[p], c, p); }).join('') +
+  if (HOST && HOST.track && isVideoClip(c)) out += fsec('track', 'トラッキング', null, trackForm(c), 1);
+  if (c.type === 'adj') out += fsec('mask', '範囲', null, maskForm(c), 1);
+  if (c.type === 'title' && c.st !== 'credit') out += fsec('tanim', 'アニメーション', null, titleAnimForm(c), 1);
+  if (c.type !== 'adj' && canKf(c)) out += fsec('fxmotion', 'モーション', null, ['x', 'y', 'scale', 'rot', 'op'].map(function (p) { return numRow(KF_LABEL[p], c, p); }).join('') +
     '<div class="row" style="justify-content:flex-end;padding-top:8px">' + btn('元に戻す', 'mreset', c.id, 's') + '</div>', 1);
   if (pic || c.type === 'adj') {
     out += fsec('color', '色補正', null, colorForm(c), 1);
@@ -171,7 +199,8 @@ export function init() {
     return '<div class="pn l" style="width:' + pw('fxL') + 'px">' + splitter('fxL', 'l') + ph('エフェクト') +
       '<div style="padding:10px 12px"><input class="inp" type="search" placeholder="エフェクトを検索" aria-label="エフェクトを検索" data-in="fxq" value="' + h(S.fxq || '') + '" style="width:100%"></div><div class="scroll">' + libPanel(c) + '</div></div>' +
       '<div class="pc">' + ph('プレビュー', '<span class="x">' + h(clipName(c)) + '</span><span class="seg">' + btn('適用前', 'ba', 'before', 's' + (after ? '' : ' on')) + btn('適用後', 'ba', 'after', 's' + (after ? ' on' : '')) + '</span>') +
-      '<div class="mon" style="height:calc(290px + var(--xh,0px)*.5)"><canvas data-prog ' + canvasAttrs() + ' style="height:calc(270px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas></div>' +
+      '<div class="mon" style="height:calc(290px + var(--xh,0px)*.5)"><canvas data-prog ' + canvasAttrs() + ' style="height:calc(270px + var(--xh,0px)*.5);width:auto;aspect-ratio:var(--ar,16/9);max-width:100%;object-fit:contain;display:block"></canvas>' +
+      (c && isVideoClip(c) && HOST ? '<canvas data-trov="' + c.id + '" style="position:absolute;' + (S.trSel ? 'cursor:crosshair' : 'pointer-events:none') + '"></canvas>' : '') + '</div>' +
       '<div class="tp"><span class="tc" data-time="edit">' + tc(S.t.edit) + '</span><span class="mid">' + ibtn('toStart', '前のカットへ', 'fxPrevCut') + playBtn(E.playing) + ibtn('nextCut', '次のカットへ', 'fxNextCut') + '</span><span class="end"></span></div>' +
       kfBar(c) + kfTimeline(c) + '</div>' +
       '<div class="pn r" style="width:' + pw('fxR') + 'px">' + splitter('fxR', 'r') + ph('エフェクトコントロール', '<span class="x">' + h(clipName(c)) + '</span>') + '<div class="scroll">' + controls(c) + '</div></div>';

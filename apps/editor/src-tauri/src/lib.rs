@@ -22,6 +22,7 @@ mod script;
 mod server;
 mod state;
 mod tools;
+mod track;
 mod update;
 
 use tauri::{DragDropEvent, Manager, RunEvent, WindowEvent};
@@ -104,6 +105,8 @@ pub fn run() {
             rec::rec_start,
             rec::rec_stop,
             rec::rec_cancel,
+            track::track_start,
+            track::track_cancel,
             update::update_info,
             update::update_check,
             update::update_install,

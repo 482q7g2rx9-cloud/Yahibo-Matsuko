@@ -54,5 +54,7 @@ export function fxApply(c, id) {
   else if (id === 'mosaic') c.fxMosaic = c.fxMosaic || 24;
   else if (id === 'vig') c.fxVig = c.fxVig || 40;
   else if (id.indexOf('mo:') === 0) applyMotionPreset(c, id.slice(3));
+  else if (id.indexOf('ti:') === 0) c.tin = { k: id.slice(3), d: c.tin && c.tin.d || 0.6 };
+  else if (id.indexOf('to:') === 0) c.tout = { k: id.slice(3), d: c.tout && c.tout.d || 0.6 };
   changed();
 }

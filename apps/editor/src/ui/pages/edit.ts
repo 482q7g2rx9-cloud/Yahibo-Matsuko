@@ -21,6 +21,7 @@ import { num } from '../exporter';
 import { COLOR_PRESETS, colorOf } from '../../core/color';
 import { cubeState } from '../colorGL';
 import { fillAdj } from '../colorUI';
+import { ANIM_DEF, TITLE_IN, TITLE_OUT } from '../titleAnim';
 import { KF_PROPS, hasKf, kfIndex, setValue, srcTime, valueAt } from '../../core/keyframes';
 import { R } from './media';
 import { draw } from '../render';
@@ -82,7 +83,7 @@ export function propPct(key,v){var p=PROPS[key];return Math.max(0,Math.min(100,(
 export function propTxt(key,v){return (+v).toFixed(PROPS[key].dec);}
 export function numRow(label,c,key){var p=PROPS[key],v=propVal(c,key),id=c.id;
   /* ◇：モーション（位置・拡大率・回転・不透明度）は、再生ヘッドの位置にキーフレームを置く・消す。キーフレームがあれば色を付ける */
-  var kp=KF_PROPS.indexOf(key)>=0&&(c.type==='media'||c.type==='title'&&c.st!=='credit'),at=kp&&kfIndex(c,key,srcTime(c,S.t.edit))>=0,any=kp&&hasKf(c,key);
+  var kp=KF_PROPS.indexOf(key)>=0&&(c.type==='media'||c.type==='title'&&c.st!=='credit'||c.type==='adj'&&(key==='x'||key==='y')),at=kp&&kfIndex(c,key,srcTime(c,S.t.edit))>=0,any=kp&&hasKf(c,key);
   return '<div class="pr">'+(kp?'<button class="kf'+(any?' has':'')+'" aria-label="'+label+'のキーフレームを追加／削除" title="キーフレームを追加／削除" aria-pressed="'+at+'"'+A('kfTog',id+'|'+key)+'>'+(at||!any?diamond(at):'<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><polygon points="6,1 11,6 6,11 1,6" fill="none" stroke="var(--ac)" stroke-width="1.6"/></svg>')+'</button>':'<span class="kf" aria-hidden="true"></span>')+'<span class="t2">'+label+'</span>'+
     '<input type="range" class="rg" min="'+p.min+'" max="'+p.max+'" step="'+p.step+'" value="'+v+'" style="--p:'+propPct(key,v)+'%" data-in="cp" data-k="'+key+'" data-cid="'+id+'" aria-label="'+label+'">'+
     '<span class="stp"><button aria-label="'+label+'を減らす"'+A('cstep',id+'|'+key+'|-1')+'>'+TRI.l+'</button><button aria-label="'+label+'を増やす"'+A('cstep',id+'|'+key+'|1')+'>'+TRI.r+'</button></span>'+
@@ -133,18 +134,26 @@ export function colorForm(c){var ls=cubeState(c),L=c.ccLut;
     '<div class="fg"><span>LUT</span><span class="row" style="gap:6px;min-width:0">'+(L?'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+h(L.path||L.name)+'">'+h(L.name)+'</span>'+(ls==='missing'?'<span class="t-wn" style="white-space:nowrap">読み込み直してください</span>':ls==='error'?'<span class="t-wn" style="white-space:nowrap">読めません</span>':'')+btn('外す','ccLutOff',c.id,'s'):'<span class="mu">なし</span>')+btn(L?'変更…':'読み込む…','ccLut',c.id,'s')+'</span></div>'+
     (L?numRow('適用量',c,'ccLutAmt'):'')+
     '<div class="row" style="justify-content:flex-end;padding-top:8px">'+btn('元に戻す','ccReset',c.id,'s')+'</div>';}
+/* 調整レイヤーの範囲：幅・高さ（画面に対する %）と中心の位置（キーフレームで動かせる） */
+export function maskForm(c){return numRow('幅',c,'maskW')+numRow('高さ',c,'maskH')+numRow('位置 X',c,'x')+numRow('位置 Y',c,'y');}
+/* テロップの登場・退場のアニメーション（titleAnim.ts） */
+export function titleAnimForm(c){var row=function(lb,key,list){var a=c[key]||{},k=a.k||'';
+    return '<div class="fg"><span>'+lb+'</span><span class="row" style="gap:6px;min-width:0"><select class="inp grow" data-in="tanimK" data-key="'+key+'" aria-label="'+lb+'の動き">'+list.map(function(x){return '<option value="'+x[0]+'"'+(x[0]===k?' selected':'')+'>'+h(x[1])+'</option>';}).join('')+'</select>'+
+      '<input class="inp" type="number" min="0.1" max="5" step="0.1" data-in="tanimD" data-key="'+key+'" value="'+(a.d||ANIM_DEF)+'" aria-label="'+lb+'の長さ（秒）" style="width:64px"'+(k?'':' disabled')+'><span class="mu">秒</span></span></div>';};
+  return '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0">'+row('登場','tin',TITLE_IN)+row('退場','tout',TITLE_OUT)+'</div>';}
 export function selTitle(){var c=primary();return c&&c.type==='title'?c:null;}
 export function inspector(){var L=S.sel.map(C).filter(Boolean),c=primary();
   if(!c)return {name:'',html:fsec('clip','クリップ',null,'')};
   var pair=L.length===2&&L[0].link&&L[0].link===L[1].link;
   if(L.length>1&&!pair){var tot=L.reduce(function(a,x){return a+cLen(x);},0);
     return {name:L.length+' 個を選択',html:fsec('clip','選んだクリップ',null,kv('数',L.length+' 個')+kv('合計の長さ',mmss(tot))+'<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">'+btn('削除','delSel','','s')+btn('リップル削除','rdel','','s')+btn(L.some(function(x){return x.link;})?'リンク解除':'リンク','lnk','','s')+btn('コピー','copy','','s')+'</div>')};}
-  if(c.type==='title')return {name:'テロップ',html:fsec('motion','モーション・不透明度',null,titleMotion(c),1)+fsec('clip','テロップ',null,titleForm(c))};
+  if(c.type==='title')return {name:'テロップ',html:fsec('motion','モーション・不透明度',null,titleMotion(c),1)+(c.st!=='credit'?fsec('tanim','アニメーション',null,titleAnimForm(c),1):'')+fsec('clip','テロップ',null,titleForm(c))};
   var m=c.m?M(c.m):null,a=pair?L.filter(function(x){return T(x.tr).kind==='a';})[0]:T(c.tr).kind==='a'?c:null,v=T(c.tr).kind==='v'?c:null;
   var info=kv('素材',h(m?m.n:c.label||'—'))+kv('トラック',c.tr+(a&&v?' / '+a.tr:''))+kv('開始',tc(c.start))+(c.type==='media'?kv('イン',tc(c.in))+kv('アウト',tc(c.out)):'')+kv('長さ',mmss(cLen(c)))+
     '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">'+btn('再生ヘッドで分割','split','','s')+btn('削除','delSel','','s')+btn('リップル削除','rdel','','s')+(c.link||pair?btn('リンク解除','lnk','','s'):'')+'</div>';
   var h2=fsec('clip','クリップ',null,info);
   if(v&&v.type==='media')h2+=fsec('motion','モーション・不透明度',null,motionForm(v),1);
+  if(v&&v.type==='adj')h2+=fsec('mask','範囲',null,maskForm(v),1);
   if(v&&(v.type==='adj'||m&&(m.k==='映像'||m.k==='画像')))h2+=fsec('color','色補正',null,colorForm(v),1);
   var tq=v&&trPairs().filter(function(q){return q.b===v;})[0];
   if(tq)h2+=fsec('trans','トランジション',null,'<div class="fg"><span>種類</span><select class="inp" data-in="trk" aria-label="トランジションの種類">'+TRANSITIONS.map(function(x){return '<option value="'+x.id+'"'+(x.id===tq.k?' selected':'')+'>'+h(x.name)+'</option>';}).join('')+'</select></div>'+numRow('長さ',v,'xd')+'<div class="row" style="justify-content:flex-end;padding-top:8px">'+btn('外す','trDel',v.id,'s')+'</div>');
@@ -176,7 +185,8 @@ PROPS={fsz:{min:12,max:300,step:1,unit:'px',def:59,dec:0},lh:{min:80,max:300,ste
   fin:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2},xd:{min:0.1,max:10,step:0.05,unit:'s',def:1,dec:2},fout:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2},
   ccExp:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccCon:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccSat:{min:-100,max:100,step:1,unit:'',def:0,dec:0},
   ccTemp:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccTint:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccGam:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccLutAmt:{min:0,max:100,step:1,unit:'%',def:100,dec:0},
-  fxBlur:{min:0,max:40,step:0.5,unit:'px',def:0,dec:1},fxMosaic:{min:0,max:120,step:1,unit:'px',def:0,dec:0},fxVig:{min:0,max:100,step:1,unit:'',def:0,dec:0}};
+  fxBlur:{min:0,max:40,step:0.5,unit:'px',def:0,dec:1},fxMosaic:{min:0,max:120,step:1,unit:'px',def:0,dec:0},fxVig:{min:0,max:100,step:1,unit:'',def:0,dec:0},
+  maskW:{min:2,max:100,step:1,unit:'%',def:100,dec:0},maskH:{min:2,max:100,step:1,unit:'%',def:100,dec:0}};
 R.edit=function(){
   var left;
   if(S.etab!=='text'&&S.etab!=='trans'){var L=P.media.filter(function(m){return (m.k==='映像'||m.k==='音声'||m.k==='画像'||m.k==='テイク')&&inBin(m,S.ebin||'all')&&(!S.eq||m.n.indexOf(S.eq)>=0);}),av=S.aview||'grid';

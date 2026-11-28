@@ -12,5 +12,6 @@ pub mod peaks;
 pub mod probe;
 pub mod run;
 pub mod timeline;
+pub mod track;
 
 pub use model::Project;

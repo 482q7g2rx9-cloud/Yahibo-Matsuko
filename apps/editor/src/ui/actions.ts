@@ -27,7 +27,8 @@ import { PREF, openPrefs, renderPrefs, savePref } from './prefs';
 import { fit } from './fit';
 import { colorReset, lutOff, pickLut, fxApply } from './colorUI';
 import { KF_PROPS, clearKf, kfTimes, setEase, srcTime, toggleKf } from '../core/keyframes';
-import { fxClip } from './pages/fx';
+import { curProp, fxClip } from './pages/fx';
+import { followTrack, hideTrack, trackCancel, trackClear, trackStart } from './tracking';
 import { RC, adopt, delTake, placeTake, playTake, recStop, recToggle, recTop as recToTop } from './recorder';
 
 /* エフェクトページ：同じトラックの前・次のクリップへ（再生ヘッドもその頭へ） */
@@ -85,13 +86,15 @@ ACT={
   cstep:function(v){var a=String(v).split('|'),c=C(a[0]),k=a[1];if(!c||!PROPS[k])return;mark();setProp(a[0],k,propVal(c,k)+(+a[2])*PROPS[k].step);drawTL();},
   /* キーフレーム（エフェクトページ・インスペクタの◇）。時刻は再生ヘッドの位置 */
   kfTog:function(v){var a=v.split('|'),c=C(a[0]);if(!c)return;mark();toggleKf(c,a[1],S.t.edit);S.kfProp=a[1];changed();},
-  kfToggle:function(){var c=fxClip();if(!c)return;mark();toggleKf(c,S.kfProp||'scale',S.t.edit);changed();},
-  kfEase:function(v){var c=fxClip();if(!c)return;mark();if(!setEase(c,S.kfProp||'scale',S.t.edit,v))return toast('再生ヘッドの位置にキーフレームがありません');changed();},
-  kfClear:function(){var c=fxClip(),p=S.kfProp||'scale';if(!c||!(c.kf&&c.kf[p]))return;mark();clearKf(c,p,S.t.edit);changed();},
-  kfPrev:function(){var c=fxClip();if(!c)return;var L=kfTimes(c,S.kfProp||'scale').filter(function(t){return t<S.t.edit-0.004;});if(!L.length)return;setProg(L[L.length-1]);draw();},
-  kfNext:function(){var c=fxClip();if(!c)return;var L=kfTimes(c,S.kfProp||'scale').filter(function(t){return t>S.t.edit+0.004;});if(!L.length)return;setProg(L[0]);draw();},
+  kfToggle:function(){var c=fxClip();if(!c)return;mark();toggleKf(c,curProp(c),S.t.edit);changed();},
+  kfEase:function(v){var c=fxClip();if(!c)return;mark();if(!setEase(c,curProp(c),S.t.edit,v))return toast('再生ヘッドの位置にキーフレームがありません');changed();},
+  kfClear:function(){var c=fxClip(),p=curProp(c);if(!c||!(c.kf&&c.kf[p]))return;mark();clearKf(c,p,S.t.edit);changed();},
+  kfPrev:function(){var c=fxClip();if(!c)return;var L=kfTimes(c,curProp(c)).filter(function(t){return t<S.t.edit-0.004;});if(!L.length)return;setProg(L[L.length-1]);draw();},
+  kfNext:function(){var c=fxClip();if(!c)return;var L=kfTimes(c,curProp(c)).filter(function(t){return t>S.t.edit+0.004;});if(!L.length)return;setProg(L[0]);draw();},
   kfProp:function(v){S.kfProp=v;draw();},
   fxApply:function(v){S.fx=v;fxApply(fxClip(),v);},
+  trSel:function(){S.trSel=!S.trSel;draw();},trGo:function(v){var c=fxClip();if(c)trackStart(c,v==='back');},trStop:function(){trackCancel();},
+  trFollow:function(){var c=fxClip();if(c)followTrack(c,S.trTarget);},trHide:function(v){var c=fxClip();if(c)hideTrack(c,v);},trClear:function(){trackClear(fxClip());},
   fxPrevCut:function(){fxCut(-1);},fxNextCut:function(){fxCut(1);},
   ccReset:function(v){colorReset(v);},ccLut:function(v){pickLut(v);},ccLutOff:function(v){lutOff(v);},
   mreset:function(v){var c=C(v);if(!c)return;mark();['x','y','scale','rot','op'].forEach(function(k){delete c[k];});delete c.kf;changed();},

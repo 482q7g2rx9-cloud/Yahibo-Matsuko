@@ -14,6 +14,7 @@ import { draw } from './render';
 import { toast } from './menus';
 import { cubesReady, exportLuts } from './colorGL';
 import { hasKf } from '../core/keyframes';
+import { animDur, hasTitleAnim } from './titleAnim';
 
 /* ================================================================
    書き出し（canvas と Web Audio をそのまま録画する。実時間かかる）
@@ -54,12 +55,19 @@ export function deskEnqueue(j,run){var ext=j.n.match(/\.([a-z0-9]+)$/i)[1];
   HOST.export.pick(j.n,ext).then(function(path){if(!path)return;j.out=path;j.n=path.split(/[\\/]/).pop();S.queue.push(j);draw();
     if(!run)return toast('キューに追加しました');if(X&&X.run)toast('いまの書き出しが終わったら始めます');else xStart(j);}).catch(function(e){toast(String(e));});}
 /* テロップを、プレビューと同じ描き方で PNG にする。クレジット（流れる文字）は文字の部分だけ */
-export function titleImages(from,to,W,H){var out=[];setNoPh(true);try{P.clips.forEach(function(c){if(c.type!=='title'||!String(c.label||'').trim()||cEnd(c)<=from||c.start>=to)return;
+/* フレームレートの数（29.97 は 30000/1001。書き出しの Fps と同じ） */
+export function fpsNum(v){var f=parseFloat(v)||30;return Math.abs(f-29.97)<0.01?30000/1001:Math.abs(f-59.94)<0.01?60000/1001:Math.abs(f-23.976)<0.01?24000/1001:f;}
+export function titleImages(from,to,W,H,fps){var out=[];setNoPh(true);try{P.clips.forEach(function(c){if(c.type!=='title'||!String(c.label||'').trim()||cEnd(c)<=from||c.start>=to)return;
     var ti=titleInfo(c),cv=document.createElement('canvas'),scroll=c.st==='credit';cv.width=W;
     if(scroll){var sz={'小':.042,'中':.055,'大':.075}[c.sz||'中']||.055,lh=(c.fsz?Math.max(4,Math.round(H*c.fsz/1080)):Math.round(H*sz))*((c.lh||135)/100),bh=lh*String(c.label||'').split('\n').length;
       cv.height=Math.max(2,Math.ceil(bh));drawTitle(cv.getContext('2d'),W,H,ti,ti.t+ti.d*H/(H+bh));}
     /* 位置・拡大率・回転・不透明度も画像に入れる。キーフレームで動くテロップは動きなしで描き、FFmpeg がフレームごとに動かす */
-    else{cv.height=H;var cc=hasKf(c)?Object.assign({},c,{x:0,y:0,scale:100,rot:0,op:100,kf:null}):c;drawTitleClip(cv.getContext('2d'),W,H,cc,c.start);}
+    else{cv.height=H;var cc=hasKf(c)?Object.assign({},c,{x:0,y:0,scale:100,rot:0,op:100,kf:null}):c,an=hasTitleAnim(c),d=an?animDur(c):[0,0,0];
+      drawTitleClip(cv.getContext('2d'),W,H,cc,c.start+d[0]);
+      /* 登場・退場のアニメーション：動いている間のフレームを 1 枚ずつ画像にする（フレームの位置は書き出しと同じく、クリップの頭・終わりのフレームから数える） */
+      if(an){var f=fpsNum(fps),fs0=Math.round(c.start*f),fe=Math.round(cEnd(c)*f),ni=Math.round(d[0]*f),no=Math.round(d[1]*f),frame=function(tt){var v=document.createElement('canvas');v.width=W;v.height=H;drawTitleClip(v.getContext('2d'),W,H,cc,tt);return v.toDataURL('image/png');};
+        var ai=[],ao=[];for(var i=0;i<ni;i++)ai.push(frame((fs0+i)/f));for(var j=0;j<no;j++)ao.push(frame((fe-no+j)/f));
+        out.push({clip:c.id,png:cv.toDataURL('image/png'),scroll:false,animIn:ai,animOut:ao});return;}}
     out.push({clip:c.id,png:cv.toDataURL('image/png'),scroll:scroll});});}finally{setNoPh(false);}return out;}
 export function deskStart(j){var set=j.set,wh=set.res.split('×'),W=+wh[0]||1920,H=+wh[1]||1080,to=set.to!=null?set.to:progDur();
   var req={id:j.id,out:j.out,project:forDisk(),titles:[],width:W,height:H,fps:String(set.fps),from:set.from||0,to:to,audioOnly:!!set.audio,videoBitrate:Math.round(set.v||8e6),audioBitrate:Math.round(set.a||192e3),audioRate:ps().ar};
@@ -67,7 +75,7 @@ export function deskStart(j){var set=j.set,wh=set.res.split('×'),W=+wh[0]||1920
   /* テロップのフォントを読み込んでから画像にする（読み込む前だと、ほかのフォントで描かれてしまう） */
   /* 色補正の LUT（プレビューと同じもの。読み込んだ LUT は読み終えてから） */
   var inRange=P.clips.filter(function(c){return cEnd(c)>(set.from||0)&&c.start<to;});
-  Promise.all(P.clips.filter(function(c){return c.type==='title';}).map(function(c){return loadFont(c.font,c.weight);}).concat([set.audio?null:cubesReady(inRange)])).then(function(){req.titles=set.audio?[]:titleImages(set.from||0,to,W,H);req.luts=set.audio?[]:exportLuts(inRange);return HOST.export.start(req);}).catch(function(e){j.st='err';j.msg=String(e);X=null;draw();xNext();});}
+  Promise.all(P.clips.filter(function(c){return c.type==='title';}).map(function(c){return loadFont(c.font,c.weight);}).concat([set.audio?null:cubesReady(inRange)])).then(function(){req.titles=set.audio?[]:titleImages(set.from||0,to,W,H,set.fps);req.luts=set.audio?[]:exportLuts(inRange);return HOST.export.start(req);}).catch(function(e){j.st='err';j.msg=String(e);X=null;draw();xNext();});}
 /* 進み具合・結果（"export-job"） */
 export function deskEvent(e){var j=S.queue.filter(function(q){return q.id===e.id;})[0];if(!j)return;var d=e.data||{};
   if(e.state==='progress'){j.p=e.p*100;var f=document.querySelector('[data-q="'+j.id+'"]'),tx=document.querySelector('[data-qt="'+j.id+'"]'),el=(Date.now()-j.t0)/1000;

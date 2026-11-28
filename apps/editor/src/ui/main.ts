@@ -31,6 +31,7 @@ import { init as iTrans } from './transPreview';
 import { init as iScript } from './scriptLink';
 import { init as iUpd } from './updater';
 import { init as iRec } from './recorder';
+import { init as iTrack } from './tracking';
 
 initPanels(); // パネルの幅（最初に描く前に読み込む）
 i0();
@@ -63,4 +64,5 @@ iTrans();
 iScript();
 iUpd();
 iRec();
+iTrack();
 i26();

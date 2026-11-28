@@ -141,6 +141,12 @@ export interface Host {
     /** 音の大きさ（0〜1 のピーク）と、始めてからの秒 */
     onLevel(fn: (e: { l: number; r: number; t: number }) => void): Promise<UnlistenFn>;
   };
+  /** トラッキング（M6）：素材の中の四角を追う。結果は onJob（data.pts：[素材の秒, 中心の横, 縦（割合）]、data.lost） */
+  track: {
+    start(req: { id: string; path: string; at: number; box: number[]; until: number; back: boolean; fps: number; ar: number }): Promise<void>;
+    cancel(id: string): Promise<void>;
+    onJob(fn: (e: { id: string; state: 'progress' | 'done' | 'error'; p: number; data: Record<string, unknown> | null }) => void): Promise<UnlistenFn>;
+  };
   /** 自動更新（M5）。enabled は、更新の署名の公開鍵を埋め込んだビルドか */
   update: {
     info(): Promise<{ enabled: boolean; current: string }>;
@@ -228,6 +234,11 @@ const host: Host = {
     stop: () => invoke('rec_stop'),
     cancel: () => invoke('rec_cancel'),
     onLevel: (fn) => listen<{ l: number; r: number; t: number }>('rec-level', (e) => fn(e.payload)),
+  },
+  track: {
+    start: (req) => invoke('track_start', { req }),
+    cancel: (id) => invoke('track_cancel', { id }),
+    onJob: (fn) => listen('track-job', (e) => fn(e.payload as Parameters<typeof fn>[0])),
   },
   update: {
     info: () => invoke('update_info'),

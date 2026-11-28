@@ -47,6 +47,43 @@ pub fn interp(list: &[Kf], s: f64) -> f64 {
     a.v + (b.v - a.v) * ease(a.e.as_deref(), u)
 }
 
+/// FFmpeg の式：フィルターの時刻 `t` のときの値（素材の秒は t + off）。キーフレームがなければ fixed。
+/// 区間ごとの式を足し合わせる形にして、入れ子を深くしない
+pub fn expr(list: Option<&[Kf]>, fixed: f64, off: f64) -> String {
+    let Some(l) = list.filter(|l| !l.is_empty()) else {
+        return format!("{fixed:.4}");
+    };
+    let s = format!("(t+{off:.6})");
+    let (first, last) = (&l[0], &l[l.len() - 1]);
+    let mut e = format!(
+        "lt({s},{:.6})*{:.4}+gte({s},{:.6})*{:.4}",
+        first.t, first.v, last.t, last.v
+    );
+    for w in l.windows(2) {
+        let (a, b) = (&w[0], &w[1]);
+        let span = b.t - a.t;
+        if span <= 0.0 {
+            continue;
+        }
+        let u = format!("(({s}-{:.6})/{span:.6})", a.t);
+        let f = match a.e.as_deref() {
+            Some("hold") => "0".to_string(),
+            Some("ease") => format!("{u}*{u}*(3-2*{u})"),
+            Some("in") => format!("{u}*{u}"),
+            Some("out") => format!("(1-(1-{u})*(1-{u}))"),
+            _ => u.clone(),
+        };
+        e.push_str(&format!(
+            "+gte({s},{:.6})*lt({s},{:.6})*({:.4}+({:.4})*{f})",
+            a.t,
+            b.t,
+            a.v,
+            b.v - a.v
+        ));
+    }
+    e
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,6 +94,21 @@ mod tests {
             v,
             e: e.map(String::from),
         }
+    }
+
+    /// 式を、同じ計算で確かめる（t と off を入れて、簡単な評価器で計算）
+    #[test]
+    fn expression_shape() {
+        let l = vec![k(1.0, 0.0, Some("ease")), k(2.0, 10.0, None)];
+        let e = expr(Some(&l), 0.0, 0.5);
+        assert!(
+            e.starts_with(
+                "lt((t+0.500000),1.000000)*0.0000+gte((t+0.500000),2.000000)*10.0000+gte("
+            ),
+            "{e}"
+        );
+        assert!(e.contains("*(3-2*"), "{e}");
+        assert_eq!(expr(None, 25.0, 0.0), "25.0000");
     }
 
     /// 画面側（keyframes.test.ts の VECTORS）と同じ値

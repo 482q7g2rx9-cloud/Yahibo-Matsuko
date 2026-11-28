@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use base64::Engine;
-use matsuko_core::export::{Fps, Settings, TitleImage, H264_ENCODERS};
+use matsuko_core::export::{Fps, Seq, Settings, TitleImage, H264_ENCODERS};
 use matsuko_core::model::Project;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -69,6 +69,11 @@ pub struct TitleReq {
     png: String,
     #[serde(default)]
     scroll: bool,
+    /// 登場・退場のアニメーションのフレーム（PNG を base64 にしたもの）
+    #[serde(default)]
+    anim_in: Vec<String>,
+    #[serde(default)]
+    anim_out: Vec<String>,
 }
 
 /// 色補正の LUT（M6）。同じ補正のクリップは 1 つの LUT を使う
@@ -155,16 +160,35 @@ pub async fn export_start(app: AppHandle, req: ExportReq) -> Result<(), String> 
     std::fs::create_dir_all(&work)
         .map_err(|e| format!("作業用のフォルダーを作れませんでした：{e}"))?;
     let mut titles = vec![];
-    for (i, t) in req.titles.iter().enumerate() {
+    let png = |d: &str, path: &std::path::Path| -> Result<(), String> {
         let bytes = base64::engine::general_purpose::STANDARD
-            .decode(t.png.trim_start_matches("data:image/png;base64,"))
+            .decode(d.trim_start_matches("data:image/png;base64,"))
             .map_err(|e| e.to_string())?;
+        std::fs::write(path, bytes).map_err(|e| e.to_string())
+    };
+    for (i, t) in req.titles.iter().enumerate() {
         let path = work.join(format!("title{i:03}.png"));
-        std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+        png(&t.png, &path)?;
+        let seq = |list: &[String], tag: &str| -> Result<Option<Seq>, String> {
+            if list.is_empty() {
+                return Ok(None);
+            }
+            for (j, d) in list.iter().enumerate() {
+                png(d, &work.join(format!("title{i:03}_{tag}_{j:05}.png")))?;
+            }
+            Ok(Some(Seq {
+                pattern: work.join(format!("title{i:03}_{tag}_%05d.png")),
+                count: list.len() as u64,
+            }))
+        };
+        let anim_in = seq(&t.anim_in, "in")?;
+        let anim_out = seq(&t.anim_out, "out")?;
         titles.push(TitleImage {
             clip: t.clip.clone(),
             path,
             scroll: t.scroll,
+            anim_in,
+            anim_out,
         });
     }
     let mut luts = std::collections::HashMap::new();

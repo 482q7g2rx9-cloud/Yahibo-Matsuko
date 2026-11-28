@@ -106,6 +106,16 @@ pub struct TitleImage {
     /// 流れるテロップ（クレジット）なら Some。画像は文字の部分だけ（幅は画面と同じ）で、下から上へ流す。
     /// そうでなければ画面と同じ大きさの透明な画像を重ねるだけ
     pub scroll: bool,
+    /// テロップのアニメーション（M6）：登場・退場で動いている間のフレームの画像（クリップの頭・終わりのフレームから数える）
+    pub anim_in: Option<Seq>,
+    pub anim_out: Option<Seq>,
+}
+
+/// 連番の画像（`pattern` は `%05d` を含むパス）
+#[derive(Debug, Clone)]
+pub struct Seq {
+    pub pattern: PathBuf,
+    pub count: u64,
 }
 
 /// 実行する手順の1つ
@@ -256,6 +266,24 @@ pub fn plan(
             if f > f0 && f < f1 {
                 cuts.push(f);
             }
+        }
+    }
+    // テロップの登場・退場のアニメーションの境目
+    for t in titles {
+        let Some(c) = p.clips.iter().find(|c| c.id == t.clip && visible(c)) else {
+            continue;
+        };
+        let (cs, ce) = (fps.frame(c.start), fps.frame(c.end()));
+        let mut add = |f: u64| {
+            if f > f0 && f < f1 {
+                cuts.push(f);
+            }
+        };
+        if let Some(q) = &t.anim_in {
+            add(cs + q.count);
+        }
+        if let Some(q) = &t.anim_out {
+            add(ce.saturating_sub(q.count));
         }
     }
     // キーフレームで動くクリップは、2 秒（60 フレーム）ごとにも区間を分ける（1 区間のフィルターが大きくなりすぎないように）
@@ -409,25 +437,62 @@ fn segment_args(
             let next = format!("b{k}");
             match c.kind {
                 ClipType::Adj => {
-                    // 調整レイヤー：それより下に重ねたもの全体の色を補正する（画面が作った LUT。プレビューと同じ）。
-                    // eq フィルターは GPL なので（配布する LGPL 版の FFmpeg にはない）、lut3d で行う
-                    let Some(f) = st.luts.get(&c.id) else {
+                    // 調整レイヤー：それより下に重ねたもの全体の色補正・エフェクト（画面が作った LUT。プレビューと同じ）。
+                    // eq フィルターは GPL なので（配布する LGPL 版の FFmpeg にはない）、色は lut3d で行う。
+                    // 範囲（maskW・maskH）があれば、その四角の中だけ。四角の中心は x・y（キーフレームで動く）
+                    let fx = effects(c, st);
+                    if fx.is_empty() {
                         k -= 1;
                         continue;
-                    };
-                    graph.push(format!("[{cur}]{}[{next}]", lut_filter(f)));
+                    }
+                    let (mw, mh) = (c.mask_w.unwrap_or(100.0), c.mask_h.unwrap_or(100.0));
+                    if mw < 100.0 || mh < 100.0 {
+                        let even = |v: f64, max: u32| ((v / 2.0).round() as u32 * 2).clamp(2, max);
+                        let (bw, bh) = (
+                            even(w as f64 * mw / 100.0, w),
+                            even(h as f64 * mh / 100.0, h),
+                        );
+                        let off = c.src_in + ta - c.start;
+                        let ex = crate::keyframes::expr(c.kf_of("x"), c.x.unwrap_or(0.0), off);
+                        let ey = crate::keyframes::expr(c.kf_of("y"), c.y.unwrap_or(0.0), off);
+                        let x = format!("clip({w}/2+({ex})*{w}/100-{bw}/2,0,{})", w - bw);
+                        let y = format!("clip({h}/2+({ey})*{h}/100-{bh}/2,0,{})", h - bh);
+                        graph.push(format!(
+                            "[{cur}]split[m{k}a][m{k}b];[m{k}b]crop=w={bw}:h={bh}:x='{x}':y='{y}'{fx}[m{k}c];[m{k}a][m{k}c]overlay=x='{x}':y='{y}':format=auto[{next}]"
+                        ));
+                    } else {
+                        graph.push(format!("[{cur}]null{fx}[{next}]"));
+                    }
                 }
                 ClipType::Title => {
                     let Some(img) = titles.iter().find(|t| t.clip == c.id) else {
                         k -= 1;
                         continue;
                     };
-                    args.extend(["-loop", "1", "-framerate"].map(s));
-                    args.push(fps.arg());
-                    args.push("-t".into());
-                    args.push(f3(len + 1.0));
-                    args.push("-i".into());
-                    args.push(img.path.to_string_lossy().into_owned());
+                    // 登場・退場のアニメーションの間は、そのフレームの画像を順に使う（区間はその境目で分けてある）
+                    let (fa, cs, ce) = (a, fps.frame(c.start), fps.frame(c.end()));
+                    let seq = match (&img.anim_in, &img.anim_out) {
+                        (Some(q), _) if fa >= cs && fa < cs + q.count => Some((q, fa - cs)),
+                        (_, Some(q)) if fa + q.count >= ce && fa < ce => {
+                            Some((q, fa + q.count - ce))
+                        }
+                        _ => None,
+                    };
+                    if let Some((q, start)) = seq {
+                        args.push("-framerate".into());
+                        args.push(fps.arg());
+                        args.push("-start_number".into());
+                        args.push(start.to_string());
+                        args.push("-i".into());
+                        args.push(q.pattern.to_string_lossy().into_owned());
+                    } else {
+                        args.extend(["-loop", "1", "-framerate"].map(s));
+                        args.push(fps.arg());
+                        args.push("-t".into());
+                        args.push(f3(len + 1.0));
+                        args.push("-i".into());
+                        args.push(img.path.to_string_lossy().into_owned());
+                    }
                     if c.animated() && !img.scroll {
                         // キーフレームのあるテロップ：画面と同じ大きさの画像（動きなしで描いたもの）を、フレームごとに動かす
                         let s0 = c.src_in + (ta - c.start).max(0.0);
@@ -979,6 +1044,8 @@ mod tests {
             clip: "t".into(),
             path: "/tmp/t.png".into(),
             scroll: false,
+            anim_in: None,
+            anim_out: None,
         }];
         let pl = plan(
             &p,
@@ -1373,6 +1440,8 @@ mod tests {
             clip: "t".into(),
             path: PathBuf::from("/w/t.png"),
             scroll: false,
+            anim_in: None,
+            anim_out: None,
         }];
         let pl = plan(
             &p,

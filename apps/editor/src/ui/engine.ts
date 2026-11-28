@@ -13,6 +13,7 @@ import { PREF } from './prefs';
 import { colorOf } from '../core/color';
 import { colorize, fxOf, process, setCubeLoaded } from './colorGL';
 import { valueAt } from '../core/keyframes';
+import { CHAR_KINDS, animAt, blockAnim, boxAlpha, charAnim } from './titleAnim';
 
 /* ================================================================
    再生エンジン：映像トラックを下から重ねて canvas に描き、音声トラックの音を Web Audio に通す。
@@ -78,14 +79,23 @@ export function drawFrame(cx,W,H,t){cx.fillStyle='#000';cx.fillRect(0,0,W,H);
   vTracks().slice().reverse().forEach(function(tr){if(tr.hide)return;var q=pairAt(t,tr.id);if(q)drawPair(cx,W,H,q,t);
     P.clips.forEach(function(c){if(c.tr!==tr.id||t<c.start-1e-9||t>=cEnd(c))return;if(q&&(c===q.a||c===q.b))return;
     if(c.type==='title')drawTitleClip(cx,W,H,c,t);
-    else if(c.type==='adj')adjust(cx,W,H,c);else drawClip(cx,W,H,c,t);});});}
+    else if(c.type==='adj')adjust(cx,W,H,c,t);else drawClip(cx,W,H,c,t);});});}
 /* トランジションの 1 フレーム：前と後ろのクリップを、それぞれ黒の上に描いてから切り替える（書き出しの xfade と同じ） */
 var LAYER={};
 function layer(k,W,H){var c=LAYER[k];if(!c){c=LAYER[k]=document.createElement('canvas');}if(c.width!==W||c.height!==H){c.width=W;c.height=H;}var x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,W,H);return c;}
 export function drawPair(cx,W,H,q,t){var la=layer('a',W,H),lb=layer('b',W,H);drawClip(la.getContext('2d'),W,H,q.a,t);drawClip(lb.getContext('2d'),W,H,q.b,t);
   mixTransition(cx,q.k,la,lb,(t-q.w0)/q.d,W,H);}
 /* 調整レイヤー：それより下に重ねたもの全体に色補正をかける（core/color.ts の LUT。書き出しと同じ） */
-export function adjust(cx,W,H,c){if(c&&E.noFx===c.id)return;var p=colorOf(c||{type:'adj'}),fx=fxOf(c);if(!p&&!fx)return;try{var cz=process(cx.canvas,W,H,W,H,p,fx,H);if(!cz)return;cx.save();cx.setTransform(1,0,0,1,0,0);cx.globalAlpha=1;cx.globalCompositeOperation='copy';cx.drawImage(cz,0,0,W,H);cx.restore();}catch(e){}}
+export function adjust(cx,W,H,c,t){if(c&&E.noFx===c.id)return;var p=colorOf(c||{type:'adj'}),fx=fxOf(c);if(!p&&!fx)return;if(t==null)t=S.t.edit;
+  var mw=c&&c.maskW!=null?c.maskW:100,mh=c&&c.maskH!=null?c.maskH:100;
+  try{
+    /* 範囲（maskW・maskH）：その四角だけを切り出して掛け、元の場所に戻す（書き出しの crop・overlay と同じ） */
+    if(mw<100||mh<100){var bw=Math.max(2,Math.min(W,Math.round(W*mw/100/2)*2)),bh=Math.max(2,Math.min(H,Math.round(H*mh/100/2)*2)),
+        x0=Math.max(0,Math.min(W-bw,W/2+valueAt(c,'x',t)*W/100-bw/2)),y0=Math.max(0,Math.min(H-bh,H/2+valueAt(c,'y',t)*H/100-bh/2));
+      var tmp=adjust.m||(adjust.m=document.createElement('canvas'));if(tmp.width!==bw||tmp.height!==bh){tmp.width=bw;tmp.height=bh;}
+      tmp.getContext('2d').drawImage(cx.canvas,Math.round(x0),Math.round(y0),bw,bh,0,0,bw,bh);
+      var cm=process(tmp,bw,bh,bw,bh,p,fx,H);if(!cm)return;cx.save();cx.setTransform(1,0,0,1,0,0);cx.globalAlpha=1;cx.drawImage(cm,Math.round(x0),Math.round(y0),bw,bh);cx.restore();return;}
+    var cz=process(cx.canvas,W,H,W,H,p,fx,H);if(!cz)return;cx.save();cx.setTransform(1,0,0,1,0,0);cx.globalAlpha=1;cx.globalCompositeOperation='copy';cx.drawImage(cz,0,0,W,H);cx.restore();}catch(e){}}
 /* t：タイムラインの時刻（キーフレームの値に使う）。E.noFx：エフェクトページの「適用前」で、そのクリップの色補正・エフェクトを外して見せる */
 export function drawClip(cx,W,H,c,t){if(t==null)t=S.t.edit;var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='映像'&&m.k!=='画像')return;
   if(m.url&&!m.loading){if(m.k==='画像'){src=imgFor(m);if(src.complete){w=src.naturalWidth;hh=src.naturalHeight;}}else{src=E.els[c.id]||elFor(c,m,false);if(src.readyState>=2){w=src.videoWidth;hh=src.videoHeight;}if(E.playing){var st=E.stats,lt=c.in+(S.t.edit-c.start);st.vframes++;if(!w){st.blank++;if(st.at.length<40)st.at.push('blank@'+S.t.edit.toFixed(2));}else if(src.paused||src.seeking)st.stale++;else if(Math.abs(src.currentTime-lt)>0.15){st.late++;if(st.at.length<40)st.at.push('late@'+S.t.edit.toFixed(2)+'('+(src.currentTime-lt).toFixed(2)+')');}}}}
@@ -114,7 +124,7 @@ export var TST;
 export function titleInfo(c){return {label:c.label,st:c.st,sz:c.sz,fsz:c.fsz,look:c.look,font:c.font,weight:c.weight,lh:c.lh,ls:c.ls,align:c.align,t:c.start-c.in,d:Math.max(0.1,c.out)};}
 export function drawTitleClip(cx,W,H,c,t){var T0=t==null?S.t.edit:t,sc=Math.max(0,valueAt(c,'scale',T0))/100,op=Math.max(0,Math.min(1,valueAt(c,'op',T0)/100));
   cx.save();cx.globalAlpha*=op;cx.translate(W/2+valueAt(c,'x',T0)/100*W,H/2+valueAt(c,'y',T0)/100*H);cx.rotate(valueAt(c,'rot',T0)*Math.PI/180);if(sc<=0){cx.restore();return;}cx.scale(sc,sc);cx.translate(-W/2,-H/2);
-  drawTitle(cx,W,H,titleInfo(c),t);cx.restore();}
+  var ti=titleInfo(c);ti.anim=animAt(c,T0);drawTitle(cx,W,H,ti,t);cx.restore();}
 /* 文字の大きさ：fsz（1080p の画面での px）。なければ前の「小・中・大」 */
 /* 文字が空のテロップは、画面だけ薄く「テキストを入力」と出す（書き出しには出さない） */
 export var NOPH=false;
@@ -127,17 +137,29 @@ export function drawTitle(cx,W,H,ti,t){if(!String(ti.label||'').trim()){if(NOPH|
   var al=ti.align||'',ax=function(def){return al==='center'?W/2:al==='right'?W*.94:al==='left'?W*.06:def;};
   var lk=ti.look; /* テロップのスタイル（titleStyles.ts）。あれば文字をそのスタイルで描く */
   var tw=Math.max.apply(null,lines.map(function(l){return cx.measureText(l).width;}).concat([0])),bh=lh*lines.length;
-  function outl(l,x,y){if(lk)return drawLookText(cx,l,x,y,fs,lk);cx.lineWidth=fs*.18;cx.strokeStyle='rgba(0,0,0,.85)';cx.strokeText(l,x,y);cx.fillStyle='#fff';cx.fillText(l,x,y);}
-  function plain(l,x,y){if(lk)drawLookText(cx,l,x,y,fs,lk);else cx.fillText(l,x,y);}
-  if(ti.st==='q'){cx.textAlign='left';cx.fillStyle='rgba(255,210,60,.92)';cx.fillRect(W*.06,H*.07,tw+pad*2,bh+pad*.8);cx.fillStyle='#1a1400';lines.forEach(function(l,i){plain(l,W*.06+pad,H*.07+pad*.4+lh*(i+.5));});}
-  else if(ti.st==='sub'){cx.textAlign='center';var y0=H*.92-bh;cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect((W-tw)/2-pad,y0-pad*.4,tw+pad*2,bh+pad*.8);cx.fillStyle='#fff';lines.forEach(function(l,i){plain(l,W/2,y0+lh*(i+.5));});}
+  /* アニメーション（titleAnim.ts）：まとまりの動きは文字の範囲で、1 文字ずつのときは文字ごとに描く */
+  var an=ti.anim,chars=an&&CHAR_KINDS[an.k],N=chars?lines.reduce(function(a,l){return a+Array.from(l).length;},0):0,g=0;
+  function each(l,x,y,draw){if(!chars)return draw(l,x,y);var al0=cx.textAlign,wl=cx.measureText(l).width,x0=al0==='center'?x-wl/2:al0==='right'||al0==='end'?x-wl:x,cs=Array.from(l),pre='';cx.textAlign='left';
+    cs.forEach(function(ch){var st=charAnim(an,g++,N);if(st.a>0){cx.save();cx.globalAlpha*=st.a;draw(ch,x0+cx.measureText(pre).width,y+st.dy*fs);cx.restore();}pre+=ch;});cx.textAlign=al0;}
+  function outl0(l,x,y){if(lk)return drawLookText(cx,l,x,y,fs,lk);cx.lineWidth=fs*.18;cx.strokeStyle='rgba(0,0,0,.85)';cx.strokeText(l,x,y);cx.fillStyle='#fff';cx.fillText(l,x,y);}
+  function plain0(l,x,y){if(lk)drawLookText(cx,l,x,y,fs,lk);else cx.fillText(l,x,y);}
+  function outl(l,x,y){each(l,x,y,outl0);}
+  function plain(l,x,y){var fsty=cx.fillStyle;each(l,x,y,function(a,b,c2){cx.fillStyle=fsty;plain0(a,b,c2);});}
+  /* 文字の範囲（まとまりの動きの中心・ワイプの範囲） */
+  function blk(x,al0,y){var x0=al0==='center'?x-tw/2:al0==='right'?x-tw:x;return [x0,y,tw,bh];}
+  cx.save();
+  if(ti.st==='q'){var rq=[W*.06,H*.07,tw+pad*2,bh+pad*.8];blockAnim(cx,an,rq,W,H);cx.textAlign='left';cx.save();cx.globalAlpha*=boxAlpha(an);cx.fillStyle='rgba(255,210,60,.92)';cx.fillRect(rq[0],rq[1],rq[2],rq[3]);cx.restore();cx.fillStyle='#1a1400';lines.forEach(function(l,i){plain(l,W*.06+pad,H*.07+pad*.4+lh*(i+.5));});}
+  else if(ti.st==='sub'){var y0=H*.92-bh,rs=[(W-tw)/2-pad,y0-pad*.4,tw+pad*2,bh+pad*.8];blockAnim(cx,an,rs,W,H);cx.textAlign='center';cx.save();cx.globalAlpha*=boxAlpha(an);cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(rs[0],rs[1],rs[2],rs[3]);cx.restore();cx.fillStyle='#fff';lines.forEach(function(l,i){plain(l,W/2,y0+lh*(i+.5));});}
   else if(ti.st==='credit'){cx.textAlign=al||'center';var pr=Math.max(0,Math.min(1,(t-ti.t)/ti.d)),y=H-(H+bh)*pr;lines.forEach(function(l,i){outl(l,ax(W/2),y+lh*(i+.5));});}
   /* center：画面の真ん中（新しく置くテロップ） */
-  else if(ti.st==='center'){cx.textAlign=al||'center';var yc=H/2-bh/2;lines.forEach(function(l,i){outl(l,ax(W/2),yc+lh*(i+.5));});}
-  else{cx.textAlign=al||'left';var yb=H*.9-bh;lines.forEach(function(l,i){outl(l,ax(W*.06),yb+lh*(i+.5));});}}
+  else if(ti.st==='center'){var alc=al||'center',yc=H/2-bh/2;blockAnim(cx,an,blk(ax(W/2),alc,yc),W,H);cx.textAlign=alc;lines.forEach(function(l,i){outl(l,ax(W/2),yc+lh*(i+.5));});}
+  else{var aln=al||'left',yb=H*.9-bh;blockAnim(cx,an,blk(ax(W*.06),aln,yb),W,H);cx.textAlign=aln;lines.forEach(function(l,i){outl(l,ax(W*.06),yb+lh*(i+.5));});}
+  cx.restore();}
 /* 止まっているときだけ描き直す（再生中は毎フレーム描くので、素材の読み込みのたびに描くと重くなる） */
 export function idleRedraw(){if(!E.playing)redrawProg();}
-export function redrawProg(){if(X&&X.run&&!X.desk)return;[].forEach.call(document.querySelectorAll('canvas[data-prog]'),function(c){drawFrame(c.getContext('2d'),c.width,c.height,S.t.edit);});}
+/* AFTER：描いたあとに呼ぶもの（エフェクトページのトラッキングの四角など） */
+export var AFTER=[];
+export function redrawProg(){if(X&&X.run&&!X.desk)return;[].forEach.call(document.querySelectorAll('canvas[data-prog]'),function(c){drawFrame(c.getContext('2d'),c.width,c.height,S.t.edit);});AFTER.forEach(function(f){try{f();}catch(e){}});}
 export function clampProg(){var d=progDur();S.t.edit=Math.max(0,Math.min(d,S.t.edit));if(P.pout!=null&&P.pout>d)P.pout=d;if(P.pin!=null&&P.pin>=(P.pout!=null?P.pout:d))P.pin=null;}
 export function setProg(t){S.t.edit=Math.max(0,Math.min(progDur(),t));heads();if(!E.playing){sync(S.t.edit,false);redrawProg();}}
 export function heads(follow){var t=S.t.edit,d=progDur()||1,pps=S.pps||10;

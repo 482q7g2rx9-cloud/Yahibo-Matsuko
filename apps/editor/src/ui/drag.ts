@@ -126,6 +126,8 @@ document.addEventListener('change',function(e){var k=e.target.dataset&&e.target.
   else if(k==='mbin'){moveToBin(e.target.dataset.mid,e.target.value);}
   else if(k==='ebin'){S.ebin=e.target.value;saveAview();draw();}
   else if(k==='binname'){renameBin(e.target.dataset.bid,e.target.value);}
+  else if(k==='tanimK'||k==='tanimD'){var ta=selTitle();if(ta){mark();var key=e.target.dataset.key,o=ta[key]||{};if(k==='tanimK'){o.k=e.target.value;if(!o.d)o.d=0.6;}else o.d=Math.max(0.1,Math.min(5,parseFloat(e.target.value)||0.6));if(o.k)ta[key]=o;else delete ta[key];changed();}}
+  else if(k==='trTarget'){S.trTarget=e.target.value;}
   else if(k==='kfProp'){S.kfProp=e.target.value;draw();}
   else if(k==='recDev'){RC.dev=e.target.value;}
   else if(k==='ccPreset'){if(e.target.value)colorPreset(e.target.dataset.cid,e.target.value);}

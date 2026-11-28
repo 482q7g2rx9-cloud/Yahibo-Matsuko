@@ -185,6 +185,11 @@ pub struct Clip {
     pub fx_mosaic: Option<f64>,
     #[serde(rename = "fxVig", skip_serializing_if = "Option::is_none")]
     pub fx_vig: Option<f64>,
+    /// 調整レイヤーの範囲（M6）：画面の幅・高さに対する %（どちらも 100 か、なければ画面全体）。中心は x・y
+    #[serde(rename = "maskW", skip_serializing_if = "Option::is_none")]
+    pub mask_w: Option<f64>,
+    #[serde(rename = "maskH", skip_serializing_if = "Option::is_none")]
+    pub mask_h: Option<f64>,
 }
 
 impl Clip {

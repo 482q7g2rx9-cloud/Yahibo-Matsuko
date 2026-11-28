@@ -237,11 +237,15 @@ fn fixture(ffmpeg: &Path, name: &str) -> Fixture {
             clip: "t1".into(),
             path: dir.join("title.png"),
             scroll: false,
+            anim_in: None,
+            anim_out: None,
         },
         TitleImage {
             clip: "cr".into(),
             path: dir.join("credit.png"),
             scroll: true,
+            anim_in: None,
+            anim_out: None,
         },
     ];
     Fixture {
@@ -493,6 +497,8 @@ fn eight_minutes_faster_than_realtime() {
             clip: format!("t{t}"),
             path: work.join("t.png"),
             scroll: false,
+            anim_in: None,
+            anim_out: None,
         });
     }
     clips.push(Clip {
@@ -797,5 +803,297 @@ fn keyframes_and_effects() {
     assert!((a + 25.0).abs() < 3.0, "0 秒は -25% のはず：{a}");
     assert!(b.abs() < 3.0, "1 秒は 0% のはず：{b}");
     assert!((e - 25.0).abs() < 3.0, "2.5 秒は +25% のはず：{e}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// テロップの登場のアニメーション（M6）：最初のフレームは連番の画像、そのあとは止まった画像
+#[test]
+fn title_animation_frames() {
+    use matsuko_core::export::Seq;
+    let Some(ffmpeg) = tool("ffmpeg") else { return };
+    let dir = std::env::temp_dir().join(format!("matsuko-export-{}-tanim", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let mk = |c: &str, f: &str| {
+        ff(
+            &ffmpeg,
+            &[
+                "-f",
+                "lavfi",
+                "-i",
+                &format!("color=c={c}:s=640x360"),
+                "-frames:v",
+                "1",
+                &dir.join(f).to_string_lossy(),
+            ],
+        );
+    };
+    mk("red", "t_in_00000.png");
+    mk("lime", "t_in_00001.png");
+    mk("blue", "t_in_00002.png");
+    mk("white", "t.png");
+    let project = Project {
+        v: 2,
+        tracks: vec![Track {
+            id: "V1".into(),
+            kind: TrackKind::Video,
+            h: 40.0,
+            ..Default::default()
+        }],
+        clips: vec![Clip {
+            id: "t".into(),
+            tr: "V1".into(),
+            kind: ClipType::Title,
+            start: 0.0,
+            src_in: 0.0,
+            src_out: 1.0,
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let titles = vec![TitleImage {
+        clip: "t".into(),
+        path: dir.join("t.png"),
+        scroll: false,
+        anim_in: Some(Seq {
+            pattern: dir.join("t_in_%05d.png"),
+            count: 3,
+        }),
+        anim_out: None,
+    }];
+    let out = dir.join("t.mp4");
+    let encs: Vec<String> = ["libopenh264", "libx264"].map(String::from).to_vec();
+    export(
+        &ffmpeg,
+        &project,
+        &titles,
+        &settings(0.0, 1.0),
+        &dir.join("w"),
+        &out,
+        &encs,
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
+    let px = |n: u32| -> [u8; 3] {
+        let o = Command::new(&ffmpeg)
+            .args(["-v", "error", "-i"])
+            .arg(&out)
+            .args([
+                "-vf",
+                &format!("select=eq(n\\,{n}),crop=8:8:316:176,scale=1:1"),
+                "-frames:v",
+                "1",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgb24",
+                "-",
+            ])
+            .output()
+            .unwrap();
+        [o.stdout[0], o.stdout[1], o.stdout[2]]
+    };
+    let near = |a: [u8; 3], b: [u8; 3]| {
+        a.iter()
+            .zip(b)
+            .all(|(x, y)| (*x as i32 - y as i32).abs() <= 24)
+    };
+    assert!(near(px(0), [255, 0, 0]), "{:?}", px(0));
+    assert!(near(px(1), [0, 255, 0]), "{:?}", px(1));
+    assert!(near(px(2), [0, 0, 255]), "{:?}", px(2));
+    assert!(near(px(10), [255, 255, 255]), "{:?}", px(10));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// 範囲のある調整レイヤー（M6）：四角の中だけモザイク。四角はキーフレームで動く
+#[test]
+fn masked_adjustment_follows_keyframes() {
+    use matsuko_core::keyframes::Kf;
+    let Some(ffmpeg) = tool("ffmpeg") else { return };
+    let dir = std::env::temp_dir().join(format!("matsuko-export-{}-mask", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let img = dir.join("checker.png");
+    ff(&ffmpeg, &["-f", "lavfi", "-i", "nullsrc=s=640x360,geq=lum='if(mod(floor(X/2)+floor(Y/2)\\,2)\\,255\\,0)':cb=128:cr=128", "-frames:v", "1", &img.to_string_lossy()]);
+    let mut kf = std::collections::BTreeMap::new();
+    kf.insert(
+        "x".to_string(),
+        vec![
+            Kf {
+                t: 0.0,
+                v: -30.0,
+                e: None,
+            },
+            Kf {
+                t: 2.0,
+                v: 30.0,
+                e: None,
+            },
+        ],
+    );
+    let tr = |id: &str| Track {
+        id: id.into(),
+        kind: TrackKind::Video,
+        h: 40.0,
+        ..Default::default()
+    };
+    let project = Project {
+        v: 2,
+        media: vec![Media {
+            id: "m".into(),
+            n: "m".into(),
+            k: "画像".into(),
+            file: 1,
+            path: Some(img.to_string_lossy().into_owned()),
+            ..Default::default()
+        }],
+        tracks: vec![tr("V2"), tr("V1")],
+        clips: vec![
+            Clip {
+                id: "c".into(),
+                tr: "V1".into(),
+                kind: ClipType::Media,
+                m: Some("m".into()),
+                start: 0.0,
+                src_in: 0.0,
+                src_out: 2.0,
+                ..Default::default()
+            },
+            Clip {
+                id: "a".into(),
+                tr: "V2".into(),
+                kind: ClipType::Adj,
+                start: 0.0,
+                src_in: 0.0,
+                src_out: 2.0,
+                fx_mosaic: Some(40.0),
+                mask_w: Some(20.0),
+                mask_h: Some(30.0),
+                kf: Some(kf),
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let out = dir.join("mask.mp4");
+    let encs: Vec<String> = ["libopenh264", "libx264"].map(String::from).to_vec();
+    export(
+        &ffmpeg,
+        &project,
+        &[],
+        &settings(0.0, 2.0),
+        &dir.join("w"),
+        &out,
+        &encs,
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
+    // 16×16 の部分の明るさのばらつき（モザイクなら小さい、市松模様なら大きい）
+    let spread = |t: &str, x: u32| -> f64 {
+        let o = Command::new(&ffmpeg)
+            .args(["-v", "error", "-ss", t, "-i"])
+            .arg(&out)
+            .args([
+                "-frames:v",
+                "1",
+                "-vf",
+                &format!("crop=16:16:{}:172", x - 8),
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "gray",
+                "-",
+            ])
+            .output()
+            .unwrap();
+        let v: Vec<f64> = o.stdout.iter().map(|x| *x as f64).collect();
+        let m = v.iter().sum::<f64>() / v.len() as f64;
+        (v.iter().map(|x| (x - m) * (x - m)).sum::<f64>() / v.len() as f64).sqrt()
+    };
+    // 0 秒：四角の中心は 640×(0.5-0.3)=128。1.9 秒：640×(0.5+0.27)≈493
+    assert!(
+        spread("0", 128) < 30.0,
+        "0 秒の左はモザイク：{}",
+        spread("0", 128)
+    );
+    assert!(
+        spread("0", 500) > 60.0,
+        "0 秒の右は元のまま：{}",
+        spread("0", 500)
+    );
+    assert!(
+        spread("1.9", 493) < 30.0,
+        "1.9 秒の右はモザイク：{}",
+        spread("1.9", 493)
+    );
+    assert!(
+        spread("1.9", 128) > 60.0,
+        "1.9 秒の左は元のまま：{}",
+        spread("1.9", 128)
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// トラッキング（M6）：実際の動画（模様が右下へ動く）を、デスクトップ版と同じ形（幅 480 のグレー）で読んで追う
+#[test]
+fn tracks_a_real_video() {
+    let Some(ffmpeg) = tool("ffmpeg") else { return };
+    let dir = std::env::temp_dir().join(format!("matsuko-track-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let v = dir.join("mv.mp4");
+    ff(
+        &ffmpeg,
+        &[
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=0x406080:s=1280x720:r=30:d=2",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc=s=120x120:r=30:d=2",
+            "-filter_complex",
+            "[0][1]overlay=x='200+200*t':y='300+50*t'",
+            "-pix_fmt",
+            "yuv420p",
+            &v.to_string_lossy(),
+        ],
+    );
+    let o = Command::new(&ffmpeg)
+        .args(["-v", "error", "-i"])
+        .arg(&v)
+        .args([
+            "-an",
+            "-vf",
+            "fps=30,scale=480:270:flags=area,format=gray",
+            "-f",
+            "rawvideo",
+            "-",
+        ])
+        .output()
+        .unwrap();
+    let frames: Vec<Vec<u8>> = o.stdout.chunks(480 * 270).map(|c| c.to_vec()).collect();
+    assert_eq!(frames.len(), 60);
+    // 1280 → 480 で 0.375 倍。最初の四角は (200, 300) から 120×120
+    let k = 0.375;
+    let pts = matsuko_core::track::track(
+        &frames,
+        480,
+        270,
+        (200.0 * k, 300.0 * k, 120.0 * k, 120.0 * k),
+        |_| true,
+    );
+    assert_eq!(pts.len(), 60);
+    for (i, p) in pts.iter().enumerate() {
+        let t = i as f64 / 30.0;
+        let want = ((260.0 + 200.0 * t) * k, (360.0 + 50.0 * t) * k);
+        assert!(
+            (p.0 - want.0).abs() < 1.5 && (p.1 - want.1).abs() < 1.5,
+            "{i}: {p:?} / {want:?}"
+        );
+    }
     let _ = std::fs::remove_dir_all(&dir);
 }

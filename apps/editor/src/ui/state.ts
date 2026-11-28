@@ -12,7 +12,7 @@ export function init(){
 S={page:'edit',theme:'system',accent:'blue',
   bin:'all',mq:'',mtype:'',msort:'name',mview:'list',media:'v03',
   ctab:'board',cflt:'all',scene:'s3',src:'v03',
-  etab:'assets',sel:['c3','c3a'],pps:null,snap:true,clipboard:null,tlx:0,tly:0,tool:'select',open:{clip:1,motion:1,audio:1,video:1,comp:1,track:1,color:1,trans:1,script:1,fxmotion:1,fxblur:1,fxvig:1,tin:1},
+  etab:'assets',sel:['c3','c3a'],pps:null,snap:true,clipboard:null,tlx:0,tly:0,tool:'select',open:{clip:1,motion:1,audio:1,video:1,comp:1,track:1,color:1,trans:1,script:1,fxmotion:1,fxblur:1,fxvig:1,tin:1,tanim:1,track:1,mask:1},
   fx:'オブジェクトトラッキング',fxClosed:{},ba:'after',kfMode:'リニア',
   rmode:'sync',line:1,take:1,tsel:1,mute:{},solo:{},countin:true,
   preset:0,x:null,queue:[],xplay:null,sil:{thr:'-35 dB',min:'0.5 秒'},
