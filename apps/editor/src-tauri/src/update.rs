@@ -17,10 +17,15 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 /// ビルドのときに埋め込んだ、更新の署名の公開鍵（ないときは空）
-pub const PUBKEY: &str = match option_env!("MATSUKO_UPDATER_PUBKEY") {
+const PUBKEY_RAW: &str = match option_env!("MATSUKO_UPDATER_PUBKEY") {
     Some(k) => k,
     None => "",
 };
+
+/// 公開鍵（前後の空白・改行を除いたもの）
+pub fn pubkey() -> &'static str {
+    PUBKEY_RAW.trim()
+}
 
 #[derive(Default)]
 pub struct Updates(Mutex<Option<Update>>);
@@ -44,7 +49,7 @@ pub struct Available {
 #[tauri::command]
 pub fn update_info(app: AppHandle) -> UpdateInfo {
     UpdateInfo {
-        enabled: !PUBKEY.is_empty(),
+        enabled: !pubkey().is_empty(),
         current: app.package_info().version.to_string(),
     }
 }
@@ -52,10 +57,10 @@ pub fn update_info(app: AppHandle) -> UpdateInfo {
 /// 新しい版があるか調べる（なければ None）
 #[tauri::command]
 pub async fn update_check(app: AppHandle) -> Result<Option<Available>, String> {
-    if PUBKEY.is_empty() {
+    if pubkey().is_empty() {
         return Err("このビルドでは更新を確認できません".into());
     }
-    let mut b = app.updater_builder().pubkey(PUBKEY);
+    let mut b = app.updater_builder().pubkey(pubkey());
     // 試験用：MATSUKO_UPDATE_URL で、確認する latest.json の場所を変えられる
     if let Some(url) = std::env::var("MATSUKO_UPDATE_URL")
         .ok()

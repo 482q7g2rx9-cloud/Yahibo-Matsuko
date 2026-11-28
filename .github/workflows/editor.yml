@@ -187,6 +187,9 @@ jobs:
             const ref = process.env.GITHUB_REF || "";
             if (ref.startsWith("refs/tags/v")) o.version = ref.slice("refs/tags/v".length);
             if (process.env.S_UPD_KEY) o.bundle = { createUpdaterArtifacts: true };
+            // 更新のファイルを作ったあと、Tauri が公開鍵で署名を確かめるので、設定にも公開鍵を入れる
+            const pub = (process.env.MATSUKO_UPDATER_PUBKEY || "").trim();
+            if (pub) o.plugins = { updater: { pubkey: pub } };
             if (process.env.WIN_THUMBPRINT) {
               o.bundle = o.bundle || {};
               o.bundle.windows = { certificateThumbprint: process.env.WIN_THUMBPRINT, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" };

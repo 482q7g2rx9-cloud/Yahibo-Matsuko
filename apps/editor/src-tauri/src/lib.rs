@@ -31,7 +31,7 @@ pub fn run() {
         .plugin(update::log_plugin())
         .plugin(
             tauri_plugin_updater::Builder::new()
-                .pubkey(update::PUBKEY)
+                .pubkey(update::pubkey())
                 .build(),
         )
         .manage(update::Updates::default())
