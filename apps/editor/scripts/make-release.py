@@ -6,7 +6,7 @@
 
 - 名前の空白は「-」にする（GitHub は空白を「.」に変えるため、latest.json の URL と合わなくなる）
 - 2 つの Mac（Apple シリコン・Intel）の更新ファイルは同じ名前なので、名前にアーキテクチャを足す
-- リリースノートは docs/release-notes/<TAG>.md があればそれ。更新の画面にも出る
+- リリースノートは docs/release-notes/<TAG>.md があればそれ（1 行目の「# 」は題名）。更新の画面にも出る
 """
 import json
 import os
@@ -59,8 +59,15 @@ for art in sorted(os.listdir(src)):
 
 notes_file = os.path.join("docs", "release-notes", tag + ".md")
 notes = open(notes_file, encoding="utf-8").read().strip() if os.path.exists(notes_file) else ""
+# 1 行目が「# 」で始まれば、リリースの題名にする（残りが説明）
+title = "Matsuko Editor " + ver
+if notes.startswith("# "):
+    first, _, rest = notes.partition("\n")
+    title, notes = first[2:].strip(), rest.strip()
 with open(notes_out, "w", encoding="utf-8") as f:
-    f.write(notes or ("Matsuko Editor " + ver))
+    f.write(notes or title)
+with open(notes_out + ".title", "w", encoding="utf-8") as f:
+    f.write(title)
 
 if platforms:
     latest = {

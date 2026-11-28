@@ -254,4 +254,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" out/* --repo "${{ github.repository }}" --title "Matsuko Editor ${TAG#v}" --notes-file notes.md --verify-tag
+          gh release create "$TAG" out/* --repo "${{ github.repository }}" --title "$(cat notes.md.title)" --notes-file notes.md --verify-tag

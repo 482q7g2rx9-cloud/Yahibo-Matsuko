@@ -48,7 +48,7 @@ npx tauri signer generate -w ~/.tauri/matsuko-editor.key
 ## 4. リリースを作る
 
 1. `apps/editor/src-tauri/tauri.conf.json` の `version` を次の版にする（タグと合わせておくと分かりやすい）。
-2. 更新の画面に出す説明を `docs/release-notes/v0.2.0.md` に書く（なくてもよい）。
+2. 更新の画面に出す説明を `docs/release-notes/v0.2.0.md` に書く（なくてもよい。1 行目を「# 題名」にすると、リリースの題名になる）。
 3. コミットして push し、タグを付けて push する。
 
 ```bash
