@@ -1,6 +1,6 @@
 # Matsuko Editor（デスクトップ版）のテストとビルド
 # Windows → macOS → Linux の順で優先（docs/tauri-plan.md）。
-# M5：v で始まるタグ（例 v0.2.0）を push すると、その版でビルドして GitHub の Releases に置く（自動更新の latest.json も）。
+# M5：v で始まるタグ（例 v0.2.0）を push するか、手動の実行で release にタグを入れると、その版でビルドして GitHub の Releases に置く（自動更新の latest.json も。手動のときはタグもここで作る）。
 # 署名・公証・更新の署名は、リポジトリの Secrets / Variables があるときだけ行う（docs/release.md）。
 name: editor
 
@@ -17,6 +17,11 @@ on:
       - "Cargo.lock"
       - ".github/workflows/editor.yml"
   workflow_dispatch:
+    inputs:
+      release:
+        description: "リリースする版のタグ（例 v0.2.0）。空ならリリースしない"
+        required: false
+        default: ""
 
 concurrency:
   group: editor-${{ github.ref }}
@@ -120,6 +125,8 @@ jobs:
       S_APPLE_ID: ${{ secrets.APPLE_ID }}
       S_APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
       S_APPLE_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+      # 手動の実行でリリースするときの版（タグ）
+      RELEASE_TAG: ${{ github.event.inputs.release }}
     steps:
       - uses: actions/checkout@v4
 
@@ -184,8 +191,9 @@ jobs:
         run: |
           node -e '
             const o = {};
-            const ref = process.env.GITHUB_REF || "";
-            if (ref.startsWith("refs/tags/v")) o.version = ref.slice("refs/tags/v".length);
+            const ref = process.env.GITHUB_REF || "", rel = process.env.RELEASE_TAG || "";
+            if (rel.startsWith("v")) o.version = rel.slice(1);
+            else if (ref.startsWith("refs/tags/v")) o.version = ref.slice("refs/tags/v".length);
             if (process.env.S_UPD_KEY) o.bundle = { createUpdaterArtifacts: true };
             // 更新のファイルを作ったあと、Tauri が公開鍵で署名を確かめるので、設定にも公開鍵を入れる
             const pub = (process.env.MATSUKO_UPDATER_PUBKEY || "").trim();
@@ -234,7 +242,7 @@ jobs:
   # v で始まるタグのときだけ：インストーラーと自動更新の latest.json を Releases に置く
   release:
     name: リリースを作る
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.event.inputs.release, 'v')
     needs: [build]
     runs-on: ubuntu-22.04
     permissions:
@@ -246,12 +254,13 @@ jobs:
           path: dist
       - name: ファイルを集め、latest.json を作る
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ github.event.inputs.release || github.ref_name }}
           REPO: ${{ github.repository }}
         run: python3 apps/editor/scripts/make-release.py dist out notes.md
       - name: Releases に置く
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ github.event.inputs.release || github.ref_name }}
         run: |
-          gh release create "$TAG" out/* --repo "${{ github.repository }}" --title "$(cat notes.md.title)" --notes-file notes.md --verify-tag
+          # 手動の実行のときは、ビルドしたコミットにタグを付けて作る（タグの push のときは、そのタグを使う）
+          gh release create "$TAG" out/* --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "$(cat notes.md.title)" --notes-file notes.md

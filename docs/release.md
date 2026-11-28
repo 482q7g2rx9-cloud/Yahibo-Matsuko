@@ -59,6 +59,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
+   タグを push できないとき（GitHub の画面から出すとき）は、Actions →「editor」→「Run workflow」で、ブランチを選び、release に `v0.2.0` のように入れて実行する。ビルドしたコミットにタグを付けて、リリースを作る。
 4. Actions の「editor」が終わると、Releases に次が置かれる：Windows の setup.exe、Mac の dmg（Apple シリコン・Intel）、Linux の deb・AppImage、更新用のファイル（.app.tar.gz・.sig）と `latest.json`。
 5. 配ったアプリは、起動して少したつと新しい版に気づき、「ヘルプ → 更新を確認…」から入れ直せる。
 
