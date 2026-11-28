@@ -118,6 +118,12 @@ export interface Clip {
   ccGam?: number;
   ccLut?: { name: string; path?: string } | null;
   ccLutAmt?: number;
+  /** キーフレーム（M6。core/keyframes.ts）：x・y・scale・rot・op ごとの列（時刻は素材の秒） */
+  kf?: import('./keyframes').KfMap | null;
+  /** エフェクト（M6）：ぼかし（1080p の画面での px）、モザイクの大きさ（同）、周辺を暗く（0〜100） */
+  fxBlur?: number;
+  fxMosaic?: number;
+  fxVig?: number;
 }
 
 /** プロジェクト設定（プロジェクト → プロジェクト設定…）。足りない項目は初期値（1920×1080・29.97 fps・標準・720p・48 kHz） */

@@ -13,6 +13,7 @@ import { stopAll } from './source';
 import { draw } from './render';
 import { toast } from './menus';
 import { cubesReady, exportLuts } from './colorGL';
+import { hasKf } from '../core/keyframes';
 
 /* ================================================================
    書き出し（canvas と Web Audio をそのまま録画する。実時間かかる）
@@ -57,7 +58,8 @@ export function titleImages(from,to,W,H){var out=[];setNoPh(true);try{P.clips.fo
     var ti=titleInfo(c),cv=document.createElement('canvas'),scroll=c.st==='credit';cv.width=W;
     if(scroll){var sz={'小':.042,'中':.055,'大':.075}[c.sz||'中']||.055,lh=(c.fsz?Math.max(4,Math.round(H*c.fsz/1080)):Math.round(H*sz))*((c.lh||135)/100),bh=lh*String(c.label||'').split('\n').length;
       cv.height=Math.max(2,Math.ceil(bh));drawTitle(cv.getContext('2d'),W,H,ti,ti.t+ti.d*H/(H+bh));}
-    else{cv.height=H;drawTitleClip(cv.getContext('2d'),W,H,c,c.start);} /* 位置・拡大率・回転・不透明度も画像に入れる */
+    /* 位置・拡大率・回転・不透明度も画像に入れる。キーフレームで動くテロップは動きなしで描き、FFmpeg がフレームごとに動かす */
+    else{cv.height=H;var cc=hasKf(c)?Object.assign({},c,{x:0,y:0,scale:100,rot:0,op:100,kf:null}):c;drawTitleClip(cv.getContext('2d'),W,H,cc,c.start);}
     out.push({clip:c.id,png:cv.toDataURL('image/png'),scroll:scroll});});}finally{setNoPh(false);}return out;}
 export function deskStart(j){var set=j.set,wh=set.res.split('×'),W=+wh[0]||1920,H=+wh[1]||1080,to=set.to!=null?set.to:progDur();
   var req={id:j.id,out:j.out,project:forDisk(),titles:[],width:W,height:H,fps:String(set.fps),from:set.from||0,to:to,audioOnly:!!set.audio,videoBitrate:Math.round(set.v||8e6),audioBitrate:Math.round(set.a||192e3),audioRate:ps().ar};

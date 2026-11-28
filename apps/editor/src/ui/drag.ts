@@ -115,6 +115,7 @@ document.addEventListener('input',function(e){var k=e.target.dataset&&e.target.d
   else if(k==='memo'){var m=M(S.src);if(m){m.memo=e.target.value;saveP();}}else if(k==='xfile'){S.x.file=e.target.value;}
   else if(k==='zoom'){var v=+e.target.value;zoomTo(2*Math.pow(200,v/100));}
   else if(k==='cp'){setProp(e.target.dataset.cid,e.target.dataset.k,parseFloat(e.target.value));}
+  else if(k==='fxq'){S.fxq=e.target.value;draw();var q=document.querySelector('[data-in="fxq"]');if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length);}}
   else if(k==='ttext'){var ti=selTitle();if(ti){ti.label=e.target.value;saveP();redrawProg();}}});
 document.addEventListener('focusin',function(e){var k=e.target.dataset&&e.target.dataset.in;if(k==='ttext'||k==='cp'&&Date.now()-(S.rgMark||0)>500)mark();});
 document.addEventListener('change',function(e){var k=e.target.dataset&&e.target.dataset.in;if(!k)return;
@@ -125,6 +126,7 @@ document.addEventListener('change',function(e){var k=e.target.dataset&&e.target.
   else if(k==='mbin'){moveToBin(e.target.dataset.mid,e.target.value);}
   else if(k==='ebin'){S.ebin=e.target.value;saveAview();draw();}
   else if(k==='binname'){renameBin(e.target.dataset.bid,e.target.value);}
+  else if(k==='kfProp'){S.kfProp=e.target.value;draw();}
   else if(k==='recDev'){RC.dev=e.target.value;}
   else if(k==='ccPreset'){if(e.target.value)colorPreset(e.target.dataset.cid,e.target.value);}
   else if(k==='trk'){var tc=selClipXin();if(tc){mark();tc.xin.k=e.target.value;changed();}}

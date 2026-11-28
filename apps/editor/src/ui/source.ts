@@ -29,7 +29,7 @@ export function setT(k,t){var tot=TOTAL[k];S.t[k]=Math.max(0,Math.min(tot,t));va
   [].forEach.call(document.querySelectorAll('[data-head="'+k+'"]'),function(e){e.style.left=pct+'%';});
   [].forEach.call(document.querySelectorAll('[data-time="'+k+'"]'),function(e){if(!e.classList.contains('tch')||e.textContent)e.textContent=tc(S.t[k]);});}
 export function stopAll(){if(E.playing)progStop();if(SRC.el&&!SRC.el.paused)SRC.el.pause();if(SIM){clearInterval(SIM);SIM=null;}SRC.playing=false;if(FXP){clearInterval(FXP);FXP=null;}if(REC){clearInterval(REC);REC=null;}syncPlayBtn();}
-export function syncPlayBtn(){var on=S.page==='cut'?SRC.playing:S.page==='fx'?!!FXP:E.playing;[].forEach.call(document.querySelectorAll('.ib.play'),function(b){b.classList.toggle('on',on);b.innerHTML=ic(on?'pause':'play');b.setAttribute('aria-label',on?'一時停止':'再生');});}
+export function syncPlayBtn(){var on=S.page==='cut'?SRC.playing:E.playing;[].forEach.call(document.querySelectorAll('.ib.play'),function(b){b.classList.toggle('on',on);b.innerHTML=ic(on?'pause':'play');b.setAttribute('aria-label',on?'一時停止':'再生');});}
 export var REC;
 export function rec(){if(REC){clearInterval(REC);REC=null;draw();return;}REC=setInterval(function(){S.rec+=0.1;var e=document.querySelector('[data-rec]');if(e)e.textContent=tc(S.rec);},100);draw();}
 /* ほかのモジュールから置き換えるための関数 */

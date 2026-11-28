@@ -21,6 +21,7 @@ import { num } from '../exporter';
 import { COLOR_PRESETS, colorOf } from '../../core/color';
 import { cubeState } from '../colorGL';
 import { fillAdj } from '../colorUI';
+import { KF_PROPS, hasKf, kfIndex, setValue, srcTime, valueAt } from '../../core/keyframes';
 import { R } from './media';
 import { draw } from '../render';
 import { keyOf } from '../keys';
@@ -76,18 +77,22 @@ export function drawTL(){var w=document.querySelector('[data-tlwrap]');if(!w)ret
 export var PROPS;
 /* テロップの文字サイズ（1080p の画面での px）。まだ決めていなければ、前の「小・中・大」から */
 export var TITLE_PX={'小':45,'中':59,'大':81};
-export function propVal(c,key){if(key.slice(0,2)==='cc'&&key!=='ccLutAmt'&&c.type==='adj'){var cp=colorOf(c);return cp&&cp[key]!=null?cp[key]:0;}if(key==='xd')return c.xin&&c.xin.d||1;if(key==='fsz'&&c.fsz==null)return TITLE_PX[c.sz||'中']||59;return c[key]==null?PROPS[key].def:c[key];}
+export function propVal(c,key){if(KF_PROPS.indexOf(key)>=0&&c.kf)return +valueAt(c,key,S.t.edit).toFixed(3);if(key.slice(0,2)==='cc'&&key!=='ccLutAmt'&&c.type==='adj'){var cp=colorOf(c);return cp&&cp[key]!=null?cp[key]:0;}if(key==='xd')return c.xin&&c.xin.d||1;if(key==='fsz'&&c.fsz==null)return TITLE_PX[c.sz||'中']||59;return c[key]==null?PROPS[key].def:c[key];}
 export function propPct(key,v){var p=PROPS[key];return Math.max(0,Math.min(100,(v-p.min)/(p.max-p.min)*100));}
 export function propTxt(key,v){return (+v).toFixed(PROPS[key].dec);}
 export function numRow(label,c,key){var p=PROPS[key],v=propVal(c,key),id=c.id;
-  return '<div class="pr"><button class="kf" aria-label="'+label+'のキーフレーム" title="キーフレーム"'+A('kfTodo')+'>'+diamond(false)+'</button><span class="t2">'+label+'</span>'+
+  /* ◇：モーション（位置・拡大率・回転・不透明度）は、再生ヘッドの位置にキーフレームを置く・消す。キーフレームがあれば色を付ける */
+  var kp=KF_PROPS.indexOf(key)>=0&&(c.type==='media'||c.type==='title'&&c.st!=='credit'),at=kp&&kfIndex(c,key,srcTime(c,S.t.edit))>=0,any=kp&&hasKf(c,key);
+  return '<div class="pr">'+(kp?'<button class="kf'+(any?' has':'')+'" aria-label="'+label+'のキーフレームを追加／削除" title="キーフレームを追加／削除" aria-pressed="'+at+'"'+A('kfTog',id+'|'+key)+'>'+(at||!any?diamond(at):'<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><polygon points="6,1 11,6 6,11 1,6" fill="none" stroke="var(--ac)" stroke-width="1.6"/></svg>')+'</button>':'<span class="kf" aria-hidden="true"></span>')+'<span class="t2">'+label+'</span>'+
     '<input type="range" class="rg" min="'+p.min+'" max="'+p.max+'" step="'+p.step+'" value="'+v+'" style="--p:'+propPct(key,v)+'%" data-in="cp" data-k="'+key+'" data-cid="'+id+'" aria-label="'+label+'">'+
     '<span class="stp"><button aria-label="'+label+'を減らす"'+A('cstep',id+'|'+key+'|-1')+'>'+TRI.l+'</button><button aria-label="'+label+'を増やす"'+A('cstep',id+'|'+key+'|1')+'>'+TRI.r+'</button></span>'+
     '<span class="v hot" tabindex="0" role="spinbutton" aria-label="'+label+'" aria-valuenow="'+v+'" aria-valuemin="'+p.min+'" aria-valuemax="'+p.max+'" data-hot data-k="'+key+'" data-cid="'+id+'" title="左右にドラッグで増減、クリックで入力">'+propTxt(key,v)+'<small>'+p.unit+'</small></span></div>';}
 export function motionForm(c){return numRow('位置 X',c,'x')+numRow('位置 Y',c,'y')+numRow('拡大率',c,'scale')+numRow('回転',c,'rot')+numRow('不透明度',c,'op')+
   '<div class="row" style="justify-content:flex-end;padding-top:8px">'+btn('元に戻す','mreset',c.id,'s')+'</div>';}
 /* 値を変えて、同じ値を表示している部品（スライダー・数値）をそろえる */
-export function setProp(cid,key,v){var c=C(cid),p=PROPS[key];if(!c||!p||isNaN(v))return;if(key==='fin'||key==='fout')v=Math.min(v,Math.max(0,cLen(c)-(key==='fin'?fades(c)[1]:fades(c)[0])));v=Math.round(Math.max(p.min,Math.min(p.max,v))/p.step)*p.step;v=+v.toFixed(3);if(key.slice(0,2)==='cc')fillAdj(c);if(key==='xd'){if(c.xin)c.xin.d=v;drawTL();redrawProg();saveP();return;}c[key]=v;
+export function setProp(cid,key,v){var c=C(cid),p=PROPS[key];if(!c||!p||isNaN(v))return;if(key==='fin'||key==='fout')v=Math.min(v,Math.max(0,cLen(c)-(key==='fin'?fades(c)[1]:fades(c)[0])));v=Math.round(Math.max(p.min,Math.min(p.max,v))/p.step)*p.step;v=+v.toFixed(3);if(key.slice(0,2)==='cc')fillAdj(c);if(key==='xd'){if(c.xin)c.xin.d=v;drawTL();redrawProg();saveP();return;}
+  /* モーションにキーフレームがあれば、再生ヘッドの位置のキーフレームの値にする */
+  if(KF_PROPS.indexOf(key)>=0)setValue(c,key,S.t.edit,v);else c[key]=v;
   [].forEach.call(document.querySelectorAll('[data-k="'+key+'"][data-cid="'+cid+'"]'),function(x){if(x.tagName==='INPUT'&&x.type==='range'){x.value=v;x.style.setProperty('--p',propPct(key,v)+'%');}else if(x.hasAttribute('data-hot')){x.firstChild.nodeValue=propTxt(key,v);x.setAttribute('aria-valuenow',v);}});
   redrawProg();saveP();if(key==='vol'||key==='fin'||key==='fout'){sync(S.t.edit,E.playing);drawTL();}}
 /* 数値をクリックしたときの入力欄 */
@@ -170,7 +175,8 @@ PROPS={fsz:{min:12,max:300,step:1,unit:'px',def:59,dec:0},lh:{min:80,max:300,ste
   rot:{min:-180,max:180,step:1,unit:'°',def:0,dec:1},op:{min:0,max:100,step:1,unit:'%',def:100,dec:1},vol:{min:-60,max:15,step:0.1,unit:'dB',def:0,dec:1},
   fin:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2},xd:{min:0.1,max:10,step:0.05,unit:'s',def:1,dec:2},fout:{min:0,max:600,step:0.05,unit:'s',def:0,dec:2},
   ccExp:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccCon:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccSat:{min:-100,max:100,step:1,unit:'',def:0,dec:0},
-  ccTemp:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccTint:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccGam:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccLutAmt:{min:0,max:100,step:1,unit:'%',def:100,dec:0}};
+  ccTemp:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccTint:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccGam:{min:-100,max:100,step:1,unit:'',def:0,dec:0},ccLutAmt:{min:0,max:100,step:1,unit:'%',def:100,dec:0},
+  fxBlur:{min:0,max:40,step:0.5,unit:'px',def:0,dec:1},fxMosaic:{min:0,max:120,step:1,unit:'px',def:0,dec:0},fxVig:{min:0,max:100,step:1,unit:'',def:0,dec:0}};
 R.edit=function(){
   var left;
   if(S.etab!=='text'&&S.etab!=='trans'){var L=P.media.filter(function(m){return (m.k==='映像'||m.k==='音声'||m.k==='画像'||m.k==='テイク')&&inBin(m,S.ebin||'all')&&(!S.eq||m.n.indexOf(S.eq)>=0);}),av=S.aview||'grid';

@@ -41,7 +41,7 @@ export function srcMax(p: Project, c: Clip): number {
 export const v1End = (p: Project): number => onTrack(p, 'V1').reduce((a, c) => Math.max(a, cEnd(c)), 0);
 /** 位置・拡大率などを変えてあるか */
 export const hasFx = (c: Clip): boolean =>
-  !!(c.x || c.y || c.rot || (c.scale != null && c.scale != 100) || (c.op != null && c.op != 100)) || hasColor(c as ColorParams);
+  !!(c.x || c.y || c.rot || (c.scale != null && c.scale != 100) || (c.op != null && c.op != 100)) || hasColor(c as ColorParams) || !!(c.kf && Object.keys(c.kf).length) || !!(c.fxBlur || c.fxMosaic || c.fxVig);
 /** 同じ組（リンク）のほかのクリップ */
 export const linked = (p: Project, c: Clip | null): Clip[] => (c && c.link ? p.clips.filter((x) => x.link === c.link && x !== c) : []);
 /** ロックしたトラック（または、ないトラック）のクリップか */

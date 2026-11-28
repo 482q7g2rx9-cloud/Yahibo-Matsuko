@@ -94,7 +94,7 @@ export function fsec(key,title,on,body,fx){var o=!!S.open[key]&&!!body;return '<
   (on!==null?'<input type="checkbox"'+(on?' checked':'')+' aria-label="'+h(title)+'を有効">':'')+'</div>'+(o?'<div class="bd">'+body+'</div>':'')+'</div>';}
 export function transport(key,btns,end){return '<div class="tp"><span class="tc" data-time="'+key+'">'+tc(S.t[key])+'</span><span class="mid">'+btns+'</span><span class="end">'+(end||'')+'</span></div>';}
 export function playBtn(on){return '<button class="ib play'+(on?' on':'')+'" aria-label="'+(on?'一時停止':'再生')+'" title="再生／一時停止（スペース）"'+A('play')+'>'+ic(on?'pause':'play')+'</button>';}
-export function playing(){return S.page==='cut'?SRC.playing:S.page==='fx'?!!SIM:E.playing;}
+export function playing(){return S.page==='cut'?SRC.playing:E.playing;}
 
 /* 読み込んだときの準備。元のファイルの順番を守るため、main.ts が順に呼ぶ */
 export function init(){

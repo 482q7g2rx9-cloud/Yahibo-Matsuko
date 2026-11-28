@@ -73,6 +73,9 @@ impl Fps {
     }
 }
 
+/// キーフレームで動くクリップの区間の長さ（フレーム）
+const ANIM_STEP: u64 = 60;
+
 /// 書き出しの設定
 #[derive(Debug, Clone)]
 pub struct Settings {
@@ -255,6 +258,17 @@ pub fn plan(
             }
         }
     }
+    // キーフレームで動くクリップは、2 秒（60 フレーム）ごとにも区間を分ける（1 区間のフィルターが大きくなりすぎないように）
+    for c in p.clips.iter().filter(|c| visible(c) && c.animated()) {
+        let (a, b) = (fps.frame(c.start), fps.frame(c.end()));
+        let mut f = a + ANIM_STEP;
+        while f < b {
+            if f > f0 && f < f1 {
+                cuts.push(f);
+            }
+            f += ANIM_STEP;
+        }
+    }
     cuts.sort_unstable();
     cuts.dedup();
     let mut list_text = String::new();
@@ -341,11 +355,12 @@ fn segment_args(
             let mut lay = Vec::new();
             for (j, c) in [q.a, q.b].iter().enumerate() {
                 let src = c.src_in + (q.w0 - c.start);
-                let Some((f, dx, dy, pre)) = clip_input(p, c, src, q.d + 1.0, n, st, &mut args)
+                let Some((f, dx, dy, pre, used)) =
+                    clip_input(p, c, src, q.d + 1.0, n, st, &mut args)
                 else {
                     continue;
                 };
-                n += 1;
+                n += used;
                 // 黒い画面の上に置いてから切り替える（プレビューと同じ）
                 args.extend(["-f", "lavfi", "-i"].map(s));
                 args.push(format!(
@@ -413,6 +428,19 @@ fn segment_args(
                     args.push(f3(len + 1.0));
                     args.push("-i".into());
                     args.push(img.path.to_string_lossy().into_owned());
+                    if c.animated() && !img.scroll {
+                        // キーフレームのあるテロップ：画面と同じ大きさの画像（動きなしで描いたもの）を、フレームごとに動かす
+                        let s0 = c.src_in + (ta - c.start).max(0.0);
+                        let base = format!("[{n}:v]setpts=PTS-STARTPTS,format=rgba,setsar=1");
+                        let (f, used) = anim_chain(c, &base, s0, len + 1.0, n + 1, st, &mut args);
+                        graph.push(format!("{f}[t{k}]"));
+                        graph.push(format!(
+                            "[{cur}][t{k}]overlay=x=0:y=0:format=auto:eof_action=repeat[{next}]"
+                        ));
+                        n += 1 + used;
+                        cur = next;
+                        continue;
+                    }
                     let y = if img.scroll {
                         // 画面のプレビュー（drawTitle）と同じ動き：y = H - (H + 文字の高さ) × 進み
                         let off = ta - (c.start - c.src_in);
@@ -429,7 +457,7 @@ fn segment_args(
                 }
                 ClipType::Media => {
                     let src_at = c.src_in + (ta - c.start).max(0.0);
-                    let Some((f, dx, dy, _)) =
+                    let Some((f, dx, dy, _, used)) =
                         clip_input(p, c, src_at, len + 1.0, n, st, &mut args)
                     else {
                         k -= 1;
@@ -441,7 +469,7 @@ fn segment_args(
                         f3(dx),
                         f3(dy)
                     ));
-                    n += 1;
+                    n += used;
                 }
             }
             cur = next;
@@ -620,7 +648,7 @@ pub fn pairs<'a>(p: &'a Project, vtracks: &[&str]) -> Vec<Pair<'a>> {
 }
 
 /// 映像・画像のクリップの入力を args に足し、拡大率・回転・不透明度をつけるフィルター（`[n:v]...`、出力の名前はなし）と、
-/// 置く位置のずれ（x, y）、頭に足す長さ（素材の頭より前から始めるとき）を返す
+/// 置く位置のずれ（x, y）、頭に足す長さ（素材の頭より前から始めるとき）、使った入力の数を返す
 fn clip_input(
     p: &Project,
     c: &Clip,
@@ -629,7 +657,7 @@ fn clip_input(
     n: usize,
     st: &Settings,
     args: &mut Vec<String>,
-) -> Option<(String, f64, f64, f64)> {
+) -> Option<(String, f64, f64, f64, usize)> {
     let m = c.m.as_deref().and_then(|id| p.media(id))?;
     if m.k != "映像" && m.k != "画像" {
         return None;
@@ -661,6 +689,17 @@ fn clip_input(
             fps.arg()
         ));
     }
+    let fx = effects(c, st);
+    let head = format!("[{n}:v]setpts=PTS-STARTPTS,fps={}", fps.arg());
+    // キーフレームがあるとき：画面いっぱいの透明な画像に、フレームごとの位置・大きさ・回転・不透明度で置いたものを返す
+    if c.animated() {
+        let base = format!(
+            "{head},scale=w={w}:h={h}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1{fx}"
+        );
+        let s0 = if m.k == "画像" { src } else { src.max(0.0) };
+        let (f, used) = anim_chain(c, &base, s0, len, n + 1, st, args);
+        return Some((f, 0.0, 0.0, pre, 1 + used));
+    }
     let sc = c.scale.unwrap_or(100.0) / 100.0;
     let rot = c.rot.unwrap_or(0.0);
     let op = (c.op.unwrap_or(100.0) / 100.0).clamp(0.0, 1.0);
@@ -668,15 +707,16 @@ fn clip_input(
         ((w as f64) * sc).round().max(2.0) as u32,
         ((h as f64) * sc).round().max(2.0) as u32,
     );
-    let mut f = format!(
-        "[{n}:v]setpts=PTS-STARTPTS,fps={},scale=w={bw}:h={bh}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1",
-        fps.arg()
-    );
-    // 色補正（拡大・縮小のあと：書き出す大きさの画素だけを補正する）
-    if let Some(file) = st.luts.get(&c.id) {
-        f.push(',');
-        f.push_str(&lut_filter(file));
-    }
+    let mut f = if fx.is_empty() || (sc - 1.0).abs() < 1e-9 {
+        format!(
+            "{head},scale=w={bw}:h={bh}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1{fx}"
+        )
+    } else {
+        // エフェクトは 100% の大きさで掛けてから、拡大・縮小する（画面のプレビューと同じ）
+        format!(
+            "{head},scale=w={w}:h={h}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1{fx},scale=w='max(2,trunc(iw*{sc:.6}/2)*2)':h='max(2,trunc(ih*{sc:.6}/2)*2)'"
+        )
+    };
     if rot != 0.0 || op < 1.0 {
         f.push_str(",format=rgba");
         if rot != 0.0 {
@@ -689,7 +729,124 @@ fn clip_input(
     }
     let dx = c.x.unwrap_or(0.0) / 100.0 * w as f64;
     let dy = c.y.unwrap_or(0.0) / 100.0 * h as f64;
-    Some((f, dx, dy, pre))
+    Some((f, dx, dy, pre, 1))
+}
+
+/// 色補正とエフェクト（ぼかし・モザイク・周辺を暗く）のフィルター（先頭に `,`）。画面の大きさ 100% の絵に掛ける。
+/// 大きさは 1080p の画面での px なので、書き出す高さに合わせる。どれも LGPL のフィルター
+fn effects(c: &Clip, st: &Settings) -> String {
+    let mut f = String::new();
+    if let Some(file) = st.luts.get(&c.id) {
+        f.push(',');
+        f.push_str(&lut_filter(file));
+    }
+    let k = st.height as f64 / 1080.0;
+    let blur = c.fx_blur.unwrap_or(0.0) * k;
+    if blur >= 0.1 {
+        f.push_str(&format!(",gblur=sigma={blur:.3}:steps=3"));
+    }
+    let mosaic = (c.fx_mosaic.unwrap_or(0.0) * k).round();
+    if mosaic >= 2.0 {
+        f.push_str(&format!(
+            ",pixelize=width={mosaic}:height={mosaic}:mode=avg"
+        ));
+    }
+    let vig = c.fx_vig.unwrap_or(0.0).clamp(0.0, 100.0);
+    if vig >= 0.5 {
+        let a = vig / 100.0 * std::f64::consts::FRAC_PI_2;
+        f.push_str(&format!(
+            ",format=gbrp,vignette=angle={a:.6}:dither=0,format=yuv420p"
+        ));
+    }
+    f
+}
+
+/// キーフレームで動くクリップの映像：フレームごとに位置・拡大率・回転・不透明度を決め、
+/// 同じ値が続くところをまとめて、それぞれを画面と同じ大きさの透明な画像に置き、つなげる。
+/// （FFmpeg のフィルターは途中で絵の大きさが変わると正しく動かないので、大きさの変わる部分を分けて作る）
+/// base は 100% の大きさの絵（出力の名前なし）、s0 は最初のフレームの素材の秒。canvas の入力の番号は n。
+/// 返すのは、出力の名前のないフィルターの文と、足した入力の数
+fn anim_chain(
+    c: &Clip,
+    base: &str,
+    s0: f64,
+    len: f64,
+    n: usize,
+    st: &Settings,
+    args: &mut Vec<String>,
+) -> (String, usize) {
+    let fps = st.fps;
+    let (w, h) = (st.width as f64, st.height as f64);
+    let frames = ((len * fps.value()).ceil() as u64).max(1);
+    // 透明な画面（フレームごとに置く台）
+    args.extend(["-f", "lavfi", "-i"].map(s));
+    args.push(format!(
+        "color=c=black@0.0:s={}x{}:r={}:d={},format=rgba",
+        st.width,
+        st.height,
+        fps.arg(),
+        f3(len)
+    ));
+    // 値が同じフレームをまとめる（位置は 0.05px、拡大率は 0.0001、回転は 0.01°、不透明度は 0.1% まで同じなら同じ）
+    let key = |m: [f64; 5]| {
+        [
+            (m[0] / 100.0 * w * 20.0).round() as i64,
+            (m[1] / 100.0 * h * 20.0).round() as i64,
+            (m[2] * 100.0).round() as i64,
+            (m[3] * 100.0).round() as i64,
+            (m[4] * 10.0).round() as i64,
+        ]
+    };
+    let mut groups: Vec<(u64, u64, [f64; 5])> = vec![];
+    for i in 0..frames {
+        let m = c.motion_at(s0 + i as f64 / fps.value());
+        match groups.last_mut() {
+            Some(g) if key(g.2) == key(m) => g.1 = i + 1,
+            _ => groups.push((i, i + 1, m)),
+        }
+    }
+    let g = groups.len();
+    let tag = format!("a{n}");
+    let mut parts = vec![format!(
+        "{base},split={g}{}",
+        (0..g).map(|i| format!("[{tag}s{i}]")).collect::<String>()
+    )];
+    parts.push(format!(
+        "[{n}:v]setsar=1,split={g}{}",
+        (0..g).map(|i| format!("[{tag}c{i}]")).collect::<String>()
+    ));
+    for (i, (a, b, m)) in groups.iter().enumerate() {
+        let trim = if i + 1 == g {
+            format!("trim=start_frame={a}")
+        } else {
+            format!("trim=start_frame={a}:end_frame={b}")
+        };
+        let sc = (m[2] / 100.0).max(0.0);
+        let mut f = format!(
+            "[{tag}s{i}]{trim},setpts=PTS-STARTPTS,scale=w='max(2,trunc(iw*{sc:.6}/2)*2)':h='max(2,trunc(ih*{sc:.6}/2)*2)',format=rgba"
+        );
+        if m[3] != 0.0 {
+            let r = format!("{:.6}", m[3].to_radians());
+            f.push_str(&format!(",rotate=a={r}:ow=rotw({r}):oh=roth({r}):c=none"));
+        }
+        let op = (m[4] / 100.0).clamp(0.0, 1.0);
+        if op < 1.0 {
+            f.push_str(&format!(",colorchannelmixer=aa={op:.3}"));
+        }
+        parts.push(format!("{f}[{tag}l{i}]"));
+        parts.push(format!(
+            "[{tag}c{i}]{trim},setpts=PTS-STARTPTS[{tag}b{i}];[{tag}b{i}][{tag}l{i}]overlay=x=(main_w-overlay_w)/2+({}):y=(main_h-overlay_h)/2+({}):format=auto:shortest=1,setsar=1[{tag}o{i}]",
+            f3(m[0] / 100.0 * w),
+            f3(m[1] / 100.0 * h)
+        ));
+    }
+    // つなげたあとの時刻は、フレームの番号から付け直す（1 フレームだけの部分は長さが分からないため）
+    parts.push(format!(
+        "{}concat=n={g}:v=1:a=0,setpts=N/({})/TB,format=rgba",
+        (0..g).map(|i| format!("[{tag}o{i}]")).collect::<String>(),
+        fps.arg()
+    ));
+    (parts.join(";"), 1)
 }
 
 /// 色補正の LUT を引くフィルター。file は作業用フォルダーの中の名前（英数字・`.`・`_` だけにする）。
@@ -1171,5 +1328,84 @@ mod tests {
         let mut q = p.clone();
         q.clips[1].xin.as_mut().unwrap().k = "nope".into();
         assert!(pairs(&q, &["V1"]).is_empty());
+    }
+
+    #[test]
+    fn animated_titles_and_effects() {
+        use crate::keyframes::Kf;
+        let x = exe();
+        let mut kf = std::collections::BTreeMap::new();
+        kf.insert(
+            "op".to_string(),
+            vec![
+                Kf {
+                    t: 0.0,
+                    v: 0.0,
+                    e: None,
+                },
+                Kf {
+                    t: 1.0,
+                    v: 100.0,
+                    e: None,
+                },
+            ],
+        );
+        let p = Project {
+            v: 2,
+            media: vec![media("v", "映像", Some(&x))],
+            tracks: tracks(),
+            clips: vec![
+                Clip {
+                    fx_blur: Some(3.0),
+                    fx_mosaic: Some(20.0),
+                    fx_vig: Some(50.0),
+                    scale: Some(50.0),
+                    ..clip("p", "V1", Some("v"), ClipType::Media, 0.0, 0.0, 4.0)
+                },
+                Clip {
+                    kf: Some(kf),
+                    ..clip("t", "V2", None, ClipType::Title, 0.0, 0.0, 4.0)
+                },
+            ],
+            ..Default::default()
+        };
+        let titles = [TitleImage {
+            clip: "t".into(),
+            path: PathBuf::from("/w/t.png"),
+            scroll: false,
+        }];
+        let pl = plan(
+            &p,
+            &titles,
+            &settings(0.0, 4.0),
+            Path::new("/w"),
+            Path::new("/o.mp4"),
+            "libx264",
+        )
+        .unwrap();
+        // キーフレームのあるクリップは 2 秒ごとに区間を分ける（0〜2・2〜4）
+        let vids: Vec<String> = pl
+            .steps
+            .iter()
+            .filter_map(|s| match s {
+                Step::Video { args, .. } => Some(args.join(" ")),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(vids.len(), 2);
+        let j = &vids[0];
+        // エフェクトは 100% の大きさで掛けてから縮める（720p なので 1080p の値の 2/3）
+        assert!(
+            j.contains("setsar=1,gblur=sigma=2.000:steps=3,pixelize=width=13:height=13:mode=avg,format=gbrp,vignette=angle=0.785398:dither=0,format=yuv420p,scale=w='max(2,trunc(iw*0.500000/2)*2)'"),
+            "{j}"
+        );
+        // テロップの不透明度は、フレームごとに変わる（0〜1 秒は 30 通り、そのあとは 1 つ）
+        assert!(j.contains("concat=n=31:v=1:a=0"), "{j}");
+        assert!(
+            j.contains("colorchannelmixer=aa=0.000") && j.contains("colorchannelmixer=aa=0.967"),
+            "{j}"
+        );
+        // 2〜4 秒の区間は動かないので 1 つ
+        assert!(vids[1].contains("concat=n=1:v=1:a=0"), "{}", vids[1]);
     }
 }

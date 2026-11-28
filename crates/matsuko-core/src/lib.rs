@@ -5,6 +5,7 @@
 //! 型はブラウザ版（`src/matsuko-editor.html` の `P`）が保存する JSON と同じ形にしてある。
 
 pub mod export;
+pub mod keyframes;
 pub mod model;
 pub mod paths;
 pub mod peaks;

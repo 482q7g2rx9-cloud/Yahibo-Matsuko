@@ -25,9 +25,13 @@ import { applyDesign, ask, infoDlg, openCx, resetProject, toast } from './menus'
 import { KB, KEYMAP, loadKeys, saveKeys } from './keys';
 import { PREF, openPrefs, renderPrefs, savePref } from './prefs';
 import { fit } from './fit';
-import { colorReset, lutOff, pickLut } from './colorUI';
+import { colorReset, lutOff, pickLut, fxApply } from './colorUI';
+import { KF_PROPS, clearKf, kfTimes, setEase, srcTime, toggleKf } from '../core/keyframes';
+import { fxClip } from './pages/fx';
 import { RC, adopt, delTake, placeTake, playTake, recStop, recToggle, recTop as recToTop } from './recorder';
 
+/* エフェクトページ：同じトラックの前・次のクリップへ（再生ヘッドもその頭へ） */
+function fxCut(d){var c=fxClip();if(!c)return;var L=P.clips.filter(function(x){return x.tr===c.tr;}).sort(function(a,b){return a.start-b.start;}),i=L.indexOf(c),n=L[i+d];if(!n)return;S.sel=[n.id];setProg(n.start);draw();}
 /* ---------- 操作 ---------- */
 export var ACT;
 /* 前・次の編集点（クリップの端） */
@@ -79,9 +83,18 @@ ACT={
   thide:function(v){var t=T(v);if(!t)return;mark();t.hide=!t.hide;changed();},tlock:function(v){var t=T(v);if(!t)return;mark();t.lock=!t.lock;if(t.lock)S.sel=S.sel.filter(function(id){var c=C(id);return c&&c.tr!==v;});changed();},
   tmute:function(v){var t=T(v);if(!t)return;mark();t.mute=!t.mute;changed();},tsolo:function(v){var t=T(v);if(!t)return;mark();t.solo=!t.solo;changed();},
   cstep:function(v){var a=String(v).split('|'),c=C(a[0]),k=a[1];if(!c||!PROPS[k])return;mark();setProp(a[0],k,propVal(c,k)+(+a[2])*PROPS[k].step);drawTL();},
-  kfTodo:function(){toast('キーフレームは、エフェクトページの本実装で使えるようになります');},
+  /* キーフレーム（エフェクトページ・インスペクタの◇）。時刻は再生ヘッドの位置 */
+  kfTog:function(v){var a=v.split('|'),c=C(a[0]);if(!c)return;mark();toggleKf(c,a[1],S.t.edit);S.kfProp=a[1];changed();},
+  kfToggle:function(){var c=fxClip();if(!c)return;mark();toggleKf(c,S.kfProp||'scale',S.t.edit);changed();},
+  kfEase:function(v){var c=fxClip();if(!c)return;mark();if(!setEase(c,S.kfProp||'scale',S.t.edit,v))return toast('再生ヘッドの位置にキーフレームがありません');changed();},
+  kfClear:function(){var c=fxClip(),p=S.kfProp||'scale';if(!c||!(c.kf&&c.kf[p]))return;mark();clearKf(c,p,S.t.edit);changed();},
+  kfPrev:function(){var c=fxClip();if(!c)return;var L=kfTimes(c,S.kfProp||'scale').filter(function(t){return t<S.t.edit-0.004;});if(!L.length)return;setProg(L[L.length-1]);draw();},
+  kfNext:function(){var c=fxClip();if(!c)return;var L=kfTimes(c,S.kfProp||'scale').filter(function(t){return t>S.t.edit+0.004;});if(!L.length)return;setProg(L[0]);draw();},
+  kfProp:function(v){S.kfProp=v;draw();},
+  fxApply:function(v){S.fx=v;fxApply(fxClip(),v);},
+  fxPrevCut:function(){fxCut(-1);},fxNextCut:function(){fxCut(1);},
   ccReset:function(v){colorReset(v);},ccLut:function(v){pickLut(v);},ccLutOff:function(v){lutOff(v);},
-  mreset:function(v){var c=C(v);if(!c)return;mark();['x','y','scale','rot','op'].forEach(function(k){delete c[k];});changed();},
+  mreset:function(v){var c=C(v);if(!c)return;mark();['x','y','scale','rot','op'].forEach(function(k){delete c[k];});delete c.kf;changed();},
   keys:function(){openPrefs('keys');},prefs:function(){openPrefs();},ptab:function(v){S.ptab=v;S.capture=null;S.kFocus=null;renderPrefs.st=0;renderPrefs();},
   pUi:function(v){PREF.ui=+v;savePref();fit();draw();renderPrefs();},pTheme:function(v){S.theme=v;applyDesign();renderPrefs();},pAcc:function(v){S.accent=v;applyDesign();renderPrefs();},
   kSet:function(v){S.capture=v;S.kFocus=v;renderPrefs();},kCancel:function(){S.capture=null;renderPrefs();},kReset:function(v){var k=KB.filter(function(x){return x[0]===v;})[0];if(k){KEYMAP[v]=k[3].slice();saveKeys();}renderPrefs();},
@@ -95,7 +108,7 @@ ACT={
   mute:function(v){S.mute[v]=!S.mute[v];draw();},solo:function(v){S.solo[v]=!S.solo[v];draw();},
   recGo:function(){recToggle();},recStop:function(){recStop();},recTop:function(){recToTop();},recRow:function(v){if(RC.on||RC.count)return;S.recRow=v||null;S.takeSel=null;draw();},
   takeSel:function(v){S.takeSel=v;draw();},takePlay:function(v){playTake(v);},takeAdopt:function(v){adopt(v);},takePlace:function(v){placeTake(v);},takeDel:function(v){delTake(v);},
-  play:function(){if(S.page==='cut')srcPlay();else if(S.page==='fx')fxPlay();else progPlay();},
+  play:function(){if(S.page==='cut')srcPlay();else progPlay();},
   prev:function(){jump(-1);},next:function(){jump(1);},fb:function(){if(E.playing)progStop();setProg(S.t.edit-frameSec());},ff:function(){if(E.playing)progStop();setProg(S.t.edit+frameSec());},
   top:function(){setProg(0);},end:function(){setProg(progDur());},
   preset:function(v){S.preset=+v;S.x=presetX(S.preset);draw();},

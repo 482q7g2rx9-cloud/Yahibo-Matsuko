@@ -683,3 +683,119 @@ fn color_luts_are_applied() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// キーフレーム（M6）：位置・拡大率がフレームごとに動く。エフェクト（ぼかし・モザイク・周辺を暗く）も通る
+#[test]
+fn keyframes_and_effects() {
+    use matsuko_core::keyframes::Kf;
+    let Some(ffmpeg) = tool("ffmpeg") else { return };
+    let dir = std::env::temp_dir().join(format!("matsuko-export-{}-kf", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let img = dir.join("white.png");
+    ff(
+        &ffmpeg,
+        &[
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=white:s=640x360",
+            "-frames:v",
+            "1",
+            &img.to_string_lossy(),
+        ],
+    );
+    let kf = |v: &[(f64, f64)]| {
+        v.iter()
+            .map(|(t, v)| Kf {
+                t: *t,
+                v: *v,
+                e: None,
+            })
+            .collect::<Vec<_>>()
+    };
+    let mut m = std::collections::BTreeMap::new();
+    // 0〜2 秒：左（-25%）から右（+25%）へ。拡大率は 50%
+    m.insert("x".to_string(), kf(&[(0.0, -25.0), (2.0, 25.0)]));
+    let project = Project {
+        v: 2,
+        media: vec![Media {
+            id: "m".into(),
+            n: "m".into(),
+            k: "画像".into(),
+            file: 1,
+            path: Some(img.to_string_lossy().into_owned()),
+            ..Default::default()
+        }],
+        tracks: vec![Track {
+            id: "V1".into(),
+            kind: TrackKind::Video,
+            h: 40.0,
+            ..Default::default()
+        }],
+        clips: vec![Clip {
+            id: "c".into(),
+            tr: "V1".into(),
+            kind: ClipType::Media,
+            m: Some("m".into()),
+            start: 0.0,
+            src_in: 0.0,
+            src_out: 3.0,
+            scale: Some(50.0),
+            kf: Some(m),
+            fx_blur: Some(2.0),
+            fx_vig: Some(30.0),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let out = dir.join("kf.mp4");
+    let encs: Vec<String> = ["libopenh264", "libx264"].map(String::from).to_vec();
+    export(
+        &ffmpeg,
+        &project,
+        &[],
+        &settings(0.0, 3.0),
+        &dir.join("w"),
+        &out,
+        &encs,
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
+    // 横 1 列の明るさ（640 の幅を 64 に縮めたもの）から、白い部分の真ん中（%）を求める
+    let center = |t: &str| -> f64 {
+        let o = Command::new(&ffmpeg)
+            .args(["-v", "error", "-ss", t, "-i"])
+            .arg(&out)
+            .args([
+                "-frames:v",
+                "1",
+                "-vf",
+                "crop=640:2:0:179,scale=64:1",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "gray",
+                "-",
+            ])
+            .output()
+            .unwrap();
+        let px: Vec<f64> = o.stdout.iter().map(|v| *v as f64).collect();
+        let sum: f64 = px.iter().sum();
+        let c = px
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (i as f64 + 0.5) * v)
+            .sum::<f64>()
+            / sum;
+        c / 64.0 * 100.0 - 50.0
+    };
+    let a = center("0.0");
+    let b = center("1.0");
+    let e = center("2.5");
+    assert!((a + 25.0).abs() < 3.0, "0 秒は -25% のはず：{a}");
+    assert!(b.abs() < 3.0, "1 秒は 0% のはず：{b}");
+    assert!((e - 25.0).abs() < 3.0, "2.5 秒は +25% のはず：{e}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -6,6 +6,8 @@ import { C } from './project';
 import { changed, mark } from './store';
 import { HOST } from './desktop';
 import { toast } from './menus';
+import { applyMotionPreset } from '../core/keyframes';
+import { canFx } from './pages/fx';
 
 /** 前の版の調整レイヤー（値がない）は、変える前に前と同じ値を入れておく（1 つ変えたら、ほかが 0 にならないように） */
 export function fillAdj(c) { if (c && c.type === 'adj' && !COLOR_KEYS.some(function (k) { return c[k] != null; }) && c.ccLut == null) Object.assign(c, ADJ_DEFAULT); }
@@ -41,3 +43,16 @@ export function pickLut(cid) {
   i.click();
 }
 export function lutOff(cid) { var c = C(cid); if (!c) return; mark(); delete c.ccLut; delete c.ccLutAmt; changed(); }
+
+/** エフェクトページの一覧から付ける：cc:色補正のプリセット、blur・mosaic・vig、mo:動きのプリセット */
+export function fxApply(c, id) {
+  if (!c) return toast('クリップを選んでください');
+  if (!canFx(c, id)) return toast('このクリップには付けられません');
+  if (id.indexOf('cc:') === 0) return colorPreset(c.id, id.slice(3));
+  mark();
+  if (id === 'blur') c.fxBlur = c.fxBlur || 8;
+  else if (id === 'mosaic') c.fxMosaic = c.fxMosaic || 24;
+  else if (id === 'vig') c.fxVig = c.fxVig || 40;
+  else if (id.indexOf('mo:') === 0) applyMotionPreset(c, id.slice(3));
+  changed();
+}

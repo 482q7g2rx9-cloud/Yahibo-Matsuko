@@ -175,9 +175,47 @@ pub struct Clip {
     pub st: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sz: Option<String>,
+    /// キーフレーム（M6）：x・y・scale・rot・op ごとの列（時刻は素材の秒）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kf: Option<std::collections::BTreeMap<String, Vec<crate::keyframes::Kf>>>,
+    /// エフェクト（M6）：ぼかし（1080p の画面での px）、モザイクの大きさ（同）、周辺を暗く（0〜100）
+    #[serde(rename = "fxBlur", skip_serializing_if = "Option::is_none")]
+    pub fx_blur: Option<f64>,
+    #[serde(rename = "fxMosaic", skip_serializing_if = "Option::is_none")]
+    pub fx_mosaic: Option<f64>,
+    #[serde(rename = "fxVig", skip_serializing_if = "Option::is_none")]
+    pub fx_vig: Option<f64>,
 }
 
 impl Clip {
+    /// キーフレームのある値の列（なければ None）
+    pub fn kf_of(&self, p: &str) -> Option<&[crate::keyframes::Kf]> {
+        self.kf
+            .as_ref()
+            .and_then(|m| m.get(p))
+            .filter(|l| !l.is_empty())
+            .map(|l| l.as_slice())
+    }
+    /// モーションにキーフレームがあるか
+    pub fn animated(&self) -> bool {
+        ["x", "y", "scale", "rot", "op"]
+            .iter()
+            .any(|p| self.kf_of(p).is_some())
+    }
+    /// 素材の秒 s のときのモーションの値：x, y（%）, 拡大率（%）, 回転（°）, 不透明度（%）
+    pub fn motion_at(&self, s: f64) -> [f64; 5] {
+        let v = |p: &str, def: Option<f64>, d: f64| match self.kf_of(p) {
+            Some(l) => crate::keyframes::interp(l, s),
+            None => def.unwrap_or(d),
+        };
+        [
+            v("x", self.x, 0.0),
+            v("y", self.y, 0.0),
+            v("scale", self.scale, 100.0),
+            v("rot", self.rot, 0.0),
+            v("op", self.op, 100.0),
+        ]
+    }
     /// クリップの長さ（秒）
     pub fn len(&self) -> f64 {
         (self.src_out - self.src_in).max(0.0)

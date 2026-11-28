@@ -8,7 +8,7 @@
 import { LUT_SIZE, buildLut, colorKey, colorOf, parseCube, sampleCube, toCube } from '../core/color';
 import { HOST } from './desktop';
 
-var GL = null, GLC = null, PROG = null, IMG = null, BAD = false;
+var GL = null, GLC = null, PROG = null, IMG = null, BAD = false, U = null, FB = [];
 var LUTS = {}; /* 補正の鍵 → {tex, data, used} */
 export var CUBES = {}; /* LUT の場所（ブラウザ版は名前）→ Cube | 'loading' | {error} */
 var onLoad = null;
@@ -73,8 +73,15 @@ function setup() {
     GL = GLC.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false, alpha: true });
     if (!GL) throw 0;
     var vs = '#version 300 es\nin vec2 p;out vec2 uv;void main(){uv=vec2((p.x+1.)*.5,(1.-p.y)*.5);gl_Position=vec4(p,0.,1.);}';
-    var fs = '#version 300 es\nprecision highp float;precision highp sampler3D;uniform sampler2D img;uniform sampler3D lut;uniform float n;in vec2 uv;out vec4 o;' +
-      'void main(){vec4 c=texture(img,uv);vec3 q=(clamp(c.rgb,0.,1.)*(n-1.)+.5)/n;o=vec4(texture(lut,q).rgb,c.a);}';
+    /* 1 つのプログラムで 4 つの処理：0 LUT、1 ぼかし（片方向のガウス）、2 モザイク（ブロックの平均）、3 周辺を暗く（FFmpeg の vignette と同じ式）。
+       flip：前の処理の結果（フレームバッファ）を読むときは上下が逆になる */
+    var fs = '#version 300 es\nprecision highp float;precision highp sampler3D;uniform sampler2D img;uniform sampler3D lut;uniform float n;uniform int mode;uniform int useLut;uniform int flip;' +
+      'uniform vec2 size;uniform vec2 dir;uniform float sigma;uniform float block;uniform float angle;in vec2 uv;out vec4 o;' +
+      'vec4 at(vec2 p){return texture(img,flip==1?vec2(p.x,1.-p.y):p);}' +
+      'void main(){if(mode==0){vec4 c=at(uv);if(useLut==1){vec3 q=(clamp(c.rgb,0.,1.)*(n-1.)+.5)/n;c.rgb=texture(lut,q).rgb;}o=c;return;}' +
+      'if(mode==1){vec4 a=vec4(0.);float ws=0.;float r=ceil(sigma*3.);float st=max(1.,ceil(r/48.));for(int i=-48;i<=48;i++){float x=float(i)*st;if(abs(x)>r)continue;float w=exp(-x*x/(2.*sigma*sigma));a+=at(uv+dir*x/size)*w;ws+=w;}o=a/ws;return;}' +
+      'if(mode==2){vec2 px=uv*size;vec2 b0=floor(px/block)*block;vec2 b1=min(b0+block,size);vec4 a=vec4(0.);for(int j=0;j<8;j++)for(int i=0;i<8;i++){vec2 p=b0+(vec2(float(i),float(j))+.5)/8.*(b1-b0);a+=at(p/size);}o=a/64.;return;}' +
+      'vec4 c=at(uv);float dn=length((uv-.5)*size)/length(size*.5);float f=dn>1.?0.:pow(cos(angle*dn),4.);o=vec4(c.rgb*f,c.a);}';
     var sh = function (t, src) { var s = GL.createShader(t); GL.shaderSource(s, src); GL.compileShader(s); if (!GL.getShaderParameter(s, GL.COMPILE_STATUS)) throw new Error(GL.getShaderInfoLog(s)); return s; };
     PROG = GL.createProgram(); GL.attachShader(PROG, sh(GL.VERTEX_SHADER, vs)); GL.attachShader(PROG, sh(GL.FRAGMENT_SHADER, fs)); GL.linkProgram(PROG);
     if (!GL.getProgramParameter(PROG, GL.LINK_STATUS)) throw new Error(GL.getProgramInfoLog(PROG));
@@ -82,6 +89,7 @@ function setup() {
     var buf = GL.createBuffer(); GL.bindBuffer(GL.ARRAY_BUFFER, buf); GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), GL.STATIC_DRAW);
     var loc = GL.getAttribLocation(PROG, 'p'); GL.enableVertexAttribArray(loc); GL.vertexAttribPointer(loc, 2, GL.FLOAT, false, 0, 0);
     GL.uniform1i(GL.getUniformLocation(PROG, 'img'), 0); GL.uniform1i(GL.getUniformLocation(PROG, 'lut'), 1); GL.uniform1f(GL.getUniformLocation(PROG, 'n'), LUT_SIZE);
+    U = {}; ['mode', 'useLut', 'flip', 'size', 'dir', 'sigma', 'block', 'angle'].forEach(function (k) { U[k] = GL.getUniformLocation(PROG, k); });
     IMG = GL.createTexture(); GL.activeTexture(GL.TEXTURE0); GL.bindTexture(GL.TEXTURE_2D, IMG);
     [GL.TEXTURE_WRAP_S, GL.TEXTURE_WRAP_T].forEach(function (k) { GL.texParameteri(GL.TEXTURE_2D, k, GL.CLAMP_TO_EDGE); });
     GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR); GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
@@ -112,6 +120,7 @@ export function colorize(src, w, h, dw, dh, p) {
       GL.activeTexture(GL.TEXTURE0); GL.bindTexture(GL.TEXTURE_2D, IMG);
       GL.pixelStorei(GL.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); GL.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, false);
       GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, src);
+      GL.bindFramebuffer(GL.FRAMEBUFFER, null); GL.uniform1i(U.mode, 0); GL.uniform1i(U.useLut, 1); GL.uniform1i(U.flip, 0);
       GL.clearColor(0, 0, 0, 0); GL.clear(GL.COLOR_BUFFER_BIT); GL.drawArrays(GL.TRIANGLE_STRIP, 0, 4);
       return GLC;
     } catch (x) { return null; }
@@ -128,3 +137,64 @@ export function colorize(src, w, h, dw, dh, p) {
 }
 /** 試し：WebGL2 で補正できるか（テストで使う） */
 export function glReady() { return !!setup(); }
+
+/* ---------- エフェクト（M6）：ぼかし・モザイク・周辺を暗く ----------
+   書き出し（crates/matsuko-core/src/export.rs の effects）と同じ順：色補正 → ぼかし → モザイク → 周辺を暗く。
+   大きさは 1080p の画面での px なので、描く画面の高さ H に合わせる */
+export function fxOf(c) {
+  if (!c) return null;
+  var b = +c.fxBlur || 0, m = +c.fxMosaic || 0, v = +c.fxVig || 0;
+  return b >= 0.05 || m >= 1 || v >= 0.5 ? { blur: b, mosaic: m, vig: v } : null;
+}
+function fbo(i, w, h) {
+  var f = FB[i];
+  if (!f) { f = FB[i] = { tex: GL.createTexture(), fb: GL.createFramebuffer(), w: 0, h: 0 }; }
+  if (f.w !== w || f.h !== h) {
+    GL.activeTexture(GL.TEXTURE0); GL.bindTexture(GL.TEXTURE_2D, f.tex);
+    GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, w, h, 0, GL.RGBA, GL.UNSIGNED_BYTE, null);
+    [GL.TEXTURE_WRAP_S, GL.TEXTURE_WRAP_T].forEach(function (k) { GL.texParameteri(GL.TEXTURE_2D, k, GL.CLAMP_TO_EDGE); });
+    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR); GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+    GL.bindFramebuffer(GL.FRAMEBUFFER, f.fb); GL.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, f.tex, 0);
+    f.w = w; f.h = h;
+  }
+  return f;
+}
+/** 色補正（p）とエフェクト（fx）を掛けた絵（dw×dh の canvas）。H は描く画面の高さ。WebGL2 がなければ色補正だけ */
+export function process(src, w, h, dw, dh, p, fx, H) {
+  if (!fx) return p ? colorize(src, w, h, dw, dh, p) : null;
+  if (!setup()) return p ? colorize(src, w, h, dw, dh, p) : null;
+  var cw = Math.max(1, Math.min(4096, Math.round(dw))), ch = Math.max(1, Math.min(4096, Math.round(dh))), k = (H || ch) / 1080;
+  try {
+    if (GLC.width !== cw || GLC.height !== ch) { GLC.width = cw; GLC.height = ch; }
+    GL.viewport(0, 0, cw, ch);
+    GL.uniform2f(U.size, cw, ch);
+    var e = p ? lutFor(p) : null;
+    GL.activeTexture(GL.TEXTURE1); GL.bindTexture(GL.TEXTURE_3D, lutTex(e || lutFor({})));
+    /* 1：元の絵 → 色補正（フレームバッファ 0） */
+    GL.activeTexture(GL.TEXTURE0); GL.bindTexture(GL.TEXTURE_2D, IMG);
+    GL.pixelStorei(GL.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); GL.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, false);
+    GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, src);
+    var steps = [];
+    if (fx.blur * k >= 0.1) { steps.push({ mode: 1, dir: [1, 0] }); steps.push({ mode: 1, dir: [0, 1] }); }
+    if (Math.round(fx.mosaic * k) >= 2) steps.push({ mode: 2 });
+    if (fx.vig >= 0.5) steps.push({ mode: 3 });
+    var cur = -1, inTex = IMG, pass = function (mode, last, set) {
+      var out = last ? null : fbo(cur === 0 ? 1 : 0, cw, ch);
+      GL.bindFramebuffer(GL.FRAMEBUFFER, out ? out.fb : null);
+      GL.activeTexture(GL.TEXTURE0); GL.bindTexture(GL.TEXTURE_2D, inTex);
+      GL.uniform1i(U.mode, mode); GL.uniform1i(U.useLut, mode === 0 && e ? 1 : 0); GL.uniform1i(U.flip, cur >= 0 ? 1 : 0);
+      if (set) set();
+      GL.clearColor(0, 0, 0, 0); GL.clear(GL.COLOR_BUFFER_BIT); GL.drawArrays(GL.TRIANGLE_STRIP, 0, 4);
+      if (out) { cur = cur === 0 ? 1 : 0; inTex = out.tex; }
+    };
+    pass(0, !steps.length);
+    steps.forEach(function (st, i) {
+      pass(st.mode, i === steps.length - 1, function () {
+        if (st.mode === 1) { GL.uniform2f(U.dir, st.dir[0], st.dir[1]); GL.uniform1f(U.sigma, fx.blur * k); }
+        else if (st.mode === 2) GL.uniform1f(U.block, Math.round(fx.mosaic * k));
+        else GL.uniform1f(U.angle, Math.min(100, fx.vig) / 100 * Math.PI / 2);
+      });
+    });
+    return GLC;
+  } catch (x) { return null; }
+}
