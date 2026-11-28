@@ -8,6 +8,7 @@
 //! テロップは画面（WebView）がプレビューと同じ描き方で PNG にして渡す（[`TitleImage`]）。
 //! 区間の境目はフレームの位置にそろえるので、つなげても長さがずれない。
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::model::{Clip, ClipType, Media, Project, TrackKind};
@@ -88,6 +89,9 @@ pub struct Settings {
     pub audio_bitrate: u64,
     /// 音声のサンプリング周波数（48000 か 44100。0 なら 48000）
     pub audio_rate: u32,
+    /// 色補正（M6）：クリップの id → 作業用フォルダーに置いた LUT（.cube）のファイル名。
+    /// 画面がプレビューと同じ LUT を作って渡す（src/core/color.ts）。FFmpeg は作業用フォルダーで動かすので、名前だけでよい
+    pub luts: HashMap<String, String>,
 }
 
 /// 画面が作ったテロップの画像
@@ -390,11 +394,13 @@ fn segment_args(
             let next = format!("b{k}");
             match c.kind {
                 ClipType::Adj => {
-                    // 調整レイヤー：それより下に重ねたもの全体の色を補正する（プレビューと同じ値：彩度 1.08・コントラスト 1.04）。
-                    // eq フィルターは GPL なので（配布する LGPL 版の FFmpeg にはない）、hue と lutyuv で行う
-                    graph.push(format!(
-                        "[{cur}]hue=s=1.08,lutyuv=y='clip((val-128)*1.04+128,0,255)'[{next}]"
-                    ));
+                    // 調整レイヤー：それより下に重ねたもの全体の色を補正する（画面が作った LUT。プレビューと同じ）。
+                    // eq フィルターは GPL なので（配布する LGPL 版の FFmpeg にはない）、lut3d で行う
+                    let Some(f) = st.luts.get(&c.id) else {
+                        k -= 1;
+                        continue;
+                    };
+                    graph.push(format!("[{cur}]{}[{next}]", lut_filter(f)));
                 }
                 ClipType::Title => {
                     let Some(img) = titles.iter().find(|t| t.clip == c.id) else {
@@ -666,6 +672,11 @@ fn clip_input(
         "[{n}:v]setpts=PTS-STARTPTS,fps={},scale=w={bw}:h={bh}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1",
         fps.arg()
     );
+    // 色補正（拡大・縮小のあと：書き出す大きさの画素だけを補正する）
+    if let Some(file) = st.luts.get(&c.id) {
+        f.push(',');
+        f.push_str(&lut_filter(file));
+    }
     if rot != 0.0 || op < 1.0 {
         f.push_str(",format=rgba");
         if rot != 0.0 {
@@ -679,6 +690,16 @@ fn clip_input(
     let dx = c.x.unwrap_or(0.0) / 100.0 * w as f64;
     let dy = c.y.unwrap_or(0.0) / 100.0 * h as f64;
     Some((f, dx, dy, pre))
+}
+
+/// 色補正の LUT を引くフィルター。file は作業用フォルダーの中の名前（英数字・`.`・`_` だけにする）。
+/// プレビュー（WebGL の 3D テクスチャ）と同じ 3 次元の直線補間
+fn lut_filter(file: &str) -> String {
+    let safe: String = file
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '.' || *ch == '_')
+        .collect();
+    format!("format=gbrp,lut3d=file={safe}:interp=trilinear,format=yuv420p")
 }
 
 /// 音量とフェード（直線）。off は、取り出した音声の頭がクリップの頭から何秒後か（範囲で頭を切ったとき）
@@ -763,6 +784,7 @@ mod tests {
             video_bitrate: 4_000_000,
             audio_bitrate: 192_000,
             audio_rate: 48_000,
+            luts: HashMap::new(),
         }
     }
     /// テスト用：ファイルがあることにする（実在するパス）
@@ -948,12 +970,15 @@ mod tests {
             j.contains("-c:v h264_mf -b:v 4000000 -rate_control cbr"),
             "{j}"
         );
-        assert!(!j.contains("hue="), "調整レイヤーは 4 秒から");
-        // 4〜6 秒：調整レイヤー（GPL の eq ではなく、hue と lutyuv）
+        assert!(!j.contains("lut3d"), "色補正の LUT がない");
+        // 4〜6 秒：調整レイヤー（GPL の eq ではなく、画面が作った LUT を lut3d で）。素材のクリップにも LUT
+        let mut st = settings(0.0, 6.0);
+        st.luts.insert("adj".into(), "lut000.cube".into());
+        st.luts.insert("p".into(), "lut001.cube".into());
         let pl = plan(
             &p,
             &[],
-            &settings(0.0, 6.0),
+            &st,
             Path::new("/w"),
             Path::new("/o.mp4"),
             "h264_mf",
@@ -964,8 +989,15 @@ mod tests {
         };
         let j = args.join(" ");
         assert!(
-            j.contains("hue=s=1.08,lutyuv=y='clip((val-128)*1.04+128,0,255)'")
-                && !j.contains("eq="),
+            j.contains("lut3d=file=lut000.cube:interp=trilinear") && !j.contains("eq="),
+            "{j}"
+        );
+        let Step::Video { args, .. } = &pl.steps[1] else {
+            panic!()
+        };
+        let j = args.join(" ");
+        assert!(
+            j.contains("setsar=1,format=gbrp,lut3d=file=lut001.cube:interp=trilinear"),
             "{j}"
         );
     }

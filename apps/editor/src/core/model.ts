@@ -109,6 +109,15 @@ export interface Clip {
   label?: string;
   st?: string;
   sz?: string;
+  /** 色補正（M6。core/color.ts の ColorParams）：明るさ・コントラスト・彩度・色温度・色かぶり・ガンマ、LUT と適用量 */
+  ccExp?: number;
+  ccCon?: number;
+  ccSat?: number;
+  ccTemp?: number;
+  ccTint?: number;
+  ccGam?: number;
+  ccLut?: { name: string; path?: string } | null;
+  ccLutAmt?: number;
 }
 
 /** プロジェクト設定（プロジェクト → プロジェクト設定…）。足りない項目は初期値（1920×1080・29.97 fps・標準・720p・48 kHz） */

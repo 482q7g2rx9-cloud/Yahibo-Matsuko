@@ -71,6 +71,15 @@ pub struct TitleReq {
     scroll: bool,
 }
 
+/// 色補正の LUT（M6）。同じ補正のクリップは 1 つの LUT を使う
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LutReq {
+    clips: Vec<String>,
+    /// .cube の中身
+    cube: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportReq {
@@ -79,6 +88,8 @@ pub struct ExportReq {
     project: Value,
     #[serde(default)]
     titles: Vec<TitleReq>,
+    #[serde(default)]
+    luts: Vec<LutReq>,
     width: u32,
     height: u32,
     fps: String,
@@ -156,6 +167,14 @@ pub async fn export_start(app: AppHandle, req: ExportReq) -> Result<(), String> 
             scroll: t.scroll,
         });
     }
+    let mut luts = std::collections::HashMap::new();
+    for (i, l) in req.luts.iter().enumerate() {
+        let name = format!("lut{i:03}.cube");
+        std::fs::write(work.join(&name), &l.cube).map_err(|e| e.to_string())?;
+        for c in &l.clips {
+            luts.insert(c.clone(), name.clone());
+        }
+    }
     let settings = Settings {
         width: req.width.max(16) / 2 * 2,
         height: req.height.max(16) / 2 * 2,
@@ -166,6 +185,7 @@ pub async fn export_start(app: AppHandle, req: ExportReq) -> Result<(), String> 
         video_bitrate: req.video_bitrate,
         audio_bitrate: req.audio_bitrate,
         audio_rate: req.audio_rate.unwrap_or(48_000),
+        luts,
     };
     let encoders = h264_encoders().await;
     let cancel = Arc::new(AtomicBool::new(false));

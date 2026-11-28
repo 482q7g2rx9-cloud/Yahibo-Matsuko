@@ -609,6 +609,134 @@ function init$u() {
     m.sample = 1;
   });
 }
+const COLOR_KEYS = ["ccExp", "ccCon", "ccSat", "ccTemp", "ccTint", "ccGam"];
+const LUT_SIZE = 33;
+const ADJ_DEFAULT = { ccSat: 8, ccCon: 4 };
+const COLOR_PRESETS = [
+  { id: "warm", name: "暖かく", v: { ccTemp: 35, ccTint: 5 } },
+  { id: "cool", name: "涼しく", v: { ccTemp: -35 } },
+  { id: "vivid", name: "鮮やか", v: { ccSat: 30, ccCon: 12 } },
+  { id: "soft", name: "落ち着いた", v: { ccSat: -25, ccCon: -12, ccGam: 6 } },
+  { id: "bright", name: "明るく", v: { ccExp: 25, ccGam: 10 } },
+  { id: "night", name: "夕方・夜", v: { ccExp: -30, ccTemp: -20, ccSat: -15, ccCon: 10 } },
+  { id: "mono", name: "白黒", v: { ccSat: -100, ccCon: 10 } }
+];
+function hasColor(c) {
+  if (!c) return false;
+  if (COLOR_KEYS.some((k) => Math.abs(c[k] || 0) > 1e-9)) return true;
+  return !!(c.ccLut && (c.ccLutAmt == null || c.ccLutAmt > 0));
+}
+function colorOf(c) {
+  if (!c) return null;
+  const any = COLOR_KEYS.some((k) => c[k] != null) || c.ccLut != null;
+  if (c.type === "adj" && !any) return { ...ADJ_DEFAULT };
+  return hasColor(c) ? c : null;
+}
+function colorKey(c) {
+  const v = COLOR_KEYS.map((k) => +(c[k] || 0).toFixed(3));
+  const lut = c.ccLut ? (c.ccLut.path || c.ccLut.name) + "@" + (c.ccLutAmt == null ? 100 : c.ccLutAmt) : "";
+  return v.join(",") + "|" + lut;
+}
+const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
+function sampleCube(cube, r, g, b) {
+  const n = cube.size, m = n - 1, d = cube.data;
+  const fr = clamp01(r) * m, fg = clamp01(g) * m, fb = clamp01(b) * m;
+  const r0 = Math.min(m - 1, Math.floor(fr)), g0 = Math.min(m - 1, Math.floor(fg)), b0 = Math.min(m - 1, Math.floor(fb));
+  const tr = fr - r0, tg = fg - g0, tb = fb - b0;
+  const out = [0, 0, 0];
+  for (let ch = 0; ch < 3; ch++) {
+    const at = (ri, gi, bi) => d[((bi * n + gi) * n + ri) * 3 + ch];
+    const c00 = at(r0, g0, b0) * (1 - tr) + at(r0 + 1, g0, b0) * tr;
+    const c10 = at(r0, g0 + 1, b0) * (1 - tr) + at(r0 + 1, g0 + 1, b0) * tr;
+    const c01 = at(r0, g0, b0 + 1) * (1 - tr) + at(r0 + 1, g0, b0 + 1) * tr;
+    const c11 = at(r0, g0 + 1, b0 + 1) * (1 - tr) + at(r0 + 1, g0 + 1, b0 + 1) * tr;
+    const c0 = c00 * (1 - tg) + c10 * tg, c1 = c01 * (1 - tg) + c11 * tg;
+    out[ch] = c0 * (1 - tb) + c1 * tb;
+  }
+  return out;
+}
+function applyColor(c, rgb, cube) {
+  let [r, g, b] = rgb;
+  if (cube && c.ccLut) {
+    const a = c.ccLutAmt == null ? 1 : clamp01(c.ccLutAmt / 100);
+    const [lr, lg, lb] = sampleCube(cube, r, g, b);
+    r += (lr - r) * a;
+    g += (lg - g) * a;
+    b += (lb - b) * a;
+  }
+  const t = (c.ccTemp || 0) / 100, ti = (c.ccTint || 0) / 100;
+  r *= 1 + 0.2 * t + 0.05 * ti;
+  g *= 1 - 0.15 * ti;
+  b *= 1 - 0.2 * t + 0.05 * ti;
+  const k = Math.pow(2, (c.ccExp || 0) / 100);
+  r *= k;
+  g *= k;
+  b *= k;
+  const con = 1 + (c.ccCon || 0) / 100;
+  r = (r - 0.5) * con + 0.5;
+  g = (g - 0.5) * con + 0.5;
+  b = (b - 0.5) * con + 0.5;
+  const ga = Math.pow(2, -(c.ccGam || 0) / 100);
+  if (ga !== 1) {
+    r = Math.pow(clamp01(r), ga);
+    g = Math.pow(clamp01(g), ga);
+    b = Math.pow(clamp01(b), ga);
+  }
+  const s = 1 + (c.ccSat || 0) / 100;
+  if (s !== 1) {
+    const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    r = y + (r - y) * s;
+    g = y + (g - y) * s;
+    b = y + (b - y) * s;
+  }
+  return [clamp01(r), clamp01(g), clamp01(b)];
+}
+function buildLut(c, cube, size = LUT_SIZE) {
+  const out = new Float32Array(size * size * size * 3), m = size - 1;
+  let i = 0;
+  for (let bi = 0; bi < size; bi++)
+    for (let gi = 0; gi < size; gi++)
+      for (let ri = 0; ri < size; ri++) {
+        const v = applyColor(c, [ri / m, gi / m, bi / m], cube);
+        out[i++] = v[0];
+        out[i++] = v[1];
+        out[i++] = v[2];
+      }
+  return out;
+}
+function toCube(lut, size = LUT_SIZE, title = "Matsuko Editor") {
+  const lines = ['TITLE "' + title.replace(/"/g, "") + '"', "LUT_3D_SIZE " + size, "DOMAIN_MIN 0 0 0", "DOMAIN_MAX 1 1 1"];
+  for (let i = 0; i < lut.length; i += 3) lines.push(lut[i].toFixed(6) + " " + lut[i + 1].toFixed(6) + " " + lut[i + 2].toFixed(6));
+  return lines.join("\n") + "\n";
+}
+function parseCube(text) {
+  let size = 0, title, min = [0, 0, 0], max = [1, 1, 1];
+  const vals = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/#.*/, "").trim();
+    if (!line) continue;
+    const head2 = line.split(/\s+/)[0].toUpperCase();
+    if (head2 === "TITLE") title = line.replace(/^TITLE\s+/i, "").replace(/^"|"$/g, "");
+    else if (head2 === "LUT_3D_SIZE") size = parseInt(line.split(/\s+/)[1], 10);
+    else if (head2 === "LUT_1D_SIZE") throw new Error("1D の LUT には対応していません（3D の LUT を選んでください）");
+    else if (head2 === "DOMAIN_MIN") min = line.split(/\s+/).slice(1, 4).map(Number);
+    else if (head2 === "DOMAIN_MAX") max = line.split(/\s+/).slice(1, 4).map(Number);
+    else if (/^[A-Z_]+$/.test(head2)) continue;
+    else {
+      const p = line.split(/\s+/).map(Number);
+      if (p.length < 3 || p.slice(0, 3).some((x) => !isFinite(x))) throw new Error("LUT の数値を読めませんでした");
+      vals.push(p[0], p[1], p[2]);
+    }
+  }
+  if (!(size >= 2 && size <= 256)) throw new Error("LUT_3D_SIZE がありません");
+  if (vals.length !== size * size * size * 3) throw new Error("LUT の数値の数が合いません");
+  const data = new Float32Array(vals.length);
+  for (let i = 0; i < vals.length; i++) {
+    const ch = i % 3, span = max[ch] - min[ch] || 1;
+    data[i] = (vals[i] - min[ch]) / span;
+  }
+  return { size, data, title };
+}
 const EPS$1 = 1e-6;
 const MIN_SPLIT = 0.04;
 const cLen$1 = (c) => Math.max(0, c.out - c.in);
@@ -629,7 +757,7 @@ function srcMax$1(p, c) {
   return !m || m.k === "画像" ? 1e9 : m.d || c.out;
 }
 const v1End$1 = (p) => onTrack$1(p, "V1").reduce((a, c) => Math.max(a, cEnd$1(c)), 0);
-const hasFx$1 = (c) => !!(c.x || c.y || c.rot || c.scale != null && c.scale != 100 || c.op != null && c.op != 100);
+const hasFx$1 = (c) => !!(c.x || c.y || c.rot || c.scale != null && c.scale != 100 || c.op != null && c.op != 100) || hasColor(c);
 const linked$1 = (p, c) => c && c.link ? p.clips.filter((x) => x.link === c.link && x !== c) : [];
 function locked$1(p, c) {
   const t = trackOf(p, c.tr);
@@ -2841,6 +2969,207 @@ function init$l() {
     put("error", "Promise: " + (r && r.stack ? r.stack : String(r)));
   });
 }
+var GL = null, GLC = null, PROG = null, IMG = null, BAD = false;
+var LUTS = {};
+var CUBES = {};
+var onLoad = null;
+function setCubeLoaded(fn) {
+  onLoad = fn;
+}
+function cubeId(lut) {
+  return lut ? lut.path || lut.name : "";
+}
+function cubeOf(c) {
+  if (!c || !c.ccLut) return null;
+  var id = cubeId(c.ccLut), v = CUBES[id];
+  if (v && v.size) return v;
+  if (v === void 0 && HOST && c.ccLut.path) {
+    CUBES[id] = "loading";
+    HOST.color.readLut(c.ccLut.path).then(function(t) {
+      CUBES[id] = parseCube(t);
+      dropLuts();
+      if (onLoad) onLoad();
+    }).catch(function(e) {
+      CUBES[id] = { error: String(e && e.message || e) };
+      if (onLoad) onLoad();
+    });
+  }
+  return null;
+}
+function cubeState(c) {
+  if (!c || !c.ccLut) return "";
+  var v = CUBES[cubeId(c.ccLut)];
+  if (v && v.size) return "ok";
+  if (v === "loading") return "loading";
+  if (v && v.error) return "error";
+  return HOST && c.ccLut.path ? "loading" : "missing";
+}
+function cubesReady(clips) {
+  var need = {};
+  clips.forEach(function(c) {
+    var p = colorOf(c);
+    if (p && p.ccLut && HOST && p.ccLut.path) need[cubeId(p.ccLut)] = p;
+  });
+  return Promise.all(Object.keys(need).map(function(id) {
+    var v = CUBES[id];
+    if (v && v.size) return null;
+    return HOST.color.readLut(need[id].ccLut.path).then(function(t) {
+      CUBES[id] = parseCube(t);
+    }).catch(function(e) {
+      throw new Error("LUT「" + need[id].ccLut.name + "」を読めませんでした：" + (e && e.message || e));
+    });
+  }));
+}
+function dropLuts() {
+  Object.keys(LUTS).forEach(function(k) {
+    if (LUTS[k].tex && GL) GL.deleteTexture(LUTS[k].tex);
+  });
+  LUTS = {};
+}
+function lutFor(p) {
+  var cube = cubeOf(p), key = colorKey(p) + (p.ccLut && !cube ? "#nolut" : ""), e = LUTS[key];
+  if (e) {
+    e.used = Date.now();
+    return e;
+  }
+  var ks = Object.keys(LUTS);
+  if (ks.length >= 24) {
+    ks.sort(function(a, b) {
+      return LUTS[a].used - LUTS[b].used;
+    });
+    var old = LUTS[ks[0]];
+    if (old.tex && GL) GL.deleteTexture(old.tex);
+    delete LUTS[ks[0]];
+  }
+  e = LUTS[key] = { data: buildLut(p, cube), used: Date.now(), tex: null, key };
+  return e;
+}
+function exportLuts(clips) {
+  var by = {};
+  clips.forEach(function(c) {
+    var p = colorOf(c);
+    if (!p) return;
+    var k = colorKey(p);
+    (by[k] = by[k] || { clips: [], p }).clips.push(c.id);
+  });
+  return Object.keys(by).map(function(k) {
+    var b = by[k];
+    return { clips: b.clips, cube: toCube(buildLut(b.p, cubeOf(b.p))) };
+  });
+}
+function setup() {
+  if (GL || BAD) return GL;
+  try {
+    GLC = document.createElement("canvas");
+    GL = GLC.getContext("webgl2", { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false, alpha: true });
+    if (!GL) throw 0;
+    var vs = "#version 300 es\nin vec2 p;out vec2 uv;void main(){uv=vec2((p.x+1.)*.5,(1.-p.y)*.5);gl_Position=vec4(p,0.,1.);}";
+    var fs = "#version 300 es\nprecision highp float;precision highp sampler3D;uniform sampler2D img;uniform sampler3D lut;uniform float n;in vec2 uv;out vec4 o;void main(){vec4 c=texture(img,uv);vec3 q=(clamp(c.rgb,0.,1.)*(n-1.)+.5)/n;o=vec4(texture(lut,q).rgb,c.a);}";
+    var sh = function(t, src) {
+      var s = GL.createShader(t);
+      GL.shaderSource(s, src);
+      GL.compileShader(s);
+      if (!GL.getShaderParameter(s, GL.COMPILE_STATUS)) throw new Error(GL.getShaderInfoLog(s));
+      return s;
+    };
+    PROG = GL.createProgram();
+    GL.attachShader(PROG, sh(GL.VERTEX_SHADER, vs));
+    GL.attachShader(PROG, sh(GL.FRAGMENT_SHADER, fs));
+    GL.linkProgram(PROG);
+    if (!GL.getProgramParameter(PROG, GL.LINK_STATUS)) throw new Error(GL.getProgramInfoLog(PROG));
+    GL.useProgram(PROG);
+    var buf = GL.createBuffer();
+    GL.bindBuffer(GL.ARRAY_BUFFER, buf);
+    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), GL.STATIC_DRAW);
+    var loc = GL.getAttribLocation(PROG, "p");
+    GL.enableVertexAttribArray(loc);
+    GL.vertexAttribPointer(loc, 2, GL.FLOAT, false, 0, 0);
+    GL.uniform1i(GL.getUniformLocation(PROG, "img"), 0);
+    GL.uniform1i(GL.getUniformLocation(PROG, "lut"), 1);
+    GL.uniform1f(GL.getUniformLocation(PROG, "n"), LUT_SIZE);
+    IMG = GL.createTexture();
+    GL.activeTexture(GL.TEXTURE0);
+    GL.bindTexture(GL.TEXTURE_2D, IMG);
+    [GL.TEXTURE_WRAP_S, GL.TEXTURE_WRAP_T].forEach(function(k) {
+      GL.texParameteri(GL.TEXTURE_2D, k, GL.CLAMP_TO_EDGE);
+    });
+    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+    GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+    GLC.addEventListener("webglcontextlost", function(e) {
+      e.preventDefault();
+      GL = null;
+      LUTS = {};
+    });
+  } catch (e) {
+    GL = null;
+    BAD = true;
+  }
+  return GL;
+}
+function lutTex(e) {
+  if (e.tex) return e.tex;
+  var t = GL.createTexture();
+  GL.activeTexture(GL.TEXTURE1);
+  GL.bindTexture(GL.TEXTURE_3D, t);
+  GL.pixelStorei(GL.UNPACK_ALIGNMENT, 1);
+  GL.texImage3D(GL.TEXTURE_3D, 0, GL.RGB16F, LUT_SIZE, LUT_SIZE, LUT_SIZE, 0, GL.RGB, GL.FLOAT, e.data);
+  [GL.TEXTURE_WRAP_S, GL.TEXTURE_WRAP_T, GL.TEXTURE_WRAP_R].forEach(function(k) {
+    GL.texParameteri(GL.TEXTURE_3D, k, GL.CLAMP_TO_EDGE);
+  });
+  GL.texParameteri(GL.TEXTURE_3D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+  GL.texParameteri(GL.TEXTURE_3D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+  e.tex = t;
+  return t;
+}
+var CPU = null;
+function colorize(src, w, h2, dw, dh, p) {
+  var cw = Math.max(1, Math.min(4096, Math.round(dw))), ch = Math.max(1, Math.min(4096, Math.round(dh)));
+  var e = lutFor(p);
+  if (setup()) {
+    try {
+      if (GLC.width !== cw || GLC.height !== ch) {
+        GLC.width = cw;
+        GLC.height = ch;
+      }
+      GL.viewport(0, 0, cw, ch);
+      GL.activeTexture(GL.TEXTURE1);
+      GL.bindTexture(GL.TEXTURE_3D, lutTex(e));
+      GL.activeTexture(GL.TEXTURE0);
+      GL.bindTexture(GL.TEXTURE_2D, IMG);
+      GL.pixelStorei(GL.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      GL.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, false);
+      GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, src);
+      GL.clearColor(0, 0, 0, 0);
+      GL.clear(GL.COLOR_BUFFER_BIT);
+      GL.drawArrays(GL.TRIANGLE_STRIP, 0, 4);
+      return GLC;
+    } catch (x2) {
+      return null;
+    }
+  }
+  try {
+    var k = Math.min(1, 640 / Math.max(cw, ch)), sw = Math.max(1, Math.round(cw * k)), sh = Math.max(1, Math.round(ch * k));
+    CPU = CPU || document.createElement("canvas");
+    if (CPU.width !== sw || CPU.height !== sh) {
+      CPU.width = sw;
+      CPU.height = sh;
+    }
+    var x = CPU.getContext("2d", { willReadFrequently: true });
+    x.clearRect(0, 0, sw, sh);
+    x.drawImage(src, 0, 0, sw, sh);
+    var im = x.getImageData(0, 0, sw, sh), d = im.data, cube = { size: LUT_SIZE, data: e.data };
+    for (var i = 0; i < d.length; i += 4) {
+      var v = sampleCube(cube, d[i] / 255, d[i + 1] / 255, d[i + 2] / 255);
+      d[i] = v[0] * 255;
+      d[i + 1] = v[1] * 255;
+      d[i + 2] = v[2] * 255;
+    }
+    x.putImageData(im, 0, 0);
+    return CPU;
+  } catch (x2) {
+    return null;
+  }
+}
 var VM;
 var AM;
 function supported(list) {
@@ -3063,12 +3392,16 @@ function deskStart(j) {
   j.t0 = Date.now();
   X = { j, run: true, desk: true };
   draw();
+  var inRange = P.clips.filter(function(c) {
+    return cEnd(c) > (set.from || 0) && c.start < to;
+  });
   Promise.all(P.clips.filter(function(c) {
     return c.type === "title";
   }).map(function(c) {
     return loadFont(c.font, c.weight);
-  })).then(function() {
+  }).concat([set.audio ? null : cubesReady(inRange)])).then(function() {
     req.titles = set.audio ? [] : titleImages(set.from || 0, to, W, H);
+    req.luts = set.audio ? [] : exportLuts(inRange);
     return HOST.export.start(req);
   }).catch(function(e) {
     j.st = "err";
@@ -3353,6 +3686,96 @@ function init$i() {
       return '<div style="display:grid;grid-template-columns:100px 1fr;align-items:center;height:40px"><span class="t2">' + r[0] + "</span>" + r[1] + "</div>";
     }).join("") + '<div class="box" style="margin-top:12px;padding:14px;border:1px solid var(--dv);line-height:1.9">推定サイズ　約 ' + mb(est || 0) + (HOST ? "<br>" : "<br>書き出しにかかる時間　約 " + mmss(rg[1] - rg[0]) + "（実際の長さと同じ）<br>") + '</div></div><div class="row" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv)">' + btn("キューに追加", "qadd", "", "sec", "", "flex:1;height:36px") + btn("書き出し", "xrun", "", "pri", "", "flex:1;height:36px") + "</div></div>";
   };
+}
+function fillAdj(c) {
+  if (c && c.type === "adj" && !COLOR_KEYS.some(function(k) {
+    return c[k] != null;
+  }) && c.ccLut == null) Object.assign(c, ADJ_DEFAULT);
+}
+function clear(c) {
+  COLOR_KEYS.forEach(function(k) {
+    delete c[k];
+  });
+}
+function colorPreset(cid, id) {
+  var c = C(cid), p = COLOR_PRESETS.filter(function(x) {
+    return x.id === id;
+  })[0];
+  if (!c || !p) return;
+  mark();
+  clear(c);
+  COLOR_KEYS.forEach(function(k) {
+    c[k] = p.v[k] != null ? p.v[k] : 0;
+  });
+  changed();
+}
+function colorReset(cid) {
+  var c = C(cid);
+  if (!c) return;
+  mark();
+  clear(c);
+  delete c.ccLut;
+  delete c.ccLutAmt;
+  if (c.type === "adj") COLOR_KEYS.forEach(function(k) {
+    c[k] = 0;
+  });
+  changed();
+}
+function pickLut(cid) {
+  var c = C(cid);
+  if (!c) return;
+  var put = function(name, path, text) {
+    var cube;
+    try {
+      cube = parseCube(text);
+    } catch (e) {
+      return toast("LUT を読めませんでした：" + e.message);
+    }
+    var lut = path ? { name, path } : { name };
+    CUBES[cubeId(lut)] = cube;
+    mark();
+    fillAdj(c);
+    c.ccLut = lut;
+    if (c.ccLutAmt == null) c.ccLutAmt = 100;
+    changed();
+  };
+  if (HOST) {
+    HOST.color.pickLut().then(function(p) {
+      if (!p) return;
+      return HOST.color.readLut(p).then(function(t) {
+        put(p.split(/[\\/]/).pop(), p, t);
+      });
+    }).catch(function(e) {
+      toast(String(e));
+    });
+    return;
+  }
+  var i = document.getElementById("lutIn");
+  if (!i) {
+    i = document.createElement("input");
+    i.type = "file";
+    i.id = "lutIn";
+    i.accept = ".cube";
+    i.hidden = true;
+    document.body.appendChild(i);
+  }
+  i.onchange = function() {
+    var f = i.files && i.files[0];
+    if (!f) return;
+    f.text().then(function(t) {
+      put(f.name, null, t);
+    });
+    i.value = "";
+  };
+  i.click();
+}
+function lutOff(cid) {
+  var c = C(cid);
+  if (!c) return;
+  mark();
+  delete c.ccLut;
+  delete c.ccLutAmt;
+  changed();
 }
 var ACT;
 function jump(dir) {
@@ -3738,6 +4161,15 @@ function init$h() {
     },
     kfTodo: function() {
       toast("キーフレームは、エフェクトページの本実装で使えるようになります");
+    },
+    ccReset: function(v) {
+      colorReset(v);
+    },
+    ccLut: function(v) {
+      pickLut(v);
+    },
+    ccLutOff: function(v) {
+      lutOff(v);
     },
     mreset: function(v) {
       var c = C(v);
@@ -4840,6 +5272,10 @@ function drawTL() {
 var PROPS;
 var TITLE_PX = { "小": 45, "中": 59, "大": 81 };
 function propVal(c, key) {
+  if (key.slice(0, 2) === "cc" && key !== "ccLutAmt" && c.type === "adj") {
+    var cp = colorOf(c);
+    return cp && cp[key] != null ? cp[key] : 0;
+  }
   if (key === "xd") return c.xin && c.xin.d || 1;
   if (key === "fsz" && c.fsz == null) return TITLE_PX[c.sz || "中"] || 59;
   return c[key] == null ? PROPS[key].def : c[key];
@@ -4864,6 +5300,7 @@ function setProp(cid, key, v) {
   if (key === "fin" || key === "fout") v = Math.min(v, Math.max(0, cLen(c) - (key === "fin" ? fades(c)[1] : fades(c)[0])));
   v = Math.round(Math.max(p.min, Math.min(p.max, v)) / p.step) * p.step;
   v = +v.toFixed(3);
+  if (key.slice(0, 2) === "cc") fillAdj(c);
   if (key === "xd") {
     if (c.xin) c.xin.d = v;
     drawTL();
@@ -4959,6 +5396,12 @@ function styleGallery() {
 function titleMotion(c) {
   return numRow("位置 X", c, "x") + numRow("位置 Y", c, "y") + numRow("文字サイズ", c, "fsz") + numRow("拡大率", c, "scale") + numRow("回転", c, "rot") + numRow("不透明度", c, "op") + '<div class="row" style="justify-content:flex-end;padding-top:8px">' + btn("元に戻す", "mreset", c.id, "s") + "</div>";
 }
+function colorForm(c) {
+  var ls = cubeState(c), L = c.ccLut;
+  return '<div class="fg"><span>プリセット</span><select class="inp" data-in="ccPreset" data-cid="' + c.id + '" aria-label="色補正のプリセット"><option value="">選ぶ…</option>' + COLOR_PRESETS.map(function(p) {
+    return '<option value="' + p.id + '">' + h(p.name) + "</option>";
+  }).join("") + "</select></div>" + numRow("明るさ", c, "ccExp") + numRow("コントラスト", c, "ccCon") + numRow("彩度", c, "ccSat") + numRow("色温度", c, "ccTemp") + numRow("色かぶり", c, "ccTint") + numRow("ガンマ", c, "ccGam") + '<div class="fg"><span>LUT</span><span class="row" style="gap:6px;min-width:0">' + (L ? '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + h(L.path || L.name) + '">' + h(L.name) + "</span>" + (ls === "missing" ? '<span class="t-wn" style="white-space:nowrap">読み込み直してください</span>' : ls === "error" ? '<span class="t-wn" style="white-space:nowrap">読めません</span>' : "") + btn("外す", "ccLutOff", c.id, "s") : '<span class="mu">なし</span>') + btn(L ? "変更…" : "読み込む…", "ccLut", c.id, "s") + "</span></div>" + (L ? numRow("適用量", c, "ccLutAmt") : "") + '<div class="row" style="justify-content:flex-end;padding-top:8px">' + btn("元に戻す", "ccReset", c.id, "s") + "</div>";
+}
 function selTitle() {
   var c = primary();
   return c && c.type === "title" ? c : null;
@@ -4982,6 +5425,7 @@ function inspector() {
   var info = kv("素材", h(m ? m.n : c.label || "—")) + kv("トラック", c.tr + (a && v ? " / " + a.tr : "")) + kv("開始", tc(c.start)) + (c.type === "media" ? kv("イン", tc(c.in)) + kv("アウト", tc(c.out)) : "") + kv("長さ", mmss(cLen(c))) + '<div class="row" style="gap:6px;flex-wrap:wrap;padding:8px 12px 2px">' + btn("再生ヘッドで分割", "split", "", "s") + btn("削除", "delSel", "", "s") + btn("リップル削除", "rdel", "", "s") + (c.link || pair ? btn("リンク解除", "lnk", "", "s") : "") + "</div>";
   var h2 = fsec("clip", "クリップ", null, info);
   if (v && v.type === "media") h2 += fsec("motion", "モーション・不透明度", null, motionForm(v), 1);
+  if (v && (v.type === "adj" || m && (m.k === "映像" || m.k === "画像"))) h2 += fsec("color", "色補正", null, colorForm(v), 1);
   var tq = v && trPairs().filter(function(q) {
     return q.b === v;
   })[0];
@@ -5049,7 +5493,14 @@ function init$f() {
     vol: { min: -60, max: 15, step: 0.1, unit: "dB", def: 0, dec: 1 },
     fin: { min: 0, max: 600, step: 0.05, unit: "s", def: 0, dec: 2 },
     xd: { min: 0.1, max: 10, step: 0.05, unit: "s", def: 1, dec: 2 },
-    fout: { min: 0, max: 600, step: 0.05, unit: "s", def: 0, dec: 2 }
+    fout: { min: 0, max: 600, step: 0.05, unit: "s", def: 0, dec: 2 },
+    ccExp: { min: -100, max: 100, step: 1, unit: "", def: 0, dec: 0 },
+    ccCon: { min: -100, max: 100, step: 1, unit: "", def: 0, dec: 0 },
+    ccSat: { min: -100, max: 100, step: 1, unit: "", def: 0, dec: 0 },
+    ccTemp: { min: -100, max: 100, step: 1, unit: "", def: 0, dec: 0 },
+    ccTint: { min: -100, max: 100, step: 1, unit: "", def: 0, dec: 0 },
+    ccGam: { min: -100, max: 100, step: 1, unit: "", def: 0, dec: 0 },
+    ccLutAmt: { min: 0, max: 100, step: 1, unit: "%", def: 100, dec: 0 }
   };
   R.edit = function() {
     var left;
@@ -6461,7 +6912,7 @@ function drawFrame(cx, W, H, t) {
       if (c.tr !== tr.id || t < c.start - 1e-9 || t >= cEnd(c)) return;
       if (q && (c === q.a || c === q.b)) return;
       if (c.type === "title") drawTitleClip(cx, W, H, c, t);
-      else if (c.type === "adj") adjust(cx, W, H);
+      else if (c.type === "adj") adjust(cx, W, H, c);
       else drawClip(cx, W, H, c);
     });
   });
@@ -6487,15 +6938,18 @@ function drawPair(cx, W, H, q, t) {
   drawClip(lb.getContext("2d"), W, H, q.b);
   mixTransition(cx, q.k, la, lb, (t - q.w0) / q.d, W, H);
 }
-function adjust(cx, W, H) {
+function adjust(cx, W, H, c) {
+  var p = colorOf(c || { type: "adj" });
+  if (!p) return;
   try {
-    var tmp2 = adjust.c || (adjust.c = document.createElement("canvas"));
-    tmp2.width = W;
-    tmp2.height = H;
-    tmp2.getContext("2d").drawImage(cx.canvas, 0, 0);
-    cx.filter = "saturate(1.08) contrast(1.04)";
-    cx.drawImage(tmp2, 0, 0);
-    cx.filter = "none";
+    var cz = colorize(cx.canvas, W, H, W, H, p);
+    if (!cz) return;
+    cx.save();
+    cx.setTransform(1, 0, 0, 1, 0, 0);
+    cx.globalAlpha = 1;
+    cx.globalCompositeOperation = "copy";
+    cx.drawImage(cz, 0, 0, W, H);
+    cx.restore();
   } catch (e) {
   }
 }
@@ -6550,8 +7004,12 @@ function drawClip(cx, W, H, c) {
   } else if (w && m.k === "映像" && !E.playing) keepFrame(c.id, src, w, hh);
   if (!E.playing && m.k === "映像" && m.url) E.idle.frames++;
   if (w) {
-    var s = Math.min(W / w, H / hh) * sc;
-    cx.drawImage(src, -w * s / 2, -hh * s / 2, w * s, hh * s);
+    var s = Math.min(W / w, H / hh) * sc, dw = w * s, dh = hh * s, cp = colorOf(c);
+    if (cp) {
+      var cz = colorize(src, w, hh, Math.min(dw, w), Math.min(dh, hh), cp);
+      if (cz) src = cz;
+    }
+    cx.drawImage(src, -dw / 2, -dh / 2, dw, dh);
   } else {
     if (m.url && !E.playing) E.idle.ph++;
     var col = m.col || ["#333", "#222"], g = cx.createLinearGradient(-W / 2, -H / 2, W / 2, H / 2);
@@ -6805,6 +7263,9 @@ function progStop() {
 function init$a() {
   E = { prevTr: null, ctx: null, master: null, mon: null, els: {}, imgs: {}, last: {}, thumbs: {}, idle: { frames: 0, ph: 0, fb: 0 }, playing: false, raf: 0, base: 0, t0: 0, stats: { frames: 0, vframes: 0, blank: 0, stale: 0, late: 0, maxGap: 0, slow: 0, last: 0, at: [] } };
   PLAYERR = {};
+  setCubeLoaded(function() {
+    redrawProg();
+  });
   TST = { center: "テロップ", name: "店名テロップ", q: "質問テロップ", sub: "字幕", credit: "クレジット" };
 }
 function h(s) {
@@ -8488,6 +8949,8 @@ function init$1() {
       draw();
     } else if (k === "binname") {
       renameBin(e.target.dataset.bid, e.target.value);
+    } else if (k === "ccPreset") {
+      if (e.target.value) colorPreset(e.target.dataset.cid, e.target.value);
     } else if (k === "trk") {
       var tc2 = selClipXin();
       if (tc2) {

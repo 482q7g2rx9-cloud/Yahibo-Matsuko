@@ -262,6 +262,7 @@ fn settings(from: f64, to: f64) -> Settings {
         video_bitrate: 2_000_000,
         audio_bitrate: 128_000,
         audio_rate: 48_000,
+        luts: Default::default(),
     }
 }
 
@@ -526,6 +527,7 @@ fn eight_minutes_faster_than_realtime() {
         video_bitrate: 12_000_000,
         audio_bitrate: 192_000,
         audio_rate: 48_000,
+        luts: Default::default(),
     };
     let out = work.join("8min.mp4");
     let encs: Vec<String> = ["libopenh264", "libx264"].map(String::from).to_vec();
@@ -551,4 +553,133 @@ fn eight_minutes_faster_than_realtime() {
         done.elapsed
     );
     let _ = std::fs::remove_dir_all(&work);
+}
+
+/// 色補正（M6）：画面が作った LUT を lut3d で引く。素材のクリップと調整レイヤー（下に重ねたもの全体）に効く
+#[test]
+fn color_luts_are_applied() {
+    let Some(ffmpeg) = tool("ffmpeg") else { return };
+    let dir = std::env::temp_dir().join(format!("matsuko-export-{}-color", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let work = dir.join("w");
+    std::fs::create_dir_all(&work).unwrap();
+    let img = dir.join("red.png");
+    ff(
+        &ffmpeg,
+        &[
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=0xc04020:s=640x360",
+            "-frames:v",
+            "1",
+            &img.to_string_lossy(),
+        ],
+    );
+    // 反転の LUT（.cube は R がいちばん速く変わる順）と、そのままの LUT
+    let mut inv = String::from("LUT_3D_SIZE 2\n");
+    let mut same = String::from("LUT_3D_SIZE 2\n");
+    for b in 0..2 {
+        for g in 0..2 {
+            for r in 0..2 {
+                inv.push_str(&format!("{} {} {}\n", 1 - r, 1 - g, 1 - b));
+                same.push_str(&format!("{r} {g} {b}\n"));
+            }
+        }
+    }
+    std::fs::write(work.join("lut000.cube"), inv).unwrap();
+    std::fs::write(work.join("lut001.cube"), same).unwrap();
+    let project = Project {
+        v: 2,
+        media: vec![Media {
+            id: "m".into(),
+            n: "m".into(),
+            k: "画像".into(),
+            file: 1,
+            path: Some(img.to_string_lossy().into_owned()),
+            ..Default::default()
+        }],
+        tracks: ["V2", "V1"]
+            .iter()
+            .map(|id| Track {
+                id: (*id).into(),
+                kind: TrackKind::Video,
+                h: 40.0,
+                ..Default::default()
+            })
+            .collect(),
+        clips: vec![
+            Clip {
+                id: "c".into(),
+                tr: "V1".into(),
+                kind: ClipType::Media,
+                m: Some("m".into()),
+                start: 0.0,
+                src_in: 0.0,
+                src_out: 2.0,
+                ..Default::default()
+            },
+            // 1〜2 秒：調整レイヤー（反転をもう一度＝元の色に戻る）
+            Clip {
+                id: "adj".into(),
+                tr: "V2".into(),
+                kind: ClipType::Adj,
+                start: 1.0,
+                src_in: 0.0,
+                src_out: 1.0,
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let mut st = settings(0.0, 2.0);
+    st.luts.insert("c".into(), "lut000.cube".into());
+    st.luts.insert("adj".into(), "lut000.cube".into());
+    let out = dir.join("color.mp4");
+    let encs: Vec<String> = ["libopenh264", "libx264"].map(String::from).to_vec();
+    export(
+        &ffmpeg,
+        &project,
+        &[],
+        &st,
+        &work,
+        &out,
+        &encs,
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
+    // 0.5 秒と 1.5 秒の真ん中の画素
+    let px = |t: &str| -> [u8; 3] {
+        let o = Command::new(&ffmpeg)
+            .args(["-v", "error", "-ss", t, "-i"])
+            .arg(&out)
+            .args([
+                "-frames:v",
+                "1",
+                "-vf",
+                "crop=8:8:316:176,scale=1:1",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgb24",
+                "-",
+            ])
+            .output()
+            .unwrap();
+        [o.stdout[0], o.stdout[1], o.stdout[2]]
+    };
+    let near = |a: [u8; 3], b: [u8; 3]| {
+        a.iter()
+            .zip(b)
+            .all(|(x, y)| (*x as i32 - y as i32).abs() <= 12)
+    };
+    let a = px("0.5");
+    assert!(near(a, [0x3f, 0xbf, 0xdf]), "反転していない：{a:?}");
+    let b = px("1.5");
+    assert!(
+        near(b, [0xc0, 0x40, 0x20]),
+        "調整レイヤーで元に戻っていない：{b:?}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
 }

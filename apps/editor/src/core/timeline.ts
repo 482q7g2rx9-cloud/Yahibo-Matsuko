@@ -1,6 +1,7 @@
 // タイムラインの計算と編集（画面に依存しない）。仕様は docs/timeline-spec.md。
 // どの関数も、渡されたプロジェクト p をその場で書き換える。画面の更新・元に戻す・通知は呼ぶ側（src/ui/editOps.ts）が行う。
 import type { Clip, IdMaker, Media, Project, Track, TrackKind } from './model';
+import { hasColor, type ColorParams } from './color';
 
 /** 時刻を比べるときの誤差 */
 export const EPS = 1e-6;
@@ -39,7 +40,8 @@ export function srcMax(p: Project, c: Clip): number {
 }
 export const v1End = (p: Project): number => onTrack(p, 'V1').reduce((a, c) => Math.max(a, cEnd(c)), 0);
 /** 位置・拡大率などを変えてあるか */
-export const hasFx = (c: Clip): boolean => !!(c.x || c.y || c.rot || (c.scale != null && c.scale != 100) || (c.op != null && c.op != 100));
+export const hasFx = (c: Clip): boolean =>
+  !!(c.x || c.y || c.rot || (c.scale != null && c.scale != 100) || (c.op != null && c.op != 100)) || hasColor(c as ColorParams);
 /** 同じ組（リンク）のほかのクリップ */
 export const linked = (p: Project, c: Clip | null): Clip[] => (c && c.link ? p.clips.filter((x) => x.link === c.link && x !== c) : []);
 /** ロックしたトラック（または、ないトラック）のクリップか */

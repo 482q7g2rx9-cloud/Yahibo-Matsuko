@@ -126,6 +126,11 @@ export interface Host {
     watch(path: string | null): Promise<void>;
     onChanged(fn: (path: string) => void): Promise<UnlistenFn>;
   };
+  /** 色補正（M6）：LUT（.cube）を選ぶ・読む */
+  color: {
+    pickLut(): Promise<string | null>;
+    readLut(path: string): Promise<string>;
+  };
   /** 自動更新（M5）。enabled は、更新の署名の公開鍵を埋め込んだビルドか */
   update: {
     info(): Promise<{ enabled: boolean; current: string }>;
@@ -202,6 +207,10 @@ const host: Host = {
     read: (path) => invoke('script_read', { path }),
     watch: (path) => invoke('script_watch', { path }),
     onChanged: (fn) => listen<{ path: string }>('script-changed', (e) => fn(e.payload.path)),
+  },
+  color: {
+    pickLut: () => invoke('lut_pick'),
+    readLut: (path) => invoke('lut_read', { path }),
   },
   update: {
     info: () => invoke('update_info'),

@@ -38,11 +38,14 @@ fn command(exe: &Path) -> Command {
 /// FFmpeg を1回動かす。`each` は -progress の1行ごとに呼ぶ
 fn run_one(
     exe: &Path,
+    work: &Path,
     args: &[String],
     cancel: &AtomicBool,
     mut each: impl FnMut(&str),
 ) -> Result<(), String> {
+    // 作業用フォルダーで動かす（色補正の LUT を名前だけで指定するため）
     let mut child = command(exe)
+        .current_dir(work)
         .args(args)
         .spawn()
         .map_err(|e| format!("FFmpeg を起動できませんでした：{e}"))?;
@@ -127,7 +130,7 @@ pub fn export(
         match &step {
             Step::Audio { args, seconds, .. } => {
                 let sec = seconds.max(0.001);
-                run_one(ffmpeg, args, cancel, |l| {
+                run_one(ffmpeg, work, args, cancel, |l| {
                     if let Some(us) = l
                         .strip_prefix("out_time_us=")
                         .and_then(|v| v.trim().parse::<f64>().ok())
@@ -141,7 +144,7 @@ pub fn export(
             }
             Step::Video { args, frames, .. } => {
                 let fr = (*frames).max(1) as f64;
-                let r = run_one(ffmpeg, args, cancel, |l| {
+                let r = run_one(ffmpeg, work, args, cancel, |l| {
                     if let Some(n) = l
                         .strip_prefix("frame=")
                         .and_then(|v| v.trim().parse::<f64>().ok())
@@ -177,7 +180,7 @@ pub fn export(
                 list_text,
             } => {
                 std::fs::write(list, list_text).map_err(|e| e.to_string())?;
-                run_one(ffmpeg, args, cancel, |_| {})?;
+                run_one(ffmpeg, work, args, cancel, |_| {})?;
                 done += wm;
             }
         }

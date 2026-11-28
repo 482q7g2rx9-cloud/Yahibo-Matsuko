@@ -8,6 +8,7 @@
 //! M4：台本連携（script.rs）。M5：自動更新とログ（update.rs）。
 //! 計画は docs/tauri-plan.md。
 
+mod color;
 mod commands;
 mod export;
 mod files;
@@ -95,6 +96,8 @@ pub fn run() {
             script::script_pick,
             script::script_read,
             script::script_watch,
+            color::lut_pick,
+            color::lut_read,
             update::update_info,
             update::update_check,
             update::update_install,

@@ -12,6 +12,7 @@ import { E, audioInit, drawFrame, drawTitle, drawTitleClip, heads, setNoPh, sync
 import { stopAll } from './source';
 import { draw } from './render';
 import { toast } from './menus';
+import { cubesReady, exportLuts } from './colorGL';
 
 /* ================================================================
    書き出し（canvas と Web Audio をそのまま録画する。実時間かかる）
@@ -62,7 +63,9 @@ export function deskStart(j){var set=j.set,wh=set.res.split('×'),W=+wh[0]||1920
   var req={id:j.id,out:j.out,project:forDisk(),titles:[],width:W,height:H,fps:String(set.fps),from:set.from||0,to:to,audioOnly:!!set.audio,videoBitrate:Math.round(set.v||8e6),audioBitrate:Math.round(set.a||192e3),audioRate:ps().ar};
   j.st='run';j.p=0;j.t0=Date.now();X={j:j,run:true,desk:true};draw();
   /* テロップのフォントを読み込んでから画像にする（読み込む前だと、ほかのフォントで描かれてしまう） */
-  Promise.all(P.clips.filter(function(c){return c.type==='title';}).map(function(c){return loadFont(c.font,c.weight);})).then(function(){req.titles=set.audio?[]:titleImages(set.from||0,to,W,H);return HOST.export.start(req);}).catch(function(e){j.st='err';j.msg=String(e);X=null;draw();xNext();});}
+  /* 色補正の LUT（プレビューと同じもの。読み込んだ LUT は読み終えてから） */
+  var inRange=P.clips.filter(function(c){return cEnd(c)>(set.from||0)&&c.start<to;});
+  Promise.all(P.clips.filter(function(c){return c.type==='title';}).map(function(c){return loadFont(c.font,c.weight);}).concat([set.audio?null:cubesReady(inRange)])).then(function(){req.titles=set.audio?[]:titleImages(set.from||0,to,W,H);req.luts=set.audio?[]:exportLuts(inRange);return HOST.export.start(req);}).catch(function(e){j.st='err';j.msg=String(e);X=null;draw();xNext();});}
 /* 進み具合・結果（"export-job"） */
 export function deskEvent(e){var j=S.queue.filter(function(q){return q.id===e.id;})[0];if(!j)return;var d=e.data||{};
   if(e.state==='progress'){j.p=e.p*100;var f=document.querySelector('[data-q="'+j.id+'"]'),tx=document.querySelector('[data-qt="'+j.id+'"]'),el=(Date.now()-j.t0)/1000;

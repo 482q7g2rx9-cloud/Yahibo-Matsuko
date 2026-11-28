@@ -25,6 +25,7 @@ import { applyDesign, ask, infoDlg, openCx, resetProject, toast } from './menus'
 import { KB, KEYMAP, loadKeys, saveKeys } from './keys';
 import { PREF, openPrefs, renderPrefs, savePref } from './prefs';
 import { fit } from './fit';
+import { colorReset, lutOff, pickLut } from './colorUI';
 
 /* ---------- 操作 ---------- */
 export var ACT;
@@ -78,6 +79,7 @@ ACT={
   tmute:function(v){var t=T(v);if(!t)return;mark();t.mute=!t.mute;changed();},tsolo:function(v){var t=T(v);if(!t)return;mark();t.solo=!t.solo;changed();},
   cstep:function(v){var a=String(v).split('|'),c=C(a[0]),k=a[1];if(!c||!PROPS[k])return;mark();setProp(a[0],k,propVal(c,k)+(+a[2])*PROPS[k].step);drawTL();},
   kfTodo:function(){toast('キーフレームは、エフェクトページの本実装で使えるようになります');},
+  ccReset:function(v){colorReset(v);},ccLut:function(v){pickLut(v);},ccLutOff:function(v){lutOff(v);},
   mreset:function(v){var c=C(v);if(!c)return;mark();['x','y','scale','rot','op'].forEach(function(k){delete c[k];});changed();},
   keys:function(){openPrefs('keys');},prefs:function(){openPrefs();},ptab:function(v){S.ptab=v;S.capture=null;S.kFocus=null;renderPrefs.st=0;renderPrefs();},
   pUi:function(v){PREF.ui=+v;savePref();fit();draw();renderPrefs();},pTheme:function(v){S.theme=v;applyDesign();renderPrefs();},pAcc:function(v){S.accent=v;applyDesign();renderPrefs();},

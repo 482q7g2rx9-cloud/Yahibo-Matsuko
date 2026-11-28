@@ -10,6 +10,8 @@ import { syncPlayBtn } from './source';
 import { X } from './exporter';
 import { toast } from './menus';
 import { PREF } from './prefs';
+import { colorOf } from '../core/color';
+import { colorize, setCubeLoaded } from './colorGL';
 
 /* ================================================================
    再生エンジン：映像トラックを下から重ねて canvas に描き、音声トラックの音を Web Audio に通す。
@@ -75,13 +77,14 @@ export function drawFrame(cx,W,H,t){cx.fillStyle='#000';cx.fillRect(0,0,W,H);
   vTracks().slice().reverse().forEach(function(tr){if(tr.hide)return;var q=pairAt(t,tr.id);if(q)drawPair(cx,W,H,q,t);
     P.clips.forEach(function(c){if(c.tr!==tr.id||t<c.start-1e-9||t>=cEnd(c))return;if(q&&(c===q.a||c===q.b))return;
     if(c.type==='title')drawTitleClip(cx,W,H,c,t);
-    else if(c.type==='adj')adjust(cx,W,H);else drawClip(cx,W,H,c);});});}
+    else if(c.type==='adj')adjust(cx,W,H,c);else drawClip(cx,W,H,c);});});}
 /* トランジションの 1 フレーム：前と後ろのクリップを、それぞれ黒の上に描いてから切り替える（書き出しの xfade と同じ） */
 var LAYER={};
 function layer(k,W,H){var c=LAYER[k];if(!c){c=LAYER[k]=document.createElement('canvas');}if(c.width!==W||c.height!==H){c.width=W;c.height=H;}var x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,W,H);return c;}
 export function drawPair(cx,W,H,q,t){var la=layer('a',W,H),lb=layer('b',W,H);drawClip(la.getContext('2d'),W,H,q.a);drawClip(lb.getContext('2d'),W,H,q.b);
   mixTransition(cx,q.k,la,lb,(t-q.w0)/q.d,W,H);}
-export function adjust(cx,W,H){try{var tmp=adjust.c||(adjust.c=document.createElement('canvas'));tmp.width=W;tmp.height=H;tmp.getContext('2d').drawImage(cx.canvas,0,0);cx.filter='saturate(1.08) contrast(1.04)';cx.drawImage(tmp,0,0);cx.filter='none';}catch(e){}}
+/* 調整レイヤー：それより下に重ねたもの全体に色補正をかける（core/color.ts の LUT。書き出しと同じ） */
+export function adjust(cx,W,H,c){var p=colorOf(c||{type:'adj'});if(!p)return;try{var cz=colorize(cx.canvas,W,H,W,H,p);if(!cz)return;cx.save();cx.setTransform(1,0,0,1,0,0);cx.globalAlpha=1;cx.globalCompositeOperation='copy';cx.drawImage(cz,0,0,W,H);cx.restore();}catch(e){}}
 export function drawClip(cx,W,H,c){var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='映像'&&m.k!=='画像')return;
   if(m.url&&!m.loading){if(m.k==='画像'){src=imgFor(m);if(src.complete){w=src.naturalWidth;hh=src.naturalHeight;}}else{src=E.els[c.id]||elFor(c,m,false);if(src.readyState>=2){w=src.videoWidth;hh=src.videoHeight;}if(E.playing){var st=E.stats,lt=c.in+(S.t.edit-c.start);st.vframes++;if(!w){st.blank++;if(st.at.length<40)st.at.push('blank@'+S.t.edit.toFixed(2));}else if(src.paused||src.seeking)st.stale++;else if(Math.abs(src.currentTime-lt)>0.15){st.late++;if(st.at.length<40)st.at.push('late@'+S.t.edit.toFixed(2)+'('+(src.currentTime-lt).toFixed(2)+')');}}}}
   var sc=(c.scale==null?100:c.scale)/100;cx.save();cx.globalAlpha=Math.max(0,Math.min(1,(c.op==null?100:c.op)/100));
@@ -91,7 +94,10 @@ export function drawClip(cx,W,H,c){var m=M(c.m),src=null,w=0,hh=0;if(!m||m.k!=='
     if(fb){E.idle.fb++;if(fb===E.thumbs[m.id])E.idle.thumb=(E.idle.thumb||0)+1;src=fb;w=fb.width||fb.naturalWidth;hh=fb.height||fb.naturalHeight;}}
   else if(w&&m.k==='映像'&&!E.playing)keepFrame(c.id,src,w,hh);
   if(!E.playing&&m.k==='映像'&&m.url)E.idle.frames++;
-  if(w){var s=Math.min(W/w,H/hh)*sc;cx.drawImage(src,-w*s/2,-hh*s/2,w*s,hh*s);}
+  if(w){var s=Math.min(W/w,H/hh)*sc,dw=w*s,dh=hh*s,cp=colorOf(c);
+    /* 色補正（core/color.ts の LUT を WebGL で引く。書き出しの lut3d と同じ） */
+    if(cp){var cz=colorize(src,w,hh,Math.min(dw,w),Math.min(dh,hh),cp);if(cz)src=cz;}
+    cx.drawImage(src,-dw/2,-dh/2,dw,dh);}
   else{if(m.url&&!E.playing)E.idle.ph++;var col=m.col||['#333','#222'],g=cx.createLinearGradient(-W/2,-H/2,W/2,H/2);g.addColorStop(0,col[0]);g.addColorStop(1,col[1]);cx.fillStyle=g;cx.fillRect(-W/2*sc,-H/2*sc,W*sc,H*sc);
     cx.fillStyle='rgba(255,255,255,.78)';cx.font='500 '+Math.round(H*.05*sc)+'px "Noto Sans JP","Noto Sans JP Variable",sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(m.n+(m.url?'（読み込み中）':'（見本）'),0,0);}
   cx.restore();}
@@ -155,5 +161,6 @@ export function progStop(){E.playing=false;cancelAnimationFrame(E.raf);sync(S.t.
 export function init(){
 E={prevTr:null,ctx:null,master:null,mon:null,els:{},imgs:{},last:{},thumbs:{},idle:{frames:0,ph:0,fb:0},playing:false,raf:0,base:0,t0:0,stats:{frames:0,vframes:0,blank:0,stale:0,late:0,maxGap:0,slow:0,last:0,at:[]}};
 PLAYERR={};
+setCubeLoaded(function(){redrawProg();});
 TST={center:'テロップ',name:'店名テロップ',q:'質問テロップ',sub:'字幕',credit:'クレジット'};
 }
